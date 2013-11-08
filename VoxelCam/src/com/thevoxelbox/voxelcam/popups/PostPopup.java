@@ -15,6 +15,7 @@ import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.voxelcam.gui.GuiScreenShotManager;
 import com.thevoxelbox.voxelcam.upload.dropbox.DropboxHandler;
+import com.thevoxelbox.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurCallback;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurHandler;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurResponse;
@@ -23,33 +24,41 @@ import com.thevoxelbox.voxelcam.upload.imgur.ImgurUploadResponse;
 
 public class PostPopup extends GuiDialogBox {
 
-	GuiButton btnImgur, btnFacebook, btnTwitter, btnDropBox;
+	GuiButton btnImgur, btnFacebook, btnTwitter, btnDropBox, btnGoogleDrive, btnReddit;
 
 	private volatile GuiScreen completeDialog;
 
 	private boolean uploading = false;
 
 	public PostPopup(GuiScreen parentScreen) {
-		super(parentScreen, 120, 150, "Post to...");
+		super(parentScreen, 180, 120, "Post to...");
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void onInitDialog() {
 		buttonList.remove(btnOk);
-		btnCancel.xPosition = dialogX + 30;
-		btnImgur = new GuiButton(0, dialogX + (dialogWidth / 2) - 35, dialogY + 10, 70, 20, "Imgur");
-		btnDropBox = new GuiButton(1, dialogX + (dialogWidth / 2) - 35, dialogY + 40, 70, 20, "Dropbox");
-		btnFacebook = new GuiButton(2, dialogX + (dialogWidth / 2) - 35, dialogY + 70, 70, 20, "Facebook");
-		btnTwitter = new GuiButton(3, dialogX + (dialogWidth / 2) - 35, dialogY + 100, 70, 20, "Twitter");
+		btnCancel.xPosition = dialogX + 60;
+		btnImgur = new GuiButton(0, dialogX + 15, dialogY + 40, 70, 20, "Imgur");
+		btnDropBox = new GuiButton(1, dialogX + 15, dialogY + 70, 70, 20, "Dropbox");
+		btnFacebook = new GuiButton(2, dialogX + 95, dialogY + 10, 70, 20, "Facebook");
+		btnTwitter = new GuiButton(3, dialogX + 15, dialogY + 10, 70, 20, "Twitter");
+		btnGoogleDrive = new GuiButton(4, dialogX + 95, dialogY + 70, 70, 20, "Google Drive");
+		btnReddit = new GuiButton(5, dialogX + 95, dialogY + 40, 70, 20, "Reddit");
 		if (!(new File(System.getProperty("user.home"), "/dropbox/").exists())) {
 			btnDropBox.enabled = false;
 		}
+		if (!(new File(System.getProperty("user.home"), "/Google Drive/").exists())) {
+			btnGoogleDrive.enabled = false;
+		}
 		btnFacebook.enabled = false;
+		btnReddit.enabled = false;
 		buttonList.add(btnImgur);
 		buttonList.add(btnDropBox);
 		buttonList.add(btnFacebook);
 		buttonList.add(btnTwitter);
+		buttonList.add(btnGoogleDrive);
+		buttonList.add(btnReddit);
 	}
 
 	@Override
@@ -96,6 +105,9 @@ public class PostPopup extends GuiDialogBox {
 			} else {
 				mc.displayGuiScreen(new TwitterPostPopup(getParentScreen()));
 			}
+			break;
+		case 4: // Google Drive
+			GoogleDriveHandler.doGoogleDrive(GuiScreenShotManager.getSelectedPhoto());
 			break;
 		}
 	}
