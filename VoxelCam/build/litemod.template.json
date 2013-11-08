@@ -1,0 +1,11 @@
+{
+    "name": "${ant.project.name}",
+    "version": "${version}",
+    "mcversion": "${litemodversion}",
+    "revision": "${build.number}",
+    "author": "${author}",
+    "description": "VoxelCam is a tool for taking and\n
+managing screenshots within Minecraft.\n
+ - Press 'H' to open manager ingame\n
+ - Press 'F4' to take a huge screenshot"
+}
