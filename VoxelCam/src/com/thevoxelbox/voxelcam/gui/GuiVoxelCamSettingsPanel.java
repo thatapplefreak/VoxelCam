@@ -1,18 +1,13 @@
 package com.thevoxelbox.voxelcam.gui;
 
-import com.thevoxelbox.common.gui.GuiVoxelBoxSettingsPanel;
-import com.thevoxelbox.common.interfaces.IVoxelPropertyProvider;
-import com.thevoxelbox.common.util.properties.VoxelPropertyAbstractButton;
-import com.thevoxelbox.common.util.properties.VoxelPropertyIntField;
-import com.thevoxelbox.common.util.properties.VoxelPropertyLabel;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 
 public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
-	
+
 	private static final int max = (int) ((Runtime.getRuntime().totalMemory() / 1.074e9) * 5000);
 	private static final int min = 30;
-	
+
 	private VoxelPropertyIntField widthField;
 	private VoxelPropertyIntField heightField;
 
@@ -68,7 +63,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		});
 		properties.add(new VoxelPropertyLabel("WARNING! Do not use higher resolutions on low end computers!", PANEL_LEFT + 10, PANEL_TOP + 65, 0xFF0000));
 	}
-	
+
 	private void updateFields() {
 		widthField.update();
 		heightField.update();

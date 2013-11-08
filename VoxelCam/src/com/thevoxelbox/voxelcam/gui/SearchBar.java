@@ -1,14 +1,5 @@
 package com.thevoxelbox.voxelcam.gui;
 
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
-
-import net.minecraft.src.ChatAllowedCharacters;
-import net.minecraft.src.FontRenderer;
-import net.minecraft.src.Gui;
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.GuiTextField;
-import net.minecraft.src.Tessellator;
 
 public class SearchBar extends Gui {
 
@@ -60,8 +51,7 @@ public class SearchBar extends Gui {
 	/** True if this textbox is visible */
 	private boolean visible = true;
 
-	public SearchBar(FontRenderer par1FontRenderer, int par2, int par3,
-			int par4, int par5) {
+	public SearchBar(FontRenderer par1FontRenderer, int par2, int par3, int par4, int par5) {
 		this.fontRenderer = par1FontRenderer;
 		this.xPos = par2;
 		this.yPos = par3;
@@ -104,10 +94,8 @@ public class SearchBar extends Gui {
 	 * @return returns the text between the cursor and selectionEnd
 	 */
 	public String getSelectedtext() {
-		int var1 = this.cursorPosition < this.selectionEnd ? this.cursorPosition
-				: this.selectionEnd;
-		int var2 = this.cursorPosition < this.selectionEnd ? this.selectionEnd
-				: this.cursorPosition;
+		int var1 = this.cursorPosition < this.selectionEnd ? this.cursorPosition : this.selectionEnd;
+		int var2 = this.cursorPosition < this.selectionEnd ? this.selectionEnd : this.cursorPosition;
 		return this.text.substring(var1, var2);
 	}
 
@@ -117,12 +105,9 @@ public class SearchBar extends Gui {
 	public void writeText(String par1Str) {
 		String var2 = "";
 		String var3 = ChatAllowedCharacters.filerAllowedCharacters(par1Str);
-		int var4 = this.cursorPosition < this.selectionEnd ? this.cursorPosition
-				: this.selectionEnd;
-		int var5 = this.cursorPosition < this.selectionEnd ? this.selectionEnd
-				: this.cursorPosition;
-		int var6 = this.maxStringLength - this.text.length()
-				- (var4 - this.selectionEnd);
+		int var4 = this.cursorPosition < this.selectionEnd ? this.cursorPosition : this.selectionEnd;
+		int var5 = this.cursorPosition < this.selectionEnd ? this.selectionEnd : this.cursorPosition;
+		int var6 = this.maxStringLength - this.text.length() - (var4 - this.selectionEnd);
 		boolean var7 = false;
 
 		if (this.text.length() > 0) {
@@ -156,8 +141,7 @@ public class SearchBar extends Gui {
 			if (this.selectionEnd != this.cursorPosition) {
 				this.writeText("");
 			} else {
-				this.deleteFromCursor(this.getNthWordFromCursor(par1)
-						- this.cursorPosition);
+				this.deleteFromCursor(this.getNthWordFromCursor(par1) - this.cursorPosition);
 			}
 		}
 	}
@@ -172,10 +156,8 @@ public class SearchBar extends Gui {
 				this.writeText("");
 			} else {
 				boolean var2 = par1 < 0;
-				int var3 = var2 ? this.cursorPosition + par1
-						: this.cursorPosition;
-				int var4 = var2 ? this.cursorPosition : this.cursorPosition
-						+ par1;
+				int var3 = var2 ? this.cursorPosition + par1 : this.cursorPosition;
+				int var4 = var2 ? this.cursorPosition : this.cursorPosition + par1;
 				String var5 = "";
 
 				if (var3 >= 0) {
@@ -328,8 +310,7 @@ public class SearchBar extends Gui {
 				case 203:
 					if (GuiScreen.isShiftKeyDown()) {
 						if (GuiScreen.isCtrlKeyDown()) {
-							this.setSelectionPos(this.getNthWordFromPos(-1,
-									this.getSelectionEnd()));
+							this.setSelectionPos(this.getNthWordFromPos(-1, this.getSelectionEnd()));
 						} else {
 							this.setSelectionPos(this.getSelectionEnd() - 1);
 						}
@@ -344,8 +325,7 @@ public class SearchBar extends Gui {
 				case 205:
 					if (GuiScreen.isShiftKeyDown()) {
 						if (GuiScreen.isCtrlKeyDown()) {
-							this.setSelectionPos(this.getNthWordFromPos(1,
-									this.getSelectionEnd()));
+							this.setSelectionPos(this.getNthWordFromPos(1, this.getSelectionEnd()));
 						} else {
 							this.setSelectionPos(this.getSelectionEnd() + 1);
 						}
@@ -393,8 +373,7 @@ public class SearchBar extends Gui {
 	 * Args: x, y, buttonClicked
 	 */
 	public void mouseClicked(int par1, int par2, int par3) {
-		boolean var4 = par1 >= this.xPos && par1 < this.xPos + this.width
-				&& par2 >= this.yPos && par2 < this.yPos + this.height;
+		boolean var4 = par1 >= this.xPos && par1 < this.xPos + this.width && par2 >= this.yPos && par2 < this.yPos + this.height;
 
 		if (this.canLoseFocus) {
 			this.setFocused(this.isEnabled && var4);
@@ -407,13 +386,8 @@ public class SearchBar extends Gui {
 				var5 -= 4;
 			}
 
-			String var6 = this.fontRenderer
-					.trimStringToWidth(
-							this.text.substring(this.lineScrollOffset),
-							this.getWidth());
-			this.setCursorPosition(this.fontRenderer.trimStringToWidth(var6,
-					var5).length()
-					+ this.lineScrollOffset);
+			String var6 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
+			this.setCursorPosition(this.fontRenderer.trimStringToWidth(var6, var5).length() + this.lineScrollOffset);
 		}
 	}
 
@@ -423,25 +397,18 @@ public class SearchBar extends Gui {
 	public void drawTextBox() {
 		if (this.getVisible()) {
 			if (this.getEnableBackgroundDrawing()) {
-				drawRect(this.xPos - 1, this.yPos - 1, this.xPos + this.width
-						+ 1, this.yPos + this.height + 1, -6250336);
-				drawRect(this.xPos, this.yPos, this.xPos + this.width,
-						this.yPos + this.height, -16777216);
+				drawRect(this.xPos - 1, this.yPos - 1, this.xPos + this.width + 1, this.yPos + this.height + 1, -6250336);
+				drawRect(this.xPos, this.yPos, this.xPos + this.width, this.yPos + this.height, -16777216);
 			}
 
 			int var1 = this.isEnabled ? this.enabledColor : this.disabledColor;
 			int var2 = this.cursorPosition - this.lineScrollOffset;
 			int var3 = this.selectionEnd - this.lineScrollOffset;
-			String var4 = this.fontRenderer
-					.trimStringToWidth(
-							this.text.substring(this.lineScrollOffset),
-							this.getWidth());
+			String var4 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), this.getWidth());
 			boolean var5 = var2 >= 0 && var2 <= var4.length();
-			boolean var6 = this.isFocused && this.cursorCounter / 6 % 2 == 0
-					&& var5;
+			boolean var6 = this.isFocused && this.cursorCounter / 6 % 2 == 0 && var5;
 			int var7 = this.enableBackgroundDrawing ? this.xPos + 4 : this.xPos;
-			int var8 = this.enableBackgroundDrawing ? this.yPos
-					+ (this.height - 8) / 2 : this.yPos;
+			int var8 = this.enableBackgroundDrawing ? this.yPos + (this.height - 8) / 2 : this.yPos;
 			int var9 = var7;
 
 			if (var3 > var4.length()) {
@@ -450,16 +417,14 @@ public class SearchBar extends Gui {
 
 			if (var4.length() > 0) {
 				String var10 = var5 ? var4.substring(0, var2) : var4;
-				var9 = this.fontRenderer.drawStringWithShadow(var10, var7,
-						var8, var1);
+				var9 = this.fontRenderer.drawStringWithShadow(var10, var7, var8, var1);
 			} else {
 				if (!isFocused) {
 					drawString(fontRenderer, "Search", var7, var8, 0xa0a0a0);
 				}
 			}
 
-			boolean var13 = this.cursorPosition < this.text.length()
-					|| this.text.length() >= this.getMaxStringLength();
+			boolean var13 = this.cursorPosition < this.text.length() || this.text.length() >= this.getMaxStringLength();
 			int var11 = var9;
 
 			if (!var5) {
@@ -470,26 +435,20 @@ public class SearchBar extends Gui {
 			}
 
 			if (var4.length() > 0 && var5 && var2 < var4.length()) {
-				this.fontRenderer.drawStringWithShadow(var4.substring(var2),
-						var9, var8, var1);
+				this.fontRenderer.drawStringWithShadow(var4.substring(var2), var9, var8, var1);
 			}
 
 			if (var6) {
 				if (var13) {
-					Gui.drawRect(var11, var8 - 1, var11 + 1, var8 + 1
-							+ this.fontRenderer.FONT_HEIGHT, -3092272);
+					Gui.drawRect(var11, var8 - 1, var11 + 1, var8 + 1 + this.fontRenderer.FONT_HEIGHT, -3092272);
 				} else {
-					this.fontRenderer.drawStringWithShadow("_", var11, var8,
-							var1);
+					this.fontRenderer.drawStringWithShadow("_", var11, var8, var1);
 				}
 			}
 
 			if (var3 != var2) {
-				int var12 = var7
-						+ this.fontRenderer.getStringWidth(var4.substring(0,
-								var3));
-				this.drawCursorVertical(var11, var8 - 1, var12 - 1, var8 + 1
-						+ this.fontRenderer.FONT_HEIGHT);
+				int var12 = var7 + this.fontRenderer.getStringWidth(var4.substring(0, var3));
+				this.drawCursorVertical(var11, var8 - 1, var12 - 1, var8 + 1 + this.fontRenderer.FONT_HEIGHT);
 			}
 		}
 	}
@@ -636,13 +595,11 @@ public class SearchBar extends Gui {
 			}
 
 			int var3 = this.getWidth();
-			String var4 = this.fontRenderer.trimStringToWidth(
-					this.text.substring(this.lineScrollOffset), var3);
+			String var4 = this.fontRenderer.trimStringToWidth(this.text.substring(this.lineScrollOffset), var3);
 			int var5 = var4.length() + this.lineScrollOffset;
 
 			if (par1 == this.lineScrollOffset) {
-				this.lineScrollOffset -= this.fontRenderer.trimStringToWidth(
-						this.text, var3, true).length();
+				this.lineScrollOffset -= this.fontRenderer.trimStringToWidth(this.text, var3, true).length();
 			}
 
 			if (par1 > var5) {

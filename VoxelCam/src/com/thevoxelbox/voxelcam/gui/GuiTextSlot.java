@@ -1,32 +1,5 @@
 package com.thevoxelbox.voxelcam.gui;
 
-import static org.lwjgl.opengl.GL11.GL_ALPHA_TEST;
-import static org.lwjgl.opengl.GL11.GL_BLEND;
-import static org.lwjgl.opengl.GL11.GL_CLIP_PLANE0;
-import static org.lwjgl.opengl.GL11.GL_CLIP_PLANE1;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
-import static org.lwjgl.opengl.GL11.GL_FLAT;
-import static org.lwjgl.opengl.GL11.GL_FOG;
-import static org.lwjgl.opengl.GL11.GL_LIGHTING;
-import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_SMOOTH;
-import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.glBlendFunc;
-import static org.lwjgl.opengl.GL11.glClipPlane;
-import static org.lwjgl.opengl.GL11.glColor4f;
-import static org.lwjgl.opengl.GL11.glDisable;
-import static org.lwjgl.opengl.GL11.glEnable;
-import static org.lwjgl.opengl.GL11.glShadeModel;
-
-import java.nio.DoubleBuffer;
-import java.util.List;
-
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.Tessellator;
-
-import org.lwjgl.BufferUtils;
-import org.lwjgl.input.Mouse;
 
 @SuppressWarnings({ "rawtypes", "cast" })
 public abstract class GuiTextSlot {
@@ -88,11 +61,14 @@ public abstract class GuiTextSlot {
 
 	protected abstract void drawSlot(int var1, int var2, int var3, int var4, Tessellator var5);
 
-	protected void func_27260_a(int p_27260_1_, int p_27260_2_, Tessellator p_27260_3_) {}
+	protected void func_27260_a(int p_27260_1_, int p_27260_2_, Tessellator p_27260_3_) {
+	}
 
-	protected void func_27255_a(int p_27255_1_, int p_27255_2_) {}
+	protected void func_27255_a(int p_27255_1_, int p_27255_2_) {
+	}
 
-	protected void func_27257_b(int p_27257_1_, int p_27257_2_) {}
+	protected void func_27257_b(int p_27257_1_, int p_27257_2_) {
+	}
 
 	public int func_27256_c(int p_27256_1_, int p_27256_2_)
 

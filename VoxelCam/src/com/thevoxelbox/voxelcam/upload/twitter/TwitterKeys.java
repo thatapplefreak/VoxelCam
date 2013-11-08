@@ -6,10 +6,10 @@ import twitter4j.TwitterFactory;
 import twitter4j.auth.RequestToken;
 
 public abstract class TwitterKeys {
-	
+
 	public static final String CONSUMER_KEY = "okIIDosE4TsrRP3JvXufw";
 	public static final String CONSUMER_SECRET = "dFJIErDmYr61YwQfDdAGMAt79dCJGu1mpiflCAa2c";
-	
+
 	public static Twitter twitter = TwitterFactory.getSingleton();
 	public static RequestToken requestToken;
 	static {
@@ -20,5 +20,5 @@ public abstract class TwitterKeys {
 			e.printStackTrace();
 		}
 	}
-	
+
 }

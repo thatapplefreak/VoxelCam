@@ -1,7 +1,5 @@
 package com.thevoxelbox.voxelcam.upload.imgur;
 
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 
@@ -15,24 +13,29 @@ public class ImgurUploadResponse implements ImgurResponse {
 	private int status;
 
 	@Override
+	@Override
 	public String get(String key) {
 		return this.data.get(key);
 	}
 
 	@Override
+	@Override
 	public int getInt(String key) {
 		try {
 			return Integer.parseInt(key);
-		} catch (Exception ex) {}
+		} catch (Exception ex) {
+		}
 
 		return 0;
 	}
 
 	@Override
+	@Override
 	public boolean isSuccessful() {
 		return this.success;
 	}
 
+	@Override
 	@Override
 	public int getStatus() {
 		return this.status;

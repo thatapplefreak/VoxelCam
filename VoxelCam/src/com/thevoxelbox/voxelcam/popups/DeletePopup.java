@@ -1,8 +1,5 @@
 package com.thevoxelbox.voxelcam.popups;
 
-import net.minecraft.src.GuiScreen;
-
-import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.voxelcam.gui.GuiScreenShotManager;
 
 public class DeletePopup extends GuiDialogBox {
@@ -22,7 +19,7 @@ public class DeletePopup extends GuiDialogBox {
 		this.btnCancel.displayString = "No";
 
 	}
-	
+
 	@Override
 	protected void onKeyTyped(char keyChar, int keyCode) {
 		if (keyChar == 'y') {

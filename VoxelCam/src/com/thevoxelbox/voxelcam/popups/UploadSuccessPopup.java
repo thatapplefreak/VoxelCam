@@ -1,13 +1,5 @@
 package com.thevoxelbox.voxelcam.popups;
 
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
-
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
-
-import com.thevoxelbox.common.util.BrowserOpener;
-import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurDelete;
 
 public class UploadSuccessPopup extends GuiDialogBox {
@@ -49,7 +41,8 @@ public class UploadSuccessPopup extends GuiDialogBox {
 	}
 
 	@Override
-	public void onSubmit() {}
+	public void onSubmit() {
+	}
 
 	@Override
 	public boolean validateDialog() {

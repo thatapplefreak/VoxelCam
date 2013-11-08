@@ -1,28 +1,5 @@
 package com.thevoxelbox.voxelcam.gui;
 
-import static org.lwjgl.opengl.GL11.GL_ALPHA_TEST;
-import static org.lwjgl.opengl.GL11.GL_BLEND;
-import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_SMOOTH;
-import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.glBlendFunc;
-import static org.lwjgl.opengl.GL11.glColor4f;
-import static org.lwjgl.opengl.GL11.glDisable;
-import static org.lwjgl.opengl.GL11.glEnable;
-import static org.lwjgl.opengl.GL11.glShadeModel;
-
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-
-import javax.imageio.ImageIO;
-
-import net.minecraft.src.Gui;
-import net.minecraft.src.Minecraft;
-import net.minecraft.src.Tessellator;
-
-import com.thevoxelbox.common.util.ImageDrawer;
 
 public class ScalePhotoFrame extends Gui {
 
@@ -31,7 +8,7 @@ public class ScalePhotoFrame extends Gui {
 	public int x, y, width, height;
 	private File currentPhoto;
 	private GuiScreenShotManager parentScreen;
-	
+
 	private BufferedImage img = null;
 
 	public ScalePhotoFrame(GuiScreenShotManager parent, int x, int y, float scale, File photo) {
@@ -83,13 +60,13 @@ public class ScalePhotoFrame extends Gui {
 			} else if (picAspect > frameAspect) {
 				photoX = x;
 				photoX2 = x + width;
-				float picHeight = (float) width * (float) img.getHeight() / img.getWidth();
+				float picHeight = width * (float) img.getHeight() / img.getWidth();
 				photoY = (int) (y + height / 2 - picHeight / 2);
 				photoY2 = (int) (y + height / 2 + picHeight / 2);
 			} else if (picAspect < frameAspect) {
 				photoY = y;
 				photoY2 = y + height;
-				float picWidth = (float) height * (float) img.getWidth() / img.getHeight();
+				float picWidth = height * (float) img.getWidth() / img.getHeight();
 				photoX = (int) (x + (width / 2) - (picWidth / 2));
 				photoX2 = (int) (x + (width / 2) + (picWidth / 2));
 			}

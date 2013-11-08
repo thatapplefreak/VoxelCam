@@ -1,19 +1,5 @@
 package com.thevoxelbox.voxelcam.gui;
 
-import java.awt.Desktop;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-
-import net.minecraft.src.FontRenderer;
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.GuiTextField;
-import net.minecraft.src.Minecraft;
-
-import com.thevoxelbox.common.util.ImageDrawer;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.popups.DeletePopup;
 import com.thevoxelbox.voxelcam.popups.PostPopup;
@@ -52,13 +38,14 @@ public class GuiScreenShotManager extends GuiScreen {
 	 * Button to go to previous screen
 	 */
 	private GuiButton btnBack, btnRename, btnDelete, btnPost, btnOpenFolder, btnEditPicture;
-	
+
 	public SearchBar searchBar;
 
 	private static final float frameScale = 22F / 30F;
-	
+
 	/**
-	 * This makes it so it auto selects the first pic only the first time it is initialized
+	 * This makes it so it auto selects the first pic only the first time it is
+	 * initialized
 	 */
 	private boolean firstInit = true;
 
@@ -83,32 +70,32 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (firstInit) {
 			selected = 0;
 			firstInit = false;
-			
+
 			searchBar = new SearchBar(fontRenderer, 11, 14, 50, 13);
-			
+
 			selector = new PhotoSelector(this, 125);
 			selector.registerScrollButtons(buttonList, 7, 8);
 		}
-		
+
 		btnBack = new GuiButton(0, 10, height - 30, 70, 20, "Back");
 		buttonList.add(btnBack);
 
 		btnRename = new GuiButton(1, width - (70 * 3) - 5, height - 45, 70, 20, "Rename");
 		buttonList.add(btnRename);
-	
+
 		btnDelete = new GuiButton(2, width - (70 * 2) - 5, height - 45, 70, 20, "Delete");
 		buttonList.add(btnDelete);
-	
+
 		btnEditPicture = new GuiButton(3, width - (70 * 1) - 5, height - 45, 70, 20, "Edit");
 		btnEditPicture.enabled = false;
 		buttonList.add(btnEditPicture);
-			
+
 		btnOpenFolder = new GuiButton(4, width - (70 * 3) - 5, height - 25, 140, 20, "Open Screenshots Folder");
 		buttonList.add(btnOpenFolder);
-	
+
 		btnPost = new GuiButton(5, width - (70 * 1) - 5, height - 25, 70, 20, "Post to...");
 		buttonList.add(btnPost);
-		
+
 	}
 
 	@Override
@@ -167,13 +154,13 @@ public class GuiScreenShotManager extends GuiScreen {
 			@Override
 			public int compare(File f, File g) {
 				if (f.lastModified() > g.lastModified()) {
-		            return -1;
-		        } else if (f.lastModified() < g.lastModified()) {
-		            return 1;
-		        } else {
-		            return 0;
-		        }
-			}			
+					return -1;
+				} else if (f.lastModified() < g.lastModified()) {
+					return 1;
+				} else {
+					return 0;
+				}
+			}
 		});
 		return new ArrayList<File>(Arrays.asList(filesInScreenshotDir));
 	}
@@ -228,7 +215,7 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (b) {
 			btnRename.enabled = true;
 			btnDelete.enabled = true;
-			//btnEditPicture.enabled = true;
+			// btnEditPicture.enabled = true;
 			btnPost.enabled = true;
 		} else {
 			btnRename.enabled = false;
@@ -244,13 +231,13 @@ public class GuiScreenShotManager extends GuiScreen {
 	}
 
 	private void setScreenShotFiles(ArrayList<File> screenShotFiles) {
-		this.screenShotFiles = screenShotFiles;
+		GuiScreenShotManager.screenShotFiles = screenShotFiles;
 	}
-	
+
 	public static File getSelectedPhoto() {
 		return getScreenShotFiles().get(selected);
 	}
-	
+
 	@Override
 	protected void mouseClicked(int par1, int par2, int par3) {
 		super.mouseClicked(par1, par2, par3);
@@ -271,5 +258,5 @@ public class GuiScreenShotManager extends GuiScreen {
 			}
 		}
 	}
-	
+
 }

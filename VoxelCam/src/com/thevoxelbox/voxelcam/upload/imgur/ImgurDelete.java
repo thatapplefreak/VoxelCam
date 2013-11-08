@@ -17,5 +17,7 @@ public class ImgurDelete extends Imgur {
 	}
 
 	@Override
-	protected void assemble() {}
+	@Override
+	protected void assemble() {
+	}
 }

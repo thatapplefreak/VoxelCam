@@ -1,13 +1,8 @@
 package com.thevoxelbox.voxelcam.popups;
 
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.GuiTextField;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 
-import com.thevoxelbox.common.util.BrowserOpener;
-import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterKeys;
@@ -24,10 +19,8 @@ public class TwitterPINPopup extends GuiDialogBox {
 
 	@Override
 	protected void onInitDialog() {
-		pinBox = new GuiTextField(fontRenderer, width / 2 - (150 / 2), height
-				/ 2 - (16 / 2) - 8, 150, 16);
-		BrowserOpener.openURLstringInBrowser(TwitterKeys.requestToken
-				.getAuthorizationURL());
+		pinBox = new GuiTextField(fontRenderer, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
+		BrowserOpener.openURLstringInBrowser(TwitterKeys.requestToken.getAuthorizationURL());
 	}
 
 	@Override
@@ -64,8 +57,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 			AccessToken accessToken = null;
 			while (accessToken == null || accessToken.getToken() == null) {
 				try {
-					accessToken = TwitterKeys.twitter.getOAuthAccessToken(
-							TwitterKeys.requestToken, pinBox.getText());
+					accessToken = TwitterKeys.twitter.getOAuthAccessToken(TwitterKeys.requestToken, pinBox.getText());
 				} catch (TwitterException e) {
 				}
 			}
@@ -95,14 +87,9 @@ public class TwitterPINPopup extends GuiDialogBox {
 
 	private void storeAccessToken(AccessToken accessToken) {
 		System.out.println("[VoxelCam] Setting Twitter access token");
-		LiteModVoxelCam.getConfig().setProperty(
-				VoxelCamConfig.TWITTERAUTHTOKEN, accessToken.getToken());
-		LiteModVoxelCam.getConfig().setProperty(
-				VoxelCamConfig.TWITTERAUTHTOKENSECRET,
-				accessToken.getTokenSecret());
-		LiteModVoxelCam.getConfig().setProperty(
-				VoxelCamConfig.TWITTERUSERID,
-				String.valueOf(accessToken.getUserId()));
+		LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKEN, accessToken.getToken());
+		LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET, accessToken.getTokenSecret());
+		LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERUSERID, String.valueOf(accessToken.getUserId()));
 	}
 
 	private void goToPostGUI() {
