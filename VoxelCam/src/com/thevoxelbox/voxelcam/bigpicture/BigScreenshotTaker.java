@@ -20,7 +20,7 @@ import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 
 /**
- * Supposed to take Big screenshot, doesnt work properly (yet)
+ * Takes a big screenshot
  * 
  * @author thatapplefreak
  * 

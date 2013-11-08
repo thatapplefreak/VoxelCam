@@ -13,7 +13,7 @@ public class DeletePopup extends GuiDialogBox {
 
 	@Override
 	public void onSubmit() {
-		((GuiScreenShotManager) parentScreen).delete();
+		((GuiScreenShotManager) getParentScreen()).delete();
 	}
 
 	@Override

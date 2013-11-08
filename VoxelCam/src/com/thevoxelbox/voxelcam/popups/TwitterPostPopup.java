@@ -16,6 +16,7 @@ import com.thevoxelbox.voxelcam.upload.imgur.ImgurCallback;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurResponse;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurUpload;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurUploadResponse;
+import com.thevoxelbox.voxelcam.upload.twitter.TwitterHandler;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterKeys;
 
 public class TwitterPostPopup extends GuiDialogBox {
@@ -74,41 +75,13 @@ public class TwitterPostPopup extends GuiDialogBox {
 
 	@Override
 	public boolean validateDialog() {
-		doTwitter();
+		TwitterHandler.doTwitter(this, GuiScreenShotManager.getSelectedPhoto(), textbox.getText());
+		uploading = true;
 		return false;
 	}
-
-	public void doTwitter() {
-		File imageToUpload = GuiScreenShotManager.getSelectedPhoto();
-		Long twitterUserID = Long.parseLong(LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERUSERID));
-		String userAuthToken = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN);
-		String userAuthTokenSecret = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
-		TwitterKeys.twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
-		final ImgurUpload poster = new ImgurUpload(imageToUpload, imageToUpload.getName(), "");
-		poster.start(new ImgurCallback() {
-
-			@Override
-			public void onHTTPFailure(int responseCode, String responseMessage) {
-				completeDialog = new UploadFailedPopup(parentScreen, "Upload to Twitter failed", String.format("HTTP Error: %d %s", responseCode, responseMessage));
-			}
-
-			@Override
-			public void onCompleted(ImgurResponse response) {
-
-				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
-				if (uploadResponse.isSuccessful()) {
-					try {
-						Status s = TwitterKeys.twitter.updateStatus(textbox.getText() + " " + uploadResponse.getLink());
-						completeDialog = new UploadSuccessPopup(parentScreen, "Upload to Twitter succeeded", null, "http://www.twitter.com/" + s.getUser().getScreenName());
-					} catch (TwitterException e) {
-						completeDialog = new UploadFailedPopup(parentScreen, "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode()));
-					}
-				} else {
-					completeDialog = new UploadFailedPopup(parentScreen, "Upload to Twitter failed", uploadResponse.get("data"));
-				}
-			}
-		});
-		uploading = true;
+	
+	public void onUploadComplete(GuiScreen result) {
+		this.completeDialog = result;
 	}
 
 }

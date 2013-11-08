@@ -26,7 +26,7 @@ public class RenamePopup extends GuiDialogBox {
 
 	@Override
 	public void onSubmit() {
-		((GuiScreenShotManager) parentScreen).rename(renameBox.getText());
+		((GuiScreenShotManager) getParentScreen()).rename(renameBox.getText());
 	}
 
 	@Override

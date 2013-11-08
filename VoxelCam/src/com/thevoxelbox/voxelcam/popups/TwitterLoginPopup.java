@@ -28,7 +28,7 @@ public class TwitterLoginPopup extends GuiDialogBox {
 
 	@Override
 	public boolean validateDialog() {
-		mc.displayGuiScreen(new TwitterPINPopup(parentScreen));
+		mc.displayGuiScreen(new TwitterPINPopup(getParentScreen()));
 		return false;
 	}
 
