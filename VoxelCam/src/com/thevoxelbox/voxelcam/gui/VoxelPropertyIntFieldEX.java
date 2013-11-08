@@ -1,5 +1,10 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import org.lwjgl.input.Keyboard;
+
+import com.thevoxelbox.common.interfaces.IVoxelPropertyProvider;
+import com.thevoxelbox.common.util.properties.VoxelPropertyIntField;
+
 
 public class VoxelPropertyIntFieldEX extends VoxelPropertyIntField {
 

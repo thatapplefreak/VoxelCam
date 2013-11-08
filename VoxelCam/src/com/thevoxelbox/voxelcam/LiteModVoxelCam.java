@@ -1,11 +1,27 @@
 package com.thevoxelbox.voxelcam;
 
+import java.io.File;
+import java.lang.reflect.Method;
+import java.util.HashSet;
+
+import net.minecraft.src.GuiMainMenu;
+import net.minecraft.src.GuiScreen;
+import net.minecraft.src.Minecraft;
+
+import org.lwjgl.input.Keyboard;
+
+import com.mumfrey.liteloader.Configurable;
+import com.mumfrey.liteloader.RenderListener;
+import com.mumfrey.liteloader.Tickable;
+import com.mumfrey.liteloader.core.LiteLoader;
+import com.mumfrey.liteloader.modconfig.ConfigPanel;
+import com.mumfrey.liteloader.util.ModUtilities;
+import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.voxelcam.bigpicture.BigScreenshotTaker;
 import com.thevoxelbox.voxelcam.gui.GuiMainMenuWithPhotoButton;
 import com.thevoxelbox.voxelcam.gui.GuiScreenShotManager;
 import com.thevoxelbox.voxelcam.gui.GuiVoxelCamSettingsPanel;
 import com.thevoxelbox.voxelcam.popups.FirstRunPopup;
-import com.thevoxelbox.voxelcam.upload.imgur.Imgur.Method;
 
 /**
  * Main hook class for VoxelCam

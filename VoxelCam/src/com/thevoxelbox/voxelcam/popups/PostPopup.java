@@ -1,5 +1,16 @@
 package com.thevoxelbox.voxelcam.popups;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+
+import net.minecraft.src.EnumOS;
+import net.minecraft.src.GuiButton;
+import net.minecraft.src.GuiScreen;
+
+import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.voxelcam.gui.GuiScreenShotManager;
@@ -94,12 +105,10 @@ public class PostPopup extends GuiDialogBox {
 		poster.start(new ImgurCallback() {
 
 			@Override
-			@Override
 			public void onHTTPFailure(int responseCode, String responseMessage) {
 				PostPopup.this.completeDialog = new UploadFailedPopup(PostPopup.this.parentScreen, "Upload to imgur failed", String.format("HTTP Error: %d %s", responseCode, responseMessage));
 			}
 
-			@Override
 			@Override
 			public void onCompleted(ImgurResponse response) {
 

@@ -1,5 +1,10 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import net.minecraft.src.GuiButton;
+import net.minecraft.src.GuiMainMenu;
+import net.minecraft.src.Minecraft;
+import net.minecraft.src.ResourceLocation;
+
 
 public class GuiMainMenuWithPhotoButton extends GuiMainMenu {
 

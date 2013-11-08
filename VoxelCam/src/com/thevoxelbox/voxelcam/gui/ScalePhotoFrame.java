@@ -1,5 +1,19 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import static org.lwjgl.opengl.GL11.*;
+
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+
+import javax.imageio.ImageIO;
+
+import net.minecraft.src.Gui;
+import net.minecraft.src.Minecraft;
+import net.minecraft.src.Tessellator;
+
+import com.thevoxelbox.common.util.ImageDrawer;
+
 
 public class ScalePhotoFrame extends Gui {
 

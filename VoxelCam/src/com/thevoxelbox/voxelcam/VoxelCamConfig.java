@@ -1,5 +1,12 @@
 package com.thevoxelbox.voxelcam;
 
+import net.minecraft.src.KeyBinding;
+
+import org.lwjgl.input.Keyboard;
+
+import com.thevoxelbox.common.interfaces.IVoxelPropertyProvider;
+import com.thevoxelbox.common.util.ModConfig;
+
 
 public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider {
 

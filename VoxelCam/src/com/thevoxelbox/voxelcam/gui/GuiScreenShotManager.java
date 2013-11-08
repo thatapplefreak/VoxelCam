@@ -1,5 +1,17 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+
+import net.minecraft.src.FontRenderer;
+import net.minecraft.src.GuiButton;
+import net.minecraft.src.GuiScreen;
+
+import com.thevoxelbox.common.util.ImageDrawer;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.popups.DeletePopup;
 import com.thevoxelbox.voxelcam.popups.PostPopup;

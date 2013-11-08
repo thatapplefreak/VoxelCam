@@ -1,8 +1,14 @@
 package com.thevoxelbox.voxelcam.popups;
 
+import net.minecraft.src.GuiButton;
+import net.minecraft.src.GuiScreen;
+import net.minecraft.src.GuiTextField;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 
+import com.thevoxelbox.common.util.BrowserOpener;
+import com.thevoxelbox.common.util.gui.GuiDialogBox;
+import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterKeys;

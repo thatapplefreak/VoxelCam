@@ -1,5 +1,12 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import java.io.File;
+import java.text.SimpleDateFormat;
+
+import net.minecraft.src.Tessellator;
+
+import org.lwjgl.opengl.GL11;
+
 
 public class PhotoSelector extends GuiTextSlot {
 	final GuiScreenShotManager parent;
@@ -11,24 +18,20 @@ public class PhotoSelector extends GuiTextSlot {
 	}
 
 	@Override
-	@Override
 	protected int getContentHeight() {
 		return (this.getSize()) * 35 + 1;
 	}
 
-	@Override
 	@Override
 	protected int getSize() {
 		return GuiScreenShotManager.getScreenShotFiles().size();
 	}
 
 	@Override
-	@Override
 	protected boolean isSelected(int i) {
 		return parent.getSelected(i);
 	}
 
-	@Override
 	@Override
 	protected void drawBackground() {
 	}
@@ -43,7 +46,6 @@ public class PhotoSelector extends GuiTextSlot {
 		}
 	}
 
-	@Override
 	@Override
 	protected void elementClicked(int i, boolean flag) {
 		parent.selectPhotoIndex(i);

@@ -1,5 +1,10 @@
 package com.thevoxelbox.voxelcam.popups;
 
+import net.minecraft.src.GuiScreen;
+import net.minecraft.src.ResourceLocation;
+
+import com.mumfrey.liteloader.core.LiteLoader;
+import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 

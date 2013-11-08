@@ -1,5 +1,9 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import com.thevoxelbox.common.gui.GuiVoxelBoxSettingsPanel;
+import com.thevoxelbox.common.util.properties.VoxelPropertyAbstractButton;
+import com.thevoxelbox.common.util.properties.VoxelPropertyIntField;
+import com.thevoxelbox.common.util.properties.VoxelPropertyLabel;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 

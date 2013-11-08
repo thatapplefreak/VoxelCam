@@ -1,5 +1,21 @@
 package com.thevoxelbox.voxelcam.bigpicture;
 
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import javax.imageio.ImageIO;
+
+import net.minecraft.src.Minecraft;
+
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+
+import com.thevoxelbox.common.gl.FBO;
+import com.thevoxelbox.common.util.PrivateMethods;
 import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 

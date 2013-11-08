@@ -1,5 +1,12 @@
 package com.thevoxelbox.voxelcam.upload.imgur;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import com.google.gson.Gson;
+import com.thevoxelbox.common.util.upload.IUploadCompleteCallback;
+import com.thevoxelbox.common.util.upload.ThreadMultipartPostUpload;
+
 
 /**
  * Base class for objects which perform manipulation actions against the imgur

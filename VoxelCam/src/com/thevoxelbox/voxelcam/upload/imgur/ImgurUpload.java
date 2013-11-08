@@ -1,5 +1,7 @@
 package com.thevoxelbox.voxelcam.upload.imgur;
 
+import java.io.File;
+
 
 /**
  * Imgur agent to upload a file, callers should get the URL from the response
@@ -24,7 +26,6 @@ public class ImgurUpload extends Imgur {
 		this.description = imageDescription;
 	}
 
-	@Override
 	@Override
 	protected void assemble() {
 		this.postData.put("image", this.file);

@@ -1,5 +1,16 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import static org.lwjgl.opengl.GL11.*;
+
+import java.nio.DoubleBuffer;
+import java.util.List;
+
+import net.minecraft.src.GuiButton;
+import net.minecraft.src.Tessellator;
+
+import org.lwjgl.BufferUtils;
+import org.lwjgl.input.Mouse;
+
 
 @SuppressWarnings({ "rawtypes", "cast" })
 public abstract class GuiTextSlot {

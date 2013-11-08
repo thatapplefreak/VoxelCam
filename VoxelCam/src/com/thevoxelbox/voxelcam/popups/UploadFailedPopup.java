@@ -1,5 +1,9 @@
 package com.thevoxelbox.voxelcam.popups;
 
+import net.minecraft.src.GuiScreen;
+
+import com.thevoxelbox.common.util.gui.GuiDialogBox;
+
 
 public class UploadFailedPopup extends GuiDialogBox {
 	private String errorMessage;

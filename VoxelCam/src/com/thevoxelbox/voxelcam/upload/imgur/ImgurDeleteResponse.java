@@ -8,18 +8,15 @@ public class ImgurDeleteResponse implements ImgurResponse {
 	private int status;
 
 	@Override
-	@Override
 	public int getStatus() {
 		return this.status;
 	}
 
 	@Override
-	@Override
 	public boolean isSuccessful() {
 		return this.success;
 	}
 
-	@Override
 	@Override
 	public String get(String key) {
 		if ("data".equalsIgnoreCase(key))
@@ -27,7 +24,6 @@ public class ImgurDeleteResponse implements ImgurResponse {
 		return null;
 	}
 
-	@Override
 	@Override
 	public int getInt(String key) {
 		if ("data".equalsIgnoreCase(key))

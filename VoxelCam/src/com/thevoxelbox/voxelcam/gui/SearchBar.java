@@ -1,5 +1,13 @@
 package com.thevoxelbox.voxelcam.gui;
 
+import net.minecraft.src.ChatAllowedCharacters;
+import net.minecraft.src.FontRenderer;
+import net.minecraft.src.Gui;
+import net.minecraft.src.GuiScreen;
+import net.minecraft.src.Tessellator;
+
+import org.lwjgl.opengl.GL11;
+
 
 public class SearchBar extends Gui {
 
