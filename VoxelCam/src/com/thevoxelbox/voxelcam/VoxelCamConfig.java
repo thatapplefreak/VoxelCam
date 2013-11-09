@@ -10,9 +10,11 @@ import com.thevoxelbox.common.util.ModConfig;
 
 public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider {
 
+	// Keybinds that VoxelCam uses
 	public static final KeyBinding KEY_OPENSCREENSHOTMANAGER = new KeyBinding("ScreenShot Manager", Keyboard.KEY_H);
 	public static final KeyBinding KEY_TAKEBIGPICTURE = new KeyBinding("Big Screenshot", Keyboard.KEY_F4);
 
+	// Strings to access the settings
 	public static final String FIRSTRUN = "firstRun";
 	public static final String PHOTOWIDTH = "photoWidth";
 	public static final String PHOTOHEIGHT = "photoHeight";
@@ -24,6 +26,9 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		super("VoxelCam", "voxelcam.properties");
 	}
 
+	/**
+	 * Sets the default values for the settings
+	 */
 	@Override
 	protected void setDefaults() {
 		defaults.put(FIRSTRUN, "true");

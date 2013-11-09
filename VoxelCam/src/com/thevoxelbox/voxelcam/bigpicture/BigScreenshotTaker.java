@@ -27,10 +27,24 @@ import com.thevoxelbox.voxelcam.VoxelCamConfig;
  */
 public class BigScreenshotTaker {
 
+	/**
+	 * The original width of minecraft
+	 */
 	private int originalWidthOfScreen;
+	
+	/**
+	 * The original height of minecraft
+	 */
 	private int originalHeightOfScreen;
+	
+	/**
+	 * Waiting for minecraft to render to take a screenshot
+	 */
 	private boolean waiting;
 
+	/**
+	 * The FrameBuffer that the big screenshot gets rendered to
+	 */
 	FBO fbo;
 
 	public void run() {
@@ -43,10 +57,16 @@ public class BigScreenshotTaker {
 		waiting = true;
 	}
 
+	/**
+	 * Sets minecraft to a custom size
+	 */
 	private void resizeMinecraft(final int width, final int height) {
 		PrivateMethods.resizeMinecraft.invokeVoid(Minecraft.getMinecraft(), width, height);
 	}
 
+	/**
+	 * Returns Minecraft to it's original width and height
+	 */
 	private void returnMinecraftToNormal() {
 		PrivateMethods.resizeMinecraft.invokeVoid(Minecraft.getMinecraft(), originalWidthOfScreen, originalHeightOfScreen);
 	}
@@ -98,7 +118,7 @@ public class BigScreenshotTaker {
 		int var3 = 1;
 
 		while (true) {
-			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), var2 + (var3 == 1 ? "" : "_" + var3) + ".png");
+			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), "custom_" + var2 + (var3 == 1 ? "" : "_" + var3) + ".png");
 
 			if (!var1.exists()) {
 				return var1;
