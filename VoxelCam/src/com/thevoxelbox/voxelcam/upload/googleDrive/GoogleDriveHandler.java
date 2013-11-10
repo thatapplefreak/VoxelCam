@@ -15,7 +15,7 @@ public abstract class GoogleDriveHandler {
 	 */
 	public static void doGoogleDrive(File screenshot) {
 		makeGoogleDriveDir();
-		File googleDriveCopy = new File(System.getProperty("user.home") + "/dropbox/mcScreenshots/", screenshot.getName());
+		File googleDriveCopy = new File(System.getProperty("user.home") + "/Google Drive/mcScreenshots/", screenshot.getName());
 		FileChannel source = null;
 		FileChannel destination = null;
 		FileInputStream inputStream = null;
