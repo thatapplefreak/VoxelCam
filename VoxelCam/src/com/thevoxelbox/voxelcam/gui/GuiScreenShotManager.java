@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import org.lwjgl.input.Keyboard;
+
 import net.minecraft.src.FontRenderer;
 import net.minecraft.src.GuiButton;
 import net.minecraft.src.GuiScreen;
@@ -267,7 +269,15 @@ public class GuiScreenShotManager extends GuiScreen {
 				actionPerformed(btnDelete);
 			} else if (par1 == 'p') {
 				actionPerformed(btnPost);
-			}
+			} else if (par2 == Keyboard.KEY_UP || par2 == Keyboard.KEY_W) {
+				if (selected > 0) {
+					selected--;
+				}
+			} else if (par2 == Keyboard.KEY_DOWN || par2 == Keyboard.KEY_S) {
+				if (selected < getScreenShotFiles().size() - 1) {
+					selected++;
+				}
+			} 
 		}
 	}
 
