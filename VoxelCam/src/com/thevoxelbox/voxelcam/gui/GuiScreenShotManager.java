@@ -126,15 +126,22 @@ public class GuiScreenShotManager extends GuiScreen {
 		searchBar.drawTextBox();
 	}
 
+	private int updateTickCounter = 0;
+	
 	@Override
 	public void updateScreen() {
 		super.updateScreen();
 		// panoramaRenderer.updatePanorama();
 		setScreenShotFiles(getSortedScreenshots());
-		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
-			if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
-				getScreenShotFiles().remove(i); // Remove all files that are not
-												// png images
+		if (updateTickCounter % 30 == 0) { // Update every 1.5 seconds
+			for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
+				if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
+					getScreenShotFiles().remove(i); // Remove all files that are not
+													// png images
+				}
+			}
+			if (getScreenShotFiles().isEmpty()) {
+				getScreenShotFiles().add(null);
 			}
 		}
 		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
@@ -144,9 +151,6 @@ public class GuiScreenShotManager extends GuiScreen {
 		}
 		if (selected > getScreenShotFiles().size()) {
 			selected = getScreenShotFiles().size() - 1;
-		}
-		if (getScreenShotFiles().isEmpty()) {
-			getScreenShotFiles().add(null);
 		}
 		if (frame.getPhoto() != getScreenShotFiles().get(selected)) {
 			if (getScreenShotFiles().get(selected) == null) {
