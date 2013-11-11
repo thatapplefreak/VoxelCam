@@ -22,7 +22,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 	private boolean b = false;
 
 	public TwitterPINPopup(GuiScreen parentScreen) {
-		super(parentScreen, 200, 75, "Please enter the PIN you Recieved");
+		super(parentScreen, 200, 75, "Please enter the PIN you received");
 	}
 
 	@Override
