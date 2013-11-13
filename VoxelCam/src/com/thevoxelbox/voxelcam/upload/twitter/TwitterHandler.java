@@ -15,6 +15,7 @@ import com.thevoxelbox.voxelcam.upload.imgur.ImgurUpload;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurUploadResponse;
 
 import twitter4j.Status;
+import twitter4j.StatusUpdate;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 
@@ -25,30 +26,14 @@ public abstract class TwitterHandler {
 		String userAuthToken = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN);
 		String userAuthTokenSecret = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
 		TwitterKeys.twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
-		final ImgurUpload poster = new ImgurUpload(screenshot, screenshot.getName(), "");
-		poster.start(new ImgurCallback() {
-
-			@Override
-			public void onHTTPFailure(int responseCode, String responseMessage) {
-				callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", String.format("HTTP Error: %d %s", responseCode, responseMessage)));
-			}
-
-			@Override
-			public void onCompleted(ImgurResponse response) {
-
-				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
-				if (uploadResponse.isSuccessful()) {
-					try {
-						Status s = TwitterKeys.twitter.updateStatus(text + " " + uploadResponse.getLink() + " #VoxelCam");
-						callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + s.getUser().getScreenName()));
-					} catch (TwitterException e) {
-						callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
-					}
-				} else {
-					callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", uploadResponse.get("data")));
-				}
-			}
-		});
+		try {
+			StatusUpdate s = new StatusUpdate(text + " #VoxelCam");
+			s.setMedia(screenshot);
+			Status status = TwitterKeys.twitter.updateStatus(s);
+			callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + status.getUser().getScreenName()));
+		} catch (TwitterException e) {
+			callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
+		}
 	}	
 	
 	public static TwitterOauthGrabber getAGrabber(String pin, TwitterPINPopup callbackGui) {
