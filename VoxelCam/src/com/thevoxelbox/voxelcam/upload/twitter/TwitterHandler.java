@@ -39,7 +39,7 @@ public abstract class TwitterHandler {
 				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
 				if (uploadResponse.isSuccessful()) {
 					try {
-						Status s = TwitterKeys.twitter.updateStatus(text + " " + uploadResponse.getLink());
+						Status s = TwitterKeys.twitter.updateStatus(text + " " + uploadResponse.getLink() + " #VoxelCam");
 						callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + s.getUser().getScreenName()));
 					} catch (TwitterException e) {
 						callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));

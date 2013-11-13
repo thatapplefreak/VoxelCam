@@ -35,7 +35,7 @@ public class TwitterPostPopup extends GuiDialogBox {
 	protected void onInitDialog() {
 		btnOk.displayString = "Post";
 		textbox = new GuiTextField(fontRenderer, width / 2 - (200 / 2), height / 2 - (16 / 2) - 8, 200, 16);
-		textbox.setMaxStringLength(110);
+		textbox.setMaxStringLength(100);
 	}
 
 	@Override
@@ -49,7 +49,7 @@ public class TwitterPostPopup extends GuiDialogBox {
 			textbox.drawTextBox();
 			drawString(fontRenderer, "Compose Tweet:", dialogX + 5, height / 2 - 28, 0xFFFFFF);
 			drawString(fontRenderer, "Remaining letters:", width / 2 - 5, height / 2 + 5, 0xFFFFFF);
-			drawString(fontRenderer, Integer.toString(110 - textbox.getText().length()), width / 2 + 84, height / 2 + 5, 0xFFFFFF);
+			drawString(fontRenderer, Integer.toString(100 - textbox.getText().length()), width / 2 + 84, height / 2 + 5, 0xFFFFFF);
 		}
 
 		if (this.completeDialog != null) {
