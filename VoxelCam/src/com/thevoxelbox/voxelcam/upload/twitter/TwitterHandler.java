@@ -26,14 +26,18 @@ public abstract class TwitterHandler {
 		String userAuthToken = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN);
 		String userAuthTokenSecret = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
 		TwitterKeys.twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
-		try {
-			StatusUpdate s = new StatusUpdate(text + " #VoxelCam");
-			s.setMedia(screenshot);
-			Status status = TwitterKeys.twitter.updateStatus(s);
-			callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + status.getUser().getScreenName()));
-		} catch (TwitterException e) {
-			callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
-		}
+		new Thread("Twitter_Post_Thread") {
+			public void run() {
+				try {
+					StatusUpdate s = new StatusUpdate(text + " #VoxelCam");
+					s.setMedia(screenshot);
+					Status status = TwitterKeys.twitter.updateStatus(s);
+					callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + status.getUser().getScreenName()));
+				} catch (TwitterException e) {
+					callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
+				}
+			}
+		}.start();		
 	}	
 	
 	public static TwitterOauthGrabber getAGrabber(String pin, TwitterPINPopup callbackGui) {
