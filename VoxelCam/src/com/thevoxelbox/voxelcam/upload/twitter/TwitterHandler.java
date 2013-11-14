@@ -32,7 +32,8 @@ public abstract class TwitterHandler {
 					StatusUpdate s = new StatusUpdate(text + " #VoxelCam");
 					s.setMedia(screenshot);
 					Status status = TwitterKeys.twitter.updateStatus(s);
-					callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, "http://www.twitter.com/" + status.getUser().getScreenName()));
+					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
+					callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, address));
 				} catch (TwitterException e) {
 					callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
 				}
