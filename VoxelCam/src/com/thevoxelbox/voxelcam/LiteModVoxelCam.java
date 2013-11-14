@@ -7,6 +7,7 @@ import java.util.HashSet;
 import net.minecraft.src.GuiMainMenu;
 import net.minecraft.src.GuiScreen;
 import net.minecraft.src.Minecraft;
+import net.minecraft.src.ScreenShotHelper;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -43,12 +44,14 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	private static File screenshotsDir;
 
 	/**
-	 * This is a list of the keys that VoxelCam listens to that are currently in the down state
+	 * This is a list of the keys that VoxelCam listens to that are currently in
+	 * the down state
 	 */
 	private static HashSet<Integer> heldKeys = new HashSet<Integer>();
 
 	/**
-	 * If the mod VoxelMenu is installed this will be true, adds soft dependancy on VoxelMenu
+	 * If the mod VoxelMenu is installed this will be true, adds soft dependancy
+	 * on VoxelMenu
 	 */
 	public static boolean voxelMenuExists = false;
 
@@ -80,7 +83,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	public void init(File configPath) {
 		screenshotsDir = new File(LiteLoader.getGameDirectory(), "/screenshots");
 		if (!screenshotsDir.exists()) {
-			screenshotsDir.mkdir(); // Make sure that the screenshots directory is there, if not, create it
+			screenshotsDir.mkdir(); // Make sure that the screenshots directory
+									// is there, if not, create it
 		}
 
 		// Register the Keys that VoxelCam uses
@@ -99,7 +103,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 			mRegisterCustomScreen = ingameGuiClass.getDeclaredMethod("registerCustomScreen", String.class, Class.class, String.class);
 			mRegisterCustomScreen.invoke(null, "", GuiScreenShotManager.class, "Screenshots");
 			voxelMenuExists = true;
-		} catch (ClassNotFoundException ex) { // This means VoxelMenu does not exist
+		} catch (ClassNotFoundException ex) { // This means VoxelMenu does not
+												// exist
 			voxelMenuExists = false;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -108,7 +113,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	}
 
 	@Override
-	public void upgradeSettings(String version, File configPath, File oldConfigPath) {}
+	public void upgradeSettings(String version, File configPath, File oldConfigPath) {
+	}
 
 	/**
 	 * This method is called 20 times per second during the game
@@ -123,7 +129,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 				if (minecraft.currentScreen instanceof GuiMainMenu || minecraft.currentScreen == null) {
 					minecraft.displayGuiScreen(new GuiScreenShotManager());
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
-					// Dont turn the screenshot manager off if the user is typing into the searchbar
+					// Dont turn the screenshot manager off if the user is
+					// typing into the searchbar
 					if (!((GuiScreenShotManager) minecraft.currentScreen).searchBar.isFocused()) {
 						minecraft.setIngameFocus();
 					}
@@ -146,25 +153,26 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 			heldKeys.remove(VoxelCamConfig.KEY_TAKEBIGPICTURE.keyCode);
 		}
 	}
-	
-	/**
-     * Wrapper for the LWJGL functions to deal with mouse button bindings or
-     * invalid values
-     */
-    public static boolean isKeyDown(int keyCode) {
-        try {
-            if (keyCode < 0) { // If the code is less than 0 it is probably the mouse
-                return Mouse.isButtonDown(keyCode + 100);
-            }
-            return Keyboard.isKeyDown(keyCode);
-        } catch (Exception ex) {
-            return false;
-        }
-    }
 
-    /**
-     * Get the configuration
-     */
+	/**
+	 * Wrapper for the LWJGL functions to deal with mouse button bindings or
+	 * invalid values
+	 */
+	public static boolean isKeyDown(int keyCode) {
+		try {
+			if (keyCode < 0) { // If the code is less than 0 it is probably the
+								// mouse
+				return Mouse.isButtonDown(keyCode + 100);
+			}
+			return Keyboard.isKeyDown(keyCode);
+		} catch (Exception ex) {
+			return false;
+		}
+	}
+
+	/**
+	 * Get the configuration
+	 */
 	public static VoxelCamConfig getConfig() {
 		return config;
 	}
@@ -183,7 +191,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	/**
 	 * Called immediately before the current GUI is rendered
 	 * 
-	 * @param currentScreen Current screen (if any)
+	 * @param currentScreen
+	 *            Current screen (if any)
 	 */
 	@Override
 	public void onRenderGui(GuiScreen currentScreen) {
@@ -214,6 +223,20 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	@Override
 	public Class<? extends ConfigPanel> getConfigPanelClass() {
 		return GuiVoxelCamSettingsPanel.class;
+	}
+
+	private static boolean isTakingScreenshot = false;
+
+	public static void screenshotListener() {
+		if (Keyboard.isKeyDown(Keyboard.KEY_F2)) {
+			if (!isTakingScreenshot) {
+				Minecraft mc = Minecraft.getMinecraft();
+				isTakingScreenshot = true;
+				mc.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F " + ScreenShotHelper.saveScreenshot(mc.mcDataDir, mc.displayWidth, mc.displayHeight));
+			}
+		} else {
+			isTakingScreenshot = false;
+		}
 	}
 
 }
