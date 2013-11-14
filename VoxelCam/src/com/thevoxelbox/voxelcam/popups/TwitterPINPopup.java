@@ -13,7 +13,6 @@ import com.thevoxelbox.voxelcam.LiteModVoxelCam;
 import com.thevoxelbox.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterHandler;
-import com.thevoxelbox.voxelcam.upload.twitter.TwitterKeys;
 
 public class TwitterPINPopup extends GuiDialogBox {
 
@@ -28,7 +27,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		pinBox = new GuiTextField(fontRenderer, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
-		BrowserOpener.openURLstringInBrowser(TwitterKeys.requestToken.getAuthorizationURL());
+		BrowserOpener.openURLstringInBrowser(TwitterHandler.requestToken.getAuthorizationURL());
 	}
 
 	@Override

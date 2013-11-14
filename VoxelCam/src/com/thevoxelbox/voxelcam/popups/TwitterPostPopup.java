@@ -17,7 +17,6 @@ import com.thevoxelbox.voxelcam.upload.imgur.ImgurResponse;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurUpload;
 import com.thevoxelbox.voxelcam.upload.imgur.ImgurUploadResponse;
 import com.thevoxelbox.voxelcam.upload.twitter.TwitterHandler;
-import com.thevoxelbox.voxelcam.upload.twitter.TwitterKeys;
 
 public class TwitterPostPopup extends GuiDialogBox {
 
