@@ -74,7 +74,7 @@ public class BigScreenshotTaker {
 
 	public void onTick() {
 		if (waiting) {
-			capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
+			Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage(capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD)));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();
@@ -125,7 +125,7 @@ public class BigScreenshotTaker {
 		int var3 = 1;
 
 		while (true) {
-			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), "custom_" + s + (var3 == 1 ? "" : "_" + var3) + ".png");
+			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), s + (var3 == 1 ? "" : "_" + var3) + ".png");
 
 			if (!var1.exists()) {
 				return var1;
