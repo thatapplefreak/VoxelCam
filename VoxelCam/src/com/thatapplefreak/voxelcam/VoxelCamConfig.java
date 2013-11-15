@@ -39,8 +39,8 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		defaults.put(TWITTERAUTHTOKEN, "needLogin");
 		defaults.put(TWITTERAUTHTOKENSECRET, "needLogin");
 		defaults.put(TWITTERUSERID, "null");
-		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE(yyyy-MM-dd_HH.mm.ss");
-		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE(yyyy-MM-dd_HH.mm.ss)");
+		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE()");
+		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE()");
 	}
 
 }

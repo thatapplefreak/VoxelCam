@@ -17,6 +17,7 @@ import org.lwjgl.opengl.GL11;
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.common.gl.FBO;
+import com.thevoxelbox.common.util.PrivateFields;
 import com.thevoxelbox.common.util.PrivateMethods;
 
 /**
@@ -116,11 +117,15 @@ public class BigScreenshotTaker {
 	}
 
 	public static File getScreenshotName(String s) {
-		String var2 = new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date());
+		s = s
+		.replaceAll("DATE()", new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date()))
+		.replaceAll("SERVER()", PrivateFields.currentServerData.get(Minecraft.getMinecraft()) != null ? PrivateFields.currentServerData.get(Minecraft.getMinecraft()).serverName : "NoServer")
+		;
+		
 		int var3 = 1;
 
 		while (true) {
-			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), "custom_" + var2 + (var3 == 1 ? "" : "_" + var3) + ".png");
+			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), "custom_" + s + (var3 == 1 ? "" : "_" + var3) + ".png");
 
 			if (!var1.exists()) {
 				return var1;
