@@ -1,9 +1,7 @@
 {
-    "name": "${ant.project.name}",
-    "version": "${version}",
-    "mcversion": "${litemodversion}",
-    "revision": "${build.number}",
-    "author": "${author}",
+    "name": "VoxelCam",
+    "mcversion": "1.6.4",
+    "author": "thatapplefreak",
     "classTransformerClass": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
     "description": "VoxelCam is a tool for taking and\n
 managing screenshots within Minecraft.\n
