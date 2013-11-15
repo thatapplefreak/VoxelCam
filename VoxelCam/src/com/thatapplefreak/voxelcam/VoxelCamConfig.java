@@ -21,6 +21,8 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 	public static final String TWITTERUSERID = "twitterUserID";
 	public static final String TWITTERAUTHTOKEN = "twitterAuthToken";
 	public static final String TWITTERAUTHTOKENSECRET = "twitterAuthTokenSecret";
+	public static final String NORMALSCREENSHOTNAMINGMETHOD = "normalScreenshotNamingMethod";
+	public static final String BIGSCREENSHOTNAMINGMETHOD = "bigScreenshotNamingMehtod";
 
 	public VoxelCamConfig() {
 		super("VoxelCam", "voxelcam.properties");
@@ -37,6 +39,8 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		defaults.put(TWITTERAUTHTOKEN, "needLogin");
 		defaults.put(TWITTERAUTHTOKENSECRET, "needLogin");
 		defaults.put(TWITTERUSERID, "null");
+		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE(yyyy-MM-dd_HH.mm.ss");
+		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE(yyyy-MM-dd_HH.mm.ss)");
 	}
 
 }

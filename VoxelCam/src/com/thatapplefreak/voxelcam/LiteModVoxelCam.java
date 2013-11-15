@@ -232,7 +232,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 			if (!isTakingScreenshot) {
 				Minecraft mc = Minecraft.getMinecraft();
 				isTakingScreenshot = true;
-				mc.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F " + ScreenShotHelper.saveScreenshot(mc.mcDataDir, mc.displayWidth, mc.displayHeight));
+				mc.ingameGUI.getChatGUI().printChatMessage(bigScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD)));
 			}
 		} else {
 			isTakingScreenshot = false;

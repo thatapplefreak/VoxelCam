@@ -73,7 +73,7 @@ public class BigScreenshotTaker {
 
 	public void onTick() {
 		if (waiting) {
-			capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
+			capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();
@@ -82,11 +82,12 @@ public class BigScreenshotTaker {
 		}
 	}
 
-	private void capture(final int width, final int height) {
+	public String capture(final int width, final int height, String s) {
 		GL11.glReadBuffer(GL11.GL_FRONT);
 		final int bpp = 4;
 		final ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * bpp);
 		GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+		final File screenshotName = getScreenshotName(s);
 		Thread imageSaveThread = new Thread() {
 			@Override
 			public void run() {
@@ -101,7 +102,7 @@ public class BigScreenshotTaker {
 					}
 				}
 				try {
-					ImageIO.write(image, "png", getScreenshotName());
+					ImageIO.write(image, "png", screenshotName);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -111,9 +112,10 @@ public class BigScreenshotTaker {
 		imageSaveThread.setName("Image Save Thread");
 		imageSaveThread.setPriority(1);
 		imageSaveThread.start();
+		return "§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName();
 	}
 
-	private static File getScreenshotName() {
+	public static File getScreenshotName(String s) {
 		String var2 = new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date());
 		int var3 = 1;
 
