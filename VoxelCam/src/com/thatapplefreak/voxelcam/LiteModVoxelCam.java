@@ -19,6 +19,7 @@ import com.mumfrey.liteloader.core.LiteLoader;
 import com.mumfrey.liteloader.modconfig.ConfigPanel;
 import com.mumfrey.liteloader.util.ModUtilities;
 import com.thatapplefreak.voxelcam.bigpicture.BigScreenshotTaker;
+import com.thatapplefreak.voxelcam.bigpicture.ScreenshotTaker;
 import com.thatapplefreak.voxelcam.gui.GuiMainMenuWithPhotoButton;
 import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.gui.GuiVoxelCamSettingsPanel;
@@ -56,11 +57,6 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	public static boolean voxelMenuExists = false;
 
 	/**
-	 * This is the handler object for taking large screenshots
-	 */
-	public static BigScreenshotTaker bigScreenshotTaker = new BigScreenshotTaker();
-
-	/**
 	 * Get the name of the mod (Called by Liteloader)
 	 */
 	@Override
@@ -89,7 +85,6 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 
 		// Register the Keys that VoxelCam uses
 		ModUtilities.registerKey(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER);
-		ModUtilities.registerKey(VoxelCamConfig.KEY_TAKEBIGPICTURE);
 
 		// Add the configuation panel to VoxelCommons awareness
 		SettingsPanelManager.addSettingsPanel("Camera", GuiVoxelCamSettingsPanel.class);
@@ -122,7 +117,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	@Override
 	public void onTick(Minecraft minecraft, float partialTicks, boolean inGame, boolean clock) {
 		// Tell the bigscreenshot taker that the next tick has happend
-		bigScreenshotTaker.onTick();
+		BigScreenshotTaker.onTick();
 		// Check to see if the user wants to open the screenshot manager
 		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
 			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
@@ -139,18 +134,6 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 			}
 		} else {
 			heldKeys.remove(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode);
-		}
-
-		// Check to see if the user wants to take a big screenshot
-		if (isKeyDown(VoxelCamConfig.KEY_TAKEBIGPICTURE.keyCode)) {
-			if (!heldKeys.contains(VoxelCamConfig.KEY_TAKEBIGPICTURE.keyCode)) {
-				if (minecraft.currentScreen == null && !minecraft.ingameGUI.getChatGUI().getChatOpen()) {
-					bigScreenshotTaker.run();
-					heldKeys.add(VoxelCamConfig.KEY_TAKEBIGPICTURE.keyCode);
-				}
-			}
-		} else {
-			heldKeys.remove(VoxelCamConfig.KEY_TAKEBIGPICTURE.keyCode);
 		}
 	}
 
@@ -224,18 +207,22 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	public Class<? extends ConfigPanel> getConfigPanelClass() {
 		return GuiVoxelCamSettingsPanel.class;
 	}
-
-	private static boolean isTakingScreenshot = false;
-
+	
 	public static void screenshotListener() {
-		if (Keyboard.isKeyDown(Keyboard.KEY_F2)) {
-			if (!isTakingScreenshot) {
+		if (isKeyDown(Keyboard.KEY_F2)) {
+			if (!heldKeys.contains(Keyboard.KEY_F2)) {
+				if (isKeyDown(Keyboard.KEY_LSHIFT) || isKeyDown(Keyboard.KEY_RSHIFT)) {
+					Minecraft mc = Minecraft.getMinecraft();
+					heldKeys.add(Keyboard.KEY_F2);
+					BigScreenshotTaker.run();
+					return;
+				}
 				Minecraft mc = Minecraft.getMinecraft();
-				isTakingScreenshot = true;
-				mc.ingameGUI.getChatGUI().printChatMessage(bigScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD)));
+				heldKeys.add(Keyboard.KEY_F2);
+				mc.ingameGUI.getChatGUI().printChatMessage(ScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD)));
 			}
 		} else {
-			isTakingScreenshot = false;
+			heldKeys.remove(Keyboard.KEY_F2);
 		}
 	}
 

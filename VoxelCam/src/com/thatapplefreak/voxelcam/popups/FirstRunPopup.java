@@ -30,7 +30,7 @@ public class FirstRunPopup extends GuiDialogBox {
 		}
 		drawString(fontRenderer, "Keybindings:", dialogX + 5, dialogY + 20, 0x990000);
 		drawString(fontRenderer, "H - Open the screenshots manager while in game", dialogX + 10, dialogY + 30, 0x990000);
-		drawString(fontRenderer, "F4 - Take a HUGE screenhsot", dialogX + 10, dialogY + 40, 0x990000);
+		drawString(fontRenderer, "Shift + F2 - Take a HUGE screenhsot", dialogX + 10, dialogY + 40, 0x990000);
 		drawString(fontRenderer, "F7 - Open VoxelOptions", dialogX + 10, dialogY + 50, 0x990000);
 
 		drawString(fontRenderer, "Developer:", dialogX + 5, dialogY + 70, 0x00FFFF);

@@ -26,29 +26,29 @@ import com.thevoxelbox.common.util.PrivateMethods;
  * @author thatapplefreak
  * 
  */
-public class BigScreenshotTaker {
+public abstract class BigScreenshotTaker {
 
 	/**
 	 * The original width of minecraft
 	 */
-	private int originalWidthOfScreen;
+	private static int originalWidthOfScreen;
 	
 	/**
 	 * The original height of minecraft
 	 */
-	private int originalHeightOfScreen;
+	private static int originalHeightOfScreen;
 	
 	/**
 	 * Waiting for minecraft to render to take a screenshot
 	 */
-	private boolean waiting;
+	private static boolean waiting;
 
 	/**
 	 * The FrameBuffer that the big screenshot gets rendered to
 	 */
-	FBO fbo;
+	private static FBO fbo;
 
-	public void run() {
+	public static void run() {
 		Minecraft.getMinecraft().gameSettings.hideGUI = true;
 		originalWidthOfScreen = Minecraft.getMinecraft().displayWidth;
 		originalHeightOfScreen = Minecraft.getMinecraft().displayHeight;
@@ -61,77 +61,25 @@ public class BigScreenshotTaker {
 	/**
 	 * Sets minecraft to a custom size
 	 */
-	private void resizeMinecraft(final int width, final int height) {
+	private static void resizeMinecraft(final int width, final int height) {
 		PrivateMethods.resizeMinecraft.invokeVoid(Minecraft.getMinecraft(), width, height);
 	}
 
 	/**
 	 * Returns Minecraft to it's original width and height
 	 */
-	private void returnMinecraftToNormal() {
+	private static void returnMinecraftToNormal() {
 		PrivateMethods.resizeMinecraft.invokeVoid(Minecraft.getMinecraft(), originalWidthOfScreen, originalHeightOfScreen);
 	}
 
-	public void onTick() {
+	public static void onTick() {
 		if (waiting) {
-			Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage(capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD)));
+			Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage(ScreenshotTaker.capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD)));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();
 			Minecraft.getMinecraft().gameSettings.hideGUI = false;
 			waiting = false;
-		}
-	}
-
-	public String capture(final int width, final int height, String s) {
-		GL11.glReadBuffer(GL11.GL_FRONT);
-		final int bpp = 4;
-		final ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * bpp);
-		GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
-		final File screenshotName = getScreenshotName(s);
-		Thread imageSaveThread = new Thread() {
-			@Override
-			public void run() {
-				BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-				for (int x = 0; x < width; x++) {
-					for (int y = 0; y < height; y++) {
-						int i = (x + (width * y)) * bpp;
-						int r = buffer.get(i) & 0xFF;
-						int g = buffer.get(i + 1) & 0xFF;
-						int b = buffer.get(i + 2) & 0xFF;
-						image.setRGB(x, height - (y + 1), (0xFF << 24) | (r << 16) | (g << 8) | b);
-					}
-				}
-				try {
-					ImageIO.write(image, "png", screenshotName);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-		};
-
-		imageSaveThread.setName("Image Save Thread");
-		imageSaveThread.setPriority(1);
-		imageSaveThread.start();
-		return "§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName();
-	}
-
-	public static File getScreenshotName(String s) {
-		s = s
-		.replaceAll("DATE()", new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date()))
-		.replaceAll("SERVER()", PrivateFields.currentServerData.get(Minecraft.getMinecraft()) != null ? PrivateFields.currentServerData.get(Minecraft.getMinecraft()).serverName : "NoServer")
-		;
-		
-		int var3 = 1;
-
-		while (true) {
-			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), s + (var3 == 1 ? "" : "_" + var3) + ".png");
-
-			if (!var1.exists()) {
-				return var1;
-			}
-
-			++var3;
 		}
 	}
 
