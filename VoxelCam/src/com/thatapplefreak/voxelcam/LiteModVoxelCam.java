@@ -55,6 +55,8 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	 * on VoxelMenu
 	 */
 	public static boolean voxelMenuExists = false;
+	
+	public static boolean screenshotIsSaving = false;
 
 	/**
 	 * Get the name of the mod (Called by Liteloader)
@@ -122,7 +124,11 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
 			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
 				if (minecraft.currentScreen instanceof GuiMainMenu || minecraft.currentScreen == null) {
-					minecraft.displayGuiScreen(new GuiScreenShotManager());
+					if (!screenshotIsSaving) {
+						minecraft.displayGuiScreen(new GuiScreenShotManager());
+					} else {
+						minecraft.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
+					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
 					// Dont turn the screenshot manager off if the user is
 					// typing into the searchbar
@@ -219,7 +225,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 				}
 				Minecraft mc = Minecraft.getMinecraft();
 				heldKeys.add(Keyboard.KEY_F2);
-				mc.ingameGUI.getChatGUI().printChatMessage(ScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD)));
+				ScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD));
 			}
 		} else {
 			heldKeys.remove(Keyboard.KEY_F2);

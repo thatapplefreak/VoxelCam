@@ -7,12 +7,16 @@ import java.nio.ByteBuffer;
 
 import javax.imageio.ImageIO;
 
+import net.minecraft.src.Minecraft;
+
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
+import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+
 public abstract class ScreenshotTaker {
 	
-	public static String capture(final int width, final int height, String s) {
+	public static void capture(final int width, final int height, String s) {
 		GL11.glReadBuffer(GL11.GL_FRONT);
 		final int bpp = 4;
 		final ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * bpp);
@@ -21,6 +25,7 @@ public abstract class ScreenshotTaker {
 		Thread imageSaveThread = new Thread("ImageSaver") {
 			@Override
 			public void run() {
+				LiteModVoxelCam.screenshotIsSaving = true;
 				BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 				for (int x = 0; x < width; x++) {
 					for (int y = 0; y < height; y++) {
@@ -33,6 +38,8 @@ public abstract class ScreenshotTaker {
 				}
 				try {
 					ImageIO.write(image, "png", screenshotName);
+					Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+					LiteModVoxelCam.screenshotIsSaving = false;
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -42,7 +49,6 @@ public abstract class ScreenshotTaker {
 		imageSaveThread.setName("Image Save Thread");
 		imageSaveThread.setPriority(1);
 		imageSaveThread.start();
-		return "§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName();
 	}
 	
 }

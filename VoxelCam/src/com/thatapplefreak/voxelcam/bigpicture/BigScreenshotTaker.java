@@ -74,7 +74,7 @@ public abstract class BigScreenshotTaker {
 
 	public static void onTick() {
 		if (waiting) {
-			Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage(ScreenshotTaker.capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD)));
+			ScreenshotTaker.capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();
