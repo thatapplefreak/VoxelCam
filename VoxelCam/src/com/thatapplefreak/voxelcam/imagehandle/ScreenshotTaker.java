@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.bigpicture;
+package com.thatapplefreak.voxelcam.imagehandle;
 
 import java.awt.image.BufferedImage;
 import java.io.File;

@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.bigpicture;
+package com.thatapplefreak.voxelcam.imagehandle;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -13,8 +13,8 @@ public abstract class ScreenshotNamer {
 
 	public static File getScreenshotName(String s) {
 		s = s
-		.replaceAll("DATE()", new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date()))
-		.replaceAll("SERVER()", PrivateFields.currentServerData.get(Minecraft.getMinecraft()) != null ? PrivateFields.currentServerData.get(Minecraft.getMinecraft()).serverName : "NoServer")
+		.replaceAll("DATE", new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new Date()))
+		.replaceAll("SERVER", PrivateFields.currentServerData.get(Minecraft.getMinecraft()) != null ? PrivateFields.currentServerData.get(Minecraft.getMinecraft()).serverName : "NoServer")
 		;
 		
 		int var3 = 1;
