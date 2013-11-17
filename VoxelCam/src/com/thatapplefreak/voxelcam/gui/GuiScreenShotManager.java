@@ -14,10 +14,11 @@ import net.minecraft.src.GuiButton;
 import net.minecraft.src.GuiScreen;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
+import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 import com.thatapplefreak.voxelcam.popups.DeletePopup;
 import com.thatapplefreak.voxelcam.popups.PostPopup;
 import com.thatapplefreak.voxelcam.popups.RenamePopup;
-import com.thevoxelbox.common.util.ImageDrawer;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can
@@ -221,7 +222,7 @@ public class GuiScreenShotManager extends GuiScreen {
 	}
 
 	public void delete() {
-		ImageDrawer.requestImageRemovalFromMem(getScreenShotFiles().get(selected));
+		GLImageMemoryHandler.requestImageRemovalFromMem(getScreenShotFiles().get(selected));
 		getScreenShotFiles().get(selected).delete(); // EXTERMINATE!
 		getScreenShotFiles().remove(selected); // remove refrence
 		if (selected > 0) {

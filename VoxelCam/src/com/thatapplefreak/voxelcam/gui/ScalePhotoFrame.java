@@ -2,17 +2,20 @@ package com.thatapplefreak.voxelcam.gui;
 
 import static org.lwjgl.opengl.GL11.*;
 
+import java.awt.LinearGradientPaint;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
+import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
+import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
+
 import net.minecraft.src.Gui;
 import net.minecraft.src.Minecraft;
 import net.minecraft.src.Tessellator;
 
-import com.thevoxelbox.common.util.ImageDrawer;
 
 
 public class ScalePhotoFrame extends Gui {
@@ -40,6 +43,7 @@ public class ScalePhotoFrame extends Gui {
 		if (currentPhoto != null) {
 			try {
 				img = ImageIO.read(photo);
+				GLImageMemoryHandler.tryPutTextureIntoMem(photo);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -58,6 +62,13 @@ public class ScalePhotoFrame extends Gui {
 	}
 
 	public void draw(int mouseX, int mouseY, float partialTicks) {
+		
+		if (GLImageMemoryHandler.loadingImage()) {
+			drawBackground();
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, "Loading Image...", x + width / 2, y + height / 2, 0xffffff);
+			return;
+		}
+		
 		if (currentPhoto != null && img != null) {
 			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, currentPhoto.getName().replace(".png", ""), x + width / 2, y - 10, 0xffffff);
 			float frameAspect = (float) width / (float) height;
@@ -85,7 +96,7 @@ public class ScalePhotoFrame extends Gui {
 				photoX2 = (int) (x + (width / 2) + (picWidth / 2));
 			}
 			drawBackground();
-			ImageDrawer.drawImageToGuiFreePoint(currentPhoto, photoX, photoY, photoX2, photoY2);
+			ImageDrawer.drawImageToGui(GLImageMemoryHandler.getImageGLName(currentPhoto), photoX, photoY, photoX2, photoY2);
 			parentScreen.enableButtons(true);
 		} else {
 			drawBackground();
