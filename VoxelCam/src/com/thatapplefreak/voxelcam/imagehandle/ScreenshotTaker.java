@@ -45,9 +45,7 @@ public abstract class ScreenshotTaker {
 				}
 			}
 		};
-
-		imageSaveThread.setName("Image Save Thread");
-		imageSaveThread.setPriority(1);
+		imageSaveThread.setPriority(5);
 		imageSaveThread.start();
 	}
 	

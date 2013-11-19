@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.imagehandle;
 
 import static org.lwjgl.opengl.GL11.glDeleteTextures;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -36,7 +37,9 @@ public abstract class GLImageMemoryHandler {
 //				public void run() {
 					loadingImageToMem = true;
 					try {
-						imageMap.put(imageFile.getAbsolutePath(), TextureUtil.uploadTextureImageAllocate(TextureUtil.glGenTextures(), ImageIO.read(imageFile), true, false));
+						BufferedImage image = ImageIO.read(imageFile);
+						int imgageName = TextureUtil.uploadTextureImageAllocate(TextureUtil.glGenTextures(), image, true, false);
+						imageMap.put(imageFile.getAbsolutePath(), imgageName);
 					} catch (IOException e) {
 					}
 					loadingImageToMem = false;
