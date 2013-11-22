@@ -91,6 +91,7 @@ public class PostPopup extends GuiDialogBox {
 		switch (guibutton.id) {
 		case 0: // Imgur
 			ImgurHandler.doImgur(this, GuiScreenShotManager.getSelectedPhoto());
+			this.uploading = true;
 			break;
 		case 1: // DropBox
 			DropboxHandler.doDropBox(GuiScreenShotManager.getSelectedPhoto());
