@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
@@ -22,7 +23,7 @@ public abstract class GLImageMemoryHandler {
 	 */
 	private static Map<String, Integer> imageMap = new HashMap<String, Integer>();
 
-	private static boolean loadingImageToMem = false;
+	private static HashSet<Integer> loadingImages = new HashSet<Integer>();
 
 	/**
 	 * Open GL magic voodoo
@@ -32,17 +33,18 @@ public abstract class GLImageMemoryHandler {
 	 */
 	public static void tryPutTextureIntoMem(final File imageFile) {
 		if (!imageMap.containsKey(imageFile.getAbsolutePath())) {
+			int textureName = TextureUtil.glGenTextures();
+			imageMap.put(imageFile.getAbsolutePath(), textureName);
 //			new Thread("GL Image Loader") {
 //				@Override
 //				public void run() {
-					loadingImageToMem = true;
+					loadingImages.add(textureName);
 					try {
 						BufferedImage image = ImageIO.read(imageFile);
-						int imgageName = TextureUtil.uploadTextureImageAllocate(TextureUtil.glGenTextures(), image, true, false);
-						imageMap.put(imageFile.getAbsolutePath(), imgageName);
+						TextureUtil.uploadTextureImageAllocate(textureName, image, true, false);
+						loadingImages.remove(textureName);
 					} catch (IOException e) {
 					}
-					loadingImageToMem = false;
 //				}
 //			}.start();
 		}
@@ -64,8 +66,8 @@ public abstract class GLImageMemoryHandler {
 		return imageMap.get(f.getAbsolutePath());
 	}
 	
-	public static boolean loadingImage() {
-		return loadingImageToMem;
+	public static boolean loadingImage(int i) {
+		return loadingImages.contains(i);
 	}
 
 }
