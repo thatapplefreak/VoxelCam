@@ -63,7 +63,7 @@ public class ScalePhotoFrame extends Gui {
 
 	public void draw(int mouseX, int mouseY, float partialTicks) {
 		
-		if (GLImageMemoryHandler.loadingImage(GLImageMemoryHandler.getImageGLName(currentPhoto))) {
+		if (currentPhoto != null && GLImageMemoryHandler.loadingImage(GLImageMemoryHandler.getImageGLName(currentPhoto))) {
 			drawBackground();
 			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, "Loading Image...", x + width / 2, y + height / 2, 0xffffff);
 			return;
