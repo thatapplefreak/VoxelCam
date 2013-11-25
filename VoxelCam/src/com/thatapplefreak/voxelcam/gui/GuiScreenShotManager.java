@@ -128,7 +128,7 @@ public class GuiScreenShotManager extends GuiScreen {
 	}
 
 	private int updateTickCounter = 0;
-	
+
 	@Override
 	public void updateScreen() {
 		super.updateScreen();
@@ -137,7 +137,8 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (updateTickCounter % 30 == 0) { // Update every 1.5 seconds
 			for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
 				if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
-					getScreenShotFiles().remove(i); // Remove all files that are not
+					getScreenShotFiles().remove(i); // Remove all files that are
+													// not
 													// png images
 				}
 			}
@@ -199,7 +200,7 @@ public class GuiScreenShotManager extends GuiScreen {
 	@Override
 	protected void actionPerformed(GuiButton btn) {
 		if (btn == btnBack) {
-			mc.displayGuiScreen(null);
+			keyTyped('`', 1);
 		} else if (btn == btnRename) {
 			mc.displayGuiScreen(new RenamePopup(this, getScreenShotFiles().get(selected).getName()));
 		} else if (btn == btnDelete) {
@@ -265,7 +266,11 @@ public class GuiScreenShotManager extends GuiScreen {
 
 	@Override
 	protected void keyTyped(char par1, int par2) {
-		super.keyTyped(par1, par2);
+		if (par2 == 1) {
+			GLImageMemoryHandler.requestImageFlush();
+			this.mc.displayGuiScreen((GuiScreen) null);
+			this.mc.setIngameFocus();
+		}
 		searchBar.textboxKeyTyped(par1, par2);
 		if (!searchBar.isFocused()) {
 			if (par1 == 'r') {
@@ -282,7 +287,7 @@ public class GuiScreenShotManager extends GuiScreen {
 				if (selected < getScreenShotFiles().size() - 1) {
 					selected++;
 				}
-			} 
+			}
 		}
 	}
 

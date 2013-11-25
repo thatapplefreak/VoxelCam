@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.imageio.ImageIO;
 
@@ -60,6 +61,17 @@ public abstract class GLImageMemoryHandler {
 			glDeleteTextures(imageMap.get(imageFile.getAbsolutePath()));
 			imageMap.remove(imageFile.getAbsolutePath());
 		}
+	}
+	
+	/**
+	 * Flushes All images from memory
+	 */
+	public static void requestImageFlush() {
+		Set<String> keyset = imageMap.keySet();
+		for (String s : keyset) {
+			glDeleteTextures(imageMap.get(s));
+		}
+		imageMap.clear();
 	}
 	
 	public static int getImageGLName(File f) {
