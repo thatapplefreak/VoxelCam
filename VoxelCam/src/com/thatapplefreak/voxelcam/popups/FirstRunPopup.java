@@ -37,10 +37,9 @@ public class FirstRunPopup extends GuiDialogBox {
 		drawTexturedModalRect(avatarPNG, dialogX + 10, dialogY + 80, dialogX + 75, dialogY + 140, 0, 0, 259, 256);
 		drawString(fontRenderer, "thatapplefreak", dialogX + 6, dialogY + 141, 0xFFFF00);
 
-		drawString(fontRenderer, "Facebook: facebook.com/thatapplefreak", dialogX + 80, dialogY + 80, 0x3B5998);
-		drawString(fontRenderer, "Twitter: @xApplefreak", dialogX + 80, dialogY + 90, 0x4099FF);
-		drawString(fontRenderer, "Reddit: thatapplefreak", dialogX + 80, dialogY + 100, 0xff4500);
-		drawString(fontRenderer, "MinecraftForum: thatapplefreak", dialogX + 80, dialogY + 110, 0x80ba59);
+		drawString(fontRenderer, "Twitter: @xApplefreak", dialogX + 80, dialogY + 80, 0x4099FF);
+		drawString(fontRenderer, "Reddit: thatapplefreak", dialogX + 80, dialogY + 90, 0xff4500);
+		drawString(fontRenderer, "MinecraftForum: thatapplefreak", dialogX + 80, dialogY + 100, 0x80ba59);
 	}
 
 	@Override
