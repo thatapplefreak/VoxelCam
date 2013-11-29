@@ -19,5 +19,23 @@ public abstract class FacebookHandler {
 	static {
 		facebook.setOAuthAppId(APP_ID, App_Secret);
 	}
+	
+	class FacebookAuthGrabber implements Runnable {
+
+		public FacebookAuthGrabber() {
+			
+		}
+		
+		@Override
+		public void run() {
+			
+		}
+		
+		
+		private void storeAuth() {
+			
+		}
+		
+	}
 
 }

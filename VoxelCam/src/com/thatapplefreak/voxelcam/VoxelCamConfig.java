@@ -20,6 +20,10 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 	public static final String TWITTERUSERID = "twitterUserID";
 	public static final String TWITTERAUTHTOKEN = "twitterAuthToken";
 	public static final String TWITTERAUTHTOKENSECRET = "twitterAuthTokenSecret";
+	public static final String FACEBOOKAUTHTOKEN = "facebookauthtoken";
+	public static final String FACEBOOKUSERID = "facebookUserID";
+	public static final String REDDITUSERNAME = "redditUsername";
+	public static final String REDDITPASSWORD = "redditPassword";
 	public static final String NORMALSCREENSHOTNAMINGMETHOD = "normalScreenshotNamingMethod";
 	public static final String BIGSCREENSHOTNAMINGMETHOD = "bigScreenshotNamingMehtod";
 
@@ -35,9 +39,13 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		defaults.put(FIRSTRUN, "true");
 		defaults.put(PHOTOWIDTH, "1920");
 		defaults.put(PHOTOHEIGHT, "1080");
+		defaults.put(TWITTERUSERID, "needLogin");
 		defaults.put(TWITTERAUTHTOKEN, "needLogin");
 		defaults.put(TWITTERAUTHTOKENSECRET, "needLogin");
-		defaults.put(TWITTERUSERID, "null");
+		defaults.put(FACEBOOKAUTHTOKEN, "needLogin");
+		defaults.put(FACEBOOKUSERID, "needLogin");
+		defaults.put(REDDITUSERNAME, "needLogin");
+		defaults.put(REDDITPASSWORD, "needLogin");
 		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE");
 		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE");
 	}
