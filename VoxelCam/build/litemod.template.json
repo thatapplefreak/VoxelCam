@@ -4,7 +4,7 @@
     "mcversion": "${litemodversion}",
     "revision": "${build.number}",
     "author": "${author}",
-    "classTransformerClass": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
+    "classTransformerClasses": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
     "description": "VoxelCam is a tool for taking and\n
 managing screenshots within Minecraft.\n
  - Press 'H' to open manager ingame\n
