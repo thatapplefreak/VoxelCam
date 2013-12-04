@@ -39,7 +39,7 @@ public class VoxelCamTransformer implements IClassTransformer {
 	 */
 	public void transformScreenshotListener(MethodNode method) {
 		InsnList code = new InsnList();
-		code.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/thatapplefreak/voxelcam/LiteModVoxelCam", "screenshotListener", method.desc));
+		code.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/thatapplefreak/voxelcam/LiteModVoxelCam", "screenshotListener", "()V"));
 		code.add(new InsnNode(Opcodes.RETURN));
 		method.instructions.insert(code);
 	}

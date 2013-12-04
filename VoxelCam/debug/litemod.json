@@ -2,6 +2,6 @@
     "name": "VoxelCam",
     "mcversion": "1.6.4",
     "author": "thatapplefreak",
-    "classTransformerClass": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
+    "classTransformerClasses": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
     "description": "VoxelCam is a tool for taking,managing, and posting screenshots to social networks within Minecraft. It also allows the player to take screenshots far beyond the size of his/her screen."
 }
