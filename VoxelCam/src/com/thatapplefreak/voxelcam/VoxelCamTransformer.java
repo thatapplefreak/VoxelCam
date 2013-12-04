@@ -15,13 +15,13 @@ public class VoxelCamTransformer implements IClassTransformer {
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
-		if ("net.minecraft.src.Minecraft".equals(name) || "atv".equals(name)) {
+		if ("net.minecraft.client.Minecraft".equals(name) || "azd".equals(name)) {
 			ClassReader classReader = new ClassReader(basicClass);
 			ClassNode classNode = new ClassNode();
 			classReader.accept(classNode, ClassReader.EXPAND_FRAMES);
 
 			for (MethodNode method : classNode.methods) {
-				if (("screenshotListener".equals(method.name) || "func_71365_K".equals(method.name) || "V".equals(method.name)) && "()V".equals(method.desc)) {
+				if (("screenshotListener".equals(method.name) || "func_71365_K".equals(method.name) || "ae".equals(method.name)) && "()V".equals(method.desc)) {
 					this.transformScreenshotListener(method);
 				}
 			}
