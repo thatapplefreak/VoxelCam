@@ -17,6 +17,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thevoxelbox.common.util.AbstractionLayer;
 
 public abstract class ScreenshotTaker {
 	
@@ -42,8 +43,7 @@ public abstract class ScreenshotTaker {
 				}
 				try {
 					ImageIO.write(image, "png", screenshotName);
-//					Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
-					Minecraft.getMinecraft().ingameGUI.getChatGUI().func_146239_a("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
 					LiteModVoxelCam.screenshotIsSaving = false;
 				} catch (IOException e) {
 					e.printStackTrace();

@@ -24,6 +24,7 @@ import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
 import com.thatapplefreak.voxelcam.popups.FirstRunPopup;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
+import com.thevoxelbox.common.util.AbstractionLayer;
 
 /**
  * Main hook class for VoxelCam
@@ -126,8 +127,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 					if (!screenshotIsSaving) {
 						minecraft.displayGuiScreen(new GuiScreenShotManager());
 					} else {
-//						minecraft.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
-						minecraft.ingameGUI.getChatGUI().func_146239_a("§4[VoxelCam]§F Saving Screenshot right now, please wait");
+						AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
 					// Dont turn the screenshot manager off if the user is
