@@ -7,11 +7,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.lwjgl.input.Keyboard;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 
-import net.minecraft.src.FontRenderer;
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
+import org.lwjgl.input.Keyboard;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
@@ -147,7 +147,7 @@ public class GuiScreenShotManager extends GuiScreen {
 			}
 		}
 		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
-			if (!getScreenShotFiles().get(i).getName().toLowerCase().contains(searchBar.getText().toLowerCase())) {
+			if (getScreenShotFiles().get(i) != null && !getScreenShotFiles().get(i).getName().toLowerCase().contains(searchBar.getText().toLowerCase())) {
 				getScreenShotFiles().remove(i);
 			}
 		}

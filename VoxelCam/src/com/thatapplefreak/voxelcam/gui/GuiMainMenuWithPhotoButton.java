@@ -1,10 +1,9 @@
 package com.thatapplefreak.voxelcam.gui;
 
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiMainMenu;
-import net.minecraft.src.Minecraft;
-import net.minecraft.src.ResourceLocation;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.util.ResourceLocation;
 
 public class GuiMainMenuWithPhotoButton extends GuiMainMenu {
 

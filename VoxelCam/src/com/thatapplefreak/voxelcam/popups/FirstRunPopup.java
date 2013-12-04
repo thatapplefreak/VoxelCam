@@ -1,7 +1,7 @@
 package com.thatapplefreak.voxelcam.popups;
 
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.ResourceLocation;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.ResourceLocation;
 
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;

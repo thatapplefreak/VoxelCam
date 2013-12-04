@@ -9,14 +9,12 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.Tessellator;
+
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
-
-import net.minecraft.src.Gui;
-import net.minecraft.src.Minecraft;
-import net.minecraft.src.Tessellator;
-
-
 
 public class ScalePhotoFrame extends Gui {
 

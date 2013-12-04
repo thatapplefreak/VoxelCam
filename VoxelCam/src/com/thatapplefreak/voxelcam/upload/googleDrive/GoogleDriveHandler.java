@@ -6,7 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
-import net.minecraft.src.EnumOS;
+import net.minecraft.util.Util.EnumOS;
 
 public abstract class GoogleDriveHandler {
 	/**
@@ -26,7 +26,7 @@ public abstract class GoogleDriveHandler {
 			source = inputStream.getChannel();
 			destination = outputStream.getChannel();
 			destination.transferFrom(source, 0, source.size());
-			EnumOS os = net.minecraft.src.Util.getOSType();
+			EnumOS os = net.minecraft.util.Util.getOSType();
 			if (os.equals(EnumOS.WINDOWS)) {
 				new ProcessBuilder("explorer.exe", "/select,", googleDriveCopy.toString()).start();
 			} else if (os.equals(EnumOS.MACOS)) {

@@ -1,6 +1,6 @@
 package com.thatapplefreak.voxelcam;
 
-import net.minecraft.src.KeyBinding;
+import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
 
@@ -11,7 +11,7 @@ import com.thevoxelbox.common.util.ModConfig;
 public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider {
 
 	// Keybinds that VoxelCam uses
-	public static final KeyBinding KEY_OPENSCREENSHOTMANAGER = new KeyBinding("ScreenShot Manager", Keyboard.KEY_H);
+	public static final KeyBinding KEY_OPENSCREENSHOTMANAGER = new KeyBinding("ScreenShot Manager", Keyboard.KEY_H, "VoxelCam");
 
 	// Strings to access the settings
 	public static final String FIRSTRUN = "firstRun";

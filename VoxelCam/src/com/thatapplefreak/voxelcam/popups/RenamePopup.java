@@ -1,7 +1,7 @@
 package com.thatapplefreak.voxelcam.popups;
 
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.GuiTextField;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.GuiTextField;
 
 import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;

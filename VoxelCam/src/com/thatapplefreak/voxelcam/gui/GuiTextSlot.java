@@ -5,8 +5,8 @@ import static org.lwjgl.opengl.GL11.*;
 import java.nio.DoubleBuffer;
 import java.util.List;
 
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.Tessellator;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.renderer.Tessellator;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Mouse;

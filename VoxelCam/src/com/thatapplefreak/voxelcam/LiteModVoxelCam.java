@@ -4,10 +4,9 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 
-import net.minecraft.src.GuiMainMenu;
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.Minecraft;
-import net.minecraft.src.ScreenShotHelper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.client.gui.GuiScreen;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -71,7 +70,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	 */
 	@Override
 	public String getVersion() {
-		return "1.2.0";
+		return "1.2.1 Snapshot A";
 	}
 
 	/**
@@ -121,13 +120,14 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 		// Tell the bigscreenshot taker that the next tick has happend
 		BigScreenshotTaker.onTick();
 		// Check to see if the user wants to open the screenshot manager
-		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
-			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode)) {
+		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode())) {
+			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode())) {
 				if (minecraft.currentScreen instanceof GuiMainMenu || minecraft.currentScreen == null) {
 					if (!screenshotIsSaving) {
 						minecraft.displayGuiScreen(new GuiScreenShotManager());
 					} else {
-						minecraft.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
+//						minecraft.ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
+						minecraft.ingameGUI.getChatGUI().func_146239_a("§4[VoxelCam]§F Saving Screenshot right now, please wait");
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
 					// Dont turn the screenshot manager off if the user is
@@ -136,10 +136,10 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 						minecraft.setIngameFocus();
 					}
 				}
-				heldKeys.add(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode);
+				heldKeys.add(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode());
 			}
 		} else {
-			heldKeys.remove(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.keyCode);
+			heldKeys.remove(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode());
 		}
 	}
 

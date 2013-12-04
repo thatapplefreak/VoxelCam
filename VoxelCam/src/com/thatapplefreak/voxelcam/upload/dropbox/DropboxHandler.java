@@ -6,7 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
-import net.minecraft.src.EnumOS;
+import net.minecraft.util.Util.EnumOS;
 
 import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 
@@ -29,7 +29,7 @@ public abstract class DropboxHandler {
 			source = inputStream.getChannel();
 			destination = outputStream.getChannel();
 			destination.transferFrom(source, 0, source.size());
-			EnumOS os = net.minecraft.src.Util.getOSType();
+			EnumOS os = net.minecraft.util.Util.getOSType();
 			if (os.equals(EnumOS.WINDOWS)) {
 				new ProcessBuilder("explorer.exe", "/select,", dropboxCopy.toString()).start();
 			} else if (os.equals(EnumOS.MACOS)) {

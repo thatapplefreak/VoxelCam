@@ -12,10 +12,11 @@ import java.util.Set;
 
 import javax.imageio.ImageIO;
 
+import net.minecraft.client.renderer.texture.TextureUtil;
+
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 
-import net.minecraft.src.TextureUtil;
 
 public abstract class GLImageMemoryHandler {
 

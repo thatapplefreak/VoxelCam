@@ -8,9 +8,7 @@ import java.util.Map;
 
 import javax.imageio.ImageIO;
 
-import net.minecraft.src.Tessellator;
-import net.minecraft.src.TextureUtil;
-
+import net.minecraft.client.renderer.Tessellator;
 import static org.lwjgl.opengl.GL11.*;
 
 /**

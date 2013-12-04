@@ -3,8 +3,8 @@ package com.thatapplefreak.voxelcam.popups;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurDelete;
 import com.thevoxelbox.common.util.BrowserOpener;

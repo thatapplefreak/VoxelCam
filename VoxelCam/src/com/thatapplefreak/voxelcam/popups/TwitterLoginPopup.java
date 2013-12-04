@@ -1,6 +1,6 @@
 package com.thatapplefreak.voxelcam.popups;
 
-import net.minecraft.src.GuiScreen;
+import net.minecraft.client.gui.GuiScreen;
 
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 

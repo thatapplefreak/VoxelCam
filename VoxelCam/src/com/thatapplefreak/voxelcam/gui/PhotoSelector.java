@@ -3,7 +3,7 @@ package com.thatapplefreak.voxelcam.gui;
 import java.io.File;
 import java.text.SimpleDateFormat;
 
-import net.minecraft.src.Tessellator;
+import net.minecraft.client.renderer.Tessellator;
 
 import org.lwjgl.opengl.GL11;
 

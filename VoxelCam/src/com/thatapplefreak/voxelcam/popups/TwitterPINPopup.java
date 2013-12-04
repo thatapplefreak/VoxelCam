@@ -1,8 +1,8 @@
 package com.thatapplefreak.voxelcam.popups;
 
-import net.minecraft.src.GuiButton;
-import net.minecraft.src.GuiScreen;
-import net.minecraft.src.GuiTextField;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.GuiTextField;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 

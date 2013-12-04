@@ -4,10 +4,14 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
+import java.util.List;
 
 import javax.imageio.ImageIO;
 
-import net.minecraft.src.Minecraft;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ChatStyle;
+import net.minecraft.util.IChatComponent;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -38,7 +42,8 @@ public abstract class ScreenshotTaker {
 				}
 				try {
 					ImageIO.write(image, "png", screenshotName);
-					Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+//					Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+					Minecraft.getMinecraft().ingameGUI.getChatGUI().func_146239_a("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
 					LiteModVoxelCam.screenshotIsSaving = false;
 				} catch (IOException e) {
 					e.printStackTrace();
