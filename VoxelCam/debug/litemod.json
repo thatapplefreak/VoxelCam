@@ -3,8 +3,5 @@
     "mcversion": "1.6.4",
     "author": "thatapplefreak",
     "classTransformerClass": "com.thatapplefreak.voxelcam.VoxelCamTransformer",
-    "description": "VoxelCam is a tool for taking and\n
-managing screenshots within Minecraft.\n
- - Press 'H' to open manager ingame\n
- - Press 'Shift + F2' to take a huge screenshot"
+    "description": "VoxelCam is a tool for taking,managing, and posting screenshots to social networks within Minecraft. It also allows the player to take screenshots far beyond the size of his/her screen."
 }
