@@ -1,16 +1,20 @@
 package com.thatapplefreak.voxelcam.gui.mainmenu;
 
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.ResourceLocation;
 
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class FirstRunPopup extends GuiDialogBox {
 
 	private static final ResourceLocation avatarPNG = new ResourceLocation("voxelcam", "textures/avatar.png");
+	
+	private GuiButton forumLink;
 
 	public FirstRunPopup(GuiScreen parentScreen) {
 		super(parentScreen, 320, 150, "VoxelCam");
@@ -20,6 +24,8 @@ public class FirstRunPopup extends GuiDialogBox {
 	protected void onInitDialog() {
 		btnCancel.drawButton = false;
 		btnOk.displayString = "OK";
+		forumLink = new GuiButton(-111195, btnCancel.xPosition, btnCancel.yPosition, 60, 20, "More info");
+		buttonList.add(forumLink);
 	}
 
 	@Override
@@ -40,6 +46,14 @@ public class FirstRunPopup extends GuiDialogBox {
 		drawString(fontRenderer, "Twitter: @xApplefreak", dialogX + 80, dialogY + 80, 0x4099FF);
 		drawString(fontRenderer, "Reddit: thatapplefreak", dialogX + 80, dialogY + 90, 0xff4500);
 		drawString(fontRenderer, "MinecraftForum: thatapplefreak", dialogX + 80, dialogY + 100, 0x80ba59);
+	}
+	
+	@Override
+	protected void actionPerformed(GuiButton guibutton) {
+		if (guibutton.equals(forumLink)) {
+			BrowserOpener.openURLstringInBrowser("http://bit.ly/16LXtjV");
+		}
+		super.actionPerformed(guibutton);
 	}
 
 	@Override
