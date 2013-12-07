@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.gui;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;

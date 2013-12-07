@@ -2,8 +2,8 @@ package com.thatapplefreak.voxelcam.upload.facebook;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.popups.TwitterPINPopup;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler;
+import com.thatapplefreak.voxelcam.upload.twitter.TwitterPINPopup;
 
 import facebook4j.Facebook;
 import facebook4j.FacebookException;

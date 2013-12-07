@@ -4,11 +4,7 @@ import java.io.File;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
-import com.thatapplefreak.voxelcam.popups.TwitterPINPopup;
-import com.thatapplefreak.voxelcam.popups.TwitterPostPopup;
-import com.thatapplefreak.voxelcam.popups.UploadFailedPopup;
-import com.thatapplefreak.voxelcam.popups.UploadSuccessPopup;
+import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
@@ -50,9 +46,9 @@ public abstract class TwitterHandler {
 					s.setMedia(screenshot);
 					Status status = twitter.updateStatus(s);
 					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
-					callbackGui.onUploadComplete(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to Twitter succeeded", null, address));
+					callbackGui.onUploadComplete(new TwitterUploadSuccessPopup(callbackGui.getParentScreen(), status.getId(), address));
 				} catch (TwitterException e) {
-					callbackGui.onUploadComplete(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to Twitter failed", "Error Code: " + Integer.toString(e.getErrorCode())));
+					callbackGui.onUploadComplete(new TwitterUploadFailedPopup(callbackGui.getParentScreen(), "Error Code: " + Integer.toString(e.getErrorCode())));
 				}
 			}
 		}.start();		

@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,7 +11,6 @@ import net.minecraft.client.gui.GuiScreen;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
@@ -19,6 +18,8 @@ import com.thatapplefreak.voxelcam.upload.imgur.ImgurHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
+import com.thatapplefreak.voxelcam.upload.twitter.TwitterLoginPopup;
+import com.thatapplefreak.voxelcam.upload.twitter.TwitterPostPopup;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class PostPopup extends GuiDialogBox {

@@ -8,7 +8,7 @@ import java.nio.channels.FileChannel;
 
 import net.minecraft.util.Util.EnumOS;
 
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 
 public abstract class DropboxHandler {
 	

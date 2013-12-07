@@ -1,15 +1,15 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.upload.twitter;
 
 import net.minecraft.client.gui.GuiScreen;
 
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
-
-public class UploadFailedPopup extends GuiDialogBox {
+public class TwitterUploadFailedPopup extends GuiDialogBox {
+	
 	private String errorMessage;
 
-	public UploadFailedPopup(GuiScreen parentScreen, String windowTitle, String errorMessage) {
-		super(parentScreen, 300, 80, windowTitle);
+	public TwitterUploadFailedPopup(GuiScreen parentScreen, String errorMessage) {
+		super(parentScreen, 300, 80, "Post to Twitter failed");
 		this.errorMessage = errorMessage;
 	}
 
@@ -30,7 +30,7 @@ public class UploadFailedPopup extends GuiDialogBox {
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRenderer, "Upload failed", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
+		drawCenteredString(fontRenderer, "Post failed", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
 		drawCenteredString(fontRenderer, this.errorMessage, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFAA00);
 	}
 }

@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.gui;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import static org.lwjgl.opengl.GL11.*;
 

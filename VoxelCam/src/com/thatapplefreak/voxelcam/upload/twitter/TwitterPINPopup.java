@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.upload.twitter;
 
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -8,7 +8,6 @@ import twitter4j.auth.AccessToken;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;

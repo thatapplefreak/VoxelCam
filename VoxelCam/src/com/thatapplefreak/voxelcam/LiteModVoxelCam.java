@@ -17,12 +17,12 @@ import com.mumfrey.liteloader.Tickable;
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.mumfrey.liteloader.modconfig.ConfigPanel;
 import com.mumfrey.liteloader.util.ModUtilities;
-import com.thatapplefreak.voxelcam.gui.GuiMainMenuWithPhotoButton;
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
-import com.thatapplefreak.voxelcam.gui.GuiVoxelCamSettingsPanel;
+import com.thatapplefreak.voxelcam.gui.mainmenu.FirstRunPopup;
+import com.thatapplefreak.voxelcam.gui.mainmenu.GuiMainMenuWithPhotoButton;
+import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.gui.settings.GuiVoxelCamSettingsPanel;
 import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
-import com.thatapplefreak.voxelcam.popups.FirstRunPopup;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.common.util.AbstractionLayer;
 

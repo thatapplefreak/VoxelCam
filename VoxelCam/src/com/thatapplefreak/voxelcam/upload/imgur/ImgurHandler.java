@@ -2,10 +2,8 @@ package com.thatapplefreak.voxelcam.upload.imgur;
 
 import java.io.File;
 
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
-import com.thatapplefreak.voxelcam.popups.PostPopup;
-import com.thatapplefreak.voxelcam.popups.UploadFailedPopup;
-import com.thatapplefreak.voxelcam.popups.UploadSuccessPopup;
+import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.gui.manager.PostPopup;
 
 public abstract class ImgurHandler {
 	
@@ -15,7 +13,7 @@ public abstract class ImgurHandler {
 
 			@Override
 			public void onHTTPFailure(int responseCode, String responseMessage) {
-				callbackGui.onUploadCompleted(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to imgur failed", String.format("HTTP Error: %d %s", responseCode, responseMessage)));
+				callbackGui.onUploadCompleted(new ImgurUploadFailedPopup(callbackGui.getParentScreen(), String.format("HTTP Error: %d %s", responseCode, responseMessage)));
 			}
 
 			@Override
@@ -23,9 +21,9 @@ public abstract class ImgurHandler {
 
 				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
 				if (uploadResponse.isSuccessful()) {
-					callbackGui.onUploadCompleted(new UploadSuccessPopup(callbackGui.getParentScreen(), "Upload to imgur succeeded", uploadResponse.getDeleteHash(), uploadResponse.getLink()));
+					callbackGui.onUploadCompleted(new ImgurUploadSuccessPopup(callbackGui.getParentScreen(), uploadResponse.getDeleteHash(), uploadResponse.getLink()));
 				} else {
-					callbackGui.onUploadCompleted(new UploadFailedPopup(callbackGui.getParentScreen(), "Upload to imgur failed", uploadResponse.get("data")));
+					callbackGui.onUploadCompleted(new ImgurUploadFailedPopup(callbackGui.getParentScreen(), uploadResponse.get("data")));
 				}
 			}
 		});

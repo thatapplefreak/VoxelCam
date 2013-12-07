@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.upload.twitter;
 
 import net.minecraft.client.gui.GuiScreen;
 

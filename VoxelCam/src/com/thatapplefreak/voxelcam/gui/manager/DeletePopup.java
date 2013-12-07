@@ -1,8 +1,7 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import net.minecraft.client.gui.GuiScreen;
 
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class DeletePopup extends GuiDialogBox {

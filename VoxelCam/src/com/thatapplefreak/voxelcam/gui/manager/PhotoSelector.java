@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.gui;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.io.File;
 import java.text.SimpleDateFormat;

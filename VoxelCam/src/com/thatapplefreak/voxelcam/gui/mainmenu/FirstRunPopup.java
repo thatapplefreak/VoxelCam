@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.gui.mainmenu;
 
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.ResourceLocation;

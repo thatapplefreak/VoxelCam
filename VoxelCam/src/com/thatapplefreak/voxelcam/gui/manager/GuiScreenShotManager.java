@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.gui;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -16,9 +16,6 @@ import org.lwjgl.input.Keyboard;
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
-import com.thatapplefreak.voxelcam.popups.DeletePopup;
-import com.thatapplefreak.voxelcam.popups.PostPopup;
-import com.thatapplefreak.voxelcam.popups.RenamePopup;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can

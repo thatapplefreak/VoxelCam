@@ -1,9 +1,8 @@
-package com.thatapplefreak.voxelcam.popups;
+package com.thatapplefreak.voxelcam.gui.manager;
 
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 
-import com.thatapplefreak.voxelcam.gui.GuiScreenShotManager;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class RenamePopup extends GuiDialogBox {

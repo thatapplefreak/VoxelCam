@@ -1,4 +1,4 @@
-package com.thatapplefreak.voxelcam.gui;
+package com.thatapplefreak.voxelcam.gui.settings;
 
 import org.lwjgl.input.Keyboard;
 
