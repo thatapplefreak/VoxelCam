@@ -9,7 +9,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 	private String errorMessage;
 
 	public TwitterUploadFailedPopup(GuiScreen parentScreen, String errorMessage) {
-		super(parentScreen, 300, 80, "Post to Twitter failed");
+		super(parentScreen, 320, 80, "Post to Twitter failed");
 		this.errorMessage = errorMessage;
 	}
 

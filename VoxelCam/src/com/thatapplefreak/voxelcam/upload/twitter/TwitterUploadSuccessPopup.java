@@ -19,7 +19,7 @@ public class TwitterUploadSuccessPopup extends GuiDialogBox {
 	private GuiButton btnView, btnClipboard;
 
 	public TwitterUploadSuccessPopup(GuiScreen parentScreen, long postID, String url) {
-		super(parentScreen, 300, 80, "Post to Twitter succeeded");
+		super(parentScreen, 320, 80, "Post to Twitter succeeded");
 		this.postID = postID;
 		this.url = url;
 	}
