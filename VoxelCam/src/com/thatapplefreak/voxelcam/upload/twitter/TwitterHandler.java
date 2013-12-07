@@ -41,14 +41,14 @@ public abstract class TwitterHandler {
 		twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
 		new Thread("Twitter_Post_Thread") {
 			public void run() {
+				StatusUpdate statusupdate = new StatusUpdate(text + " #VoxelCam");
+				statusupdate.setMedia(screenshot);
 				try {
-					StatusUpdate s = new StatusUpdate(text + " #VoxelCam");
-					s.setMedia(screenshot);
-					Status status = twitter.updateStatus(s);
+					Status status = twitter.updateStatus(statusupdate);
 					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
 					callbackGui.onUploadComplete(new TwitterUploadSuccessPopup(callbackGui.getParentScreen(), status.getId(), address));
 				} catch (TwitterException e) {
-					callbackGui.onUploadComplete(new TwitterUploadFailedPopup(callbackGui.getParentScreen(), "Error Code: " + Integer.toString(e.getErrorCode())));
+					callbackGui.onUploadComplete(new TwitterUploadFailedPopup(callbackGui, statusupdate, "Error Code: " + Integer.toString(e.getErrorCode())));
 				}
 			}
 		}.start();		
