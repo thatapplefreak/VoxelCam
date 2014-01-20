@@ -214,20 +214,18 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 		return GuiVoxelCamSettingsPanel.class;
 	}
 	
-	public static void screenshotListener() {
-		int key = Minecraft.getMinecraft().gameSettings.keyBindScreenshot.getKeyCode();
+	public static void screenshotListener(Minecraft minecraft) {
+		int key = minecraft.gameSettings.keyBindScreenshot.getKeyCode();
 		if (isKeyDown(key)) {
-			if (!(Minecraft.getMinecraft().currentScreen instanceof GuiScreenShotManager)) {
+			if (!(minecraft.currentScreen instanceof GuiScreenShotManager)) {
 				if (!heldKeys.contains(key)) {
 					if (isKeyDown(Keyboard.KEY_LSHIFT) || isKeyDown(Keyboard.KEY_RSHIFT)) {
-						Minecraft mc = Minecraft.getMinecraft();
 						heldKeys.add(key);
 						BigScreenshotTaker.run();
 						return;
 					}
-					Minecraft mc = Minecraft.getMinecraft();
 					heldKeys.add(key);
-					ScreenshotTaker.capture(mc.displayWidth, mc.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD));
+					ScreenshotTaker.capture(minecraft.displayWidth, minecraft.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD));
 				}
 			}
 		} else {
