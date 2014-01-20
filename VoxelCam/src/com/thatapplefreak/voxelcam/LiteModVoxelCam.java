@@ -71,7 +71,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	 */
 	@Override
 	public String getVersion() {
-		return "1.2.1 Snapshot A";
+		return "1.2.1";
 	}
 
 	/**
