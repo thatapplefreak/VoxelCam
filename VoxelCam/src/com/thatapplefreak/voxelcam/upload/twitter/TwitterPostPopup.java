@@ -34,8 +34,8 @@ public class TwitterPostPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		btnOk.displayString = "Post";
-		textbox = new GuiTextField(fontRenderer, width / 2 - (200 / 2), height / 2 - (16 / 2) - 8, 200, 16);
-		textbox.setMaxStringLength(tweetLengh);
+		textbox = new GuiTextField(fontRendererObj, width / 2 - (200 / 2), height / 2 - (16 / 2) - 8, 200, 16);
+		textbox.func_146203_f(tweetLengh);
 		textbox.setFocused(true);
 	}
 
@@ -45,12 +45,12 @@ public class TwitterPostPopup extends GuiDialogBox {
 
 		if (uploading) {
 			buttonList.clear();
-			drawCenteredString(fontRenderer, "Uploading...", width / 2, height / 2, 0xFFFFFF);
+			drawCenteredString(fontRendererObj, "Uploading...", width / 2, height / 2, 0xFFFFFF);
 		} else {
 			textbox.drawTextBox();
-			drawString(fontRenderer, "Compose Tweet:", dialogX + 5, height / 2 - 28, 0xFFFFFF);
-			drawString(fontRenderer, "Remaining letters:", width / 2 - 5, height / 2 + 5, 0xFFFFFF);
-			drawString(fontRenderer, Integer.toString(tweetLengh - textbox.getText().length()), width / 2 + 84, height / 2 + 5, 0xFFFFFF);
+			drawString(fontRendererObj, "Compose Tweet:", dialogX + 5, height / 2 - 28, 0xFFFFFF);
+			drawString(fontRendererObj, "Remaining letters:", width / 2 - 5, height / 2 + 5, 0xFFFFFF);
+			drawString(fontRendererObj, Integer.toString(tweetLengh - textbox.getText().length()), width / 2 + 84, height / 2 + 5, 0xFFFFFF);
 		}
 
 		if (this.completeDialog != null) {

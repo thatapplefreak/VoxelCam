@@ -215,7 +215,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	}
 	
 	public static void screenshotListener() {
-		int key = Minecraft.getMinecraft().gameSettings.field_151447_Z.getKeyCode();
+		int key = Minecraft.getMinecraft().gameSettings.keyBindScreenshot.getKeyCode();
 		if (isKeyDown(key)) {
 			if (!(Minecraft.getMinecraft().currentScreen instanceof GuiScreenShotManager)) {
 				if (!heldKeys.contains(key)) {

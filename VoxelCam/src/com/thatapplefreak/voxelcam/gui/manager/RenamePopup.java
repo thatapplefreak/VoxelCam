@@ -18,7 +18,7 @@ public class RenamePopup extends GuiDialogBox {
 
 	@Override
 	protected void onInitDialog() {
-		renameBox = new GuiTextField(fontRenderer, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
+		renameBox = new GuiTextField(fontRendererObj, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
 		renameBox.setText(oldText);
 		renameBox.setFocused(true);
 	}

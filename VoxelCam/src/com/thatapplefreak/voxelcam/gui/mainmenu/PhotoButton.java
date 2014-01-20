@@ -12,10 +12,10 @@ public class PhotoButton extends GuiButton {
 	@Override
 	public void drawButton(Minecraft mc, int mouseX, int mouseY) {
 		mc.getTextureManager().bindTexture(GuiMainMenuWithPhotoButton.photoBtnPic);
-		if (mouseX >= this.xPosition && mouseY >= this.yPosition && mouseX < this.xPosition + this.width && mouseY < this.yPosition + this.height) {
-			drawTexturedModalRect(this.xPosition, this.yPosition, 47, 0, this.width, this.height); // TODO
+		if (mouseX >= this.field_146128_h && mouseY >= this.field_146129_i && mouseX < this.field_146128_h + this.field_146120_f && mouseY < this.field_146129_i + this.field_146121_g) {
+			drawTexturedModalRect(this.field_146128_h, this.field_146129_i, 47, 0, this.field_146120_f, this.field_146121_g); // TODO
 		} else {
-			drawTexturedModalRect(this.xPosition, this.yPosition, 0, 0, this.width, this.height);
+			drawTexturedModalRect(this.field_146128_h, this.field_146129_i, 0, 0, this.field_146120_f, this.field_146121_g);
 		}
 	}
 

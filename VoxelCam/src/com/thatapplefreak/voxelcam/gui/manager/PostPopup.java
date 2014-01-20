@@ -38,7 +38,7 @@ public class PostPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		buttonList.remove(btnOk);
-		btnCancel.xPosition = dialogX + 60;
+		btnCancel.field_146128_h = dialogX + 60;
 		btnImgur = new GuiButton(0, dialogX + 15, dialogY + 40, 70, 20, "Imgur");
 		btnDropBox = new GuiButton(1, dialogX + 15, dialogY + 70, 70, 20, "Dropbox");
 		btnFacebook = new GuiButton(2, dialogX + 95, dialogY + 10, 70, 20, "Facebook");
@@ -76,7 +76,7 @@ public class PostPopup extends GuiDialogBox {
 
 		if (uploading) {
 			buttonList.clear();
-			drawCenteredString(fontRenderer, "Uploading...", width / 2, height / 2, 0xffffff);
+			drawCenteredString(fontRendererObj, "Uploading...", width / 2, height / 2, 0xffffff);
 		}
 
 		if (this.completeDialog != null) {

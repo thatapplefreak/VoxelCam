@@ -47,8 +47,8 @@ public class ImgurUploadSuccessPopup  extends GuiDialogBox {
 	
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRenderer, "Upload completed successfully", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
-		drawCenteredString(fontRenderer, this.url, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFFF55);
+		drawCenteredString(fontRendererObj, "Upload completed successfully", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
+		drawCenteredString(fontRendererObj, this.url, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFFF55);
 	}
 
 	@Override

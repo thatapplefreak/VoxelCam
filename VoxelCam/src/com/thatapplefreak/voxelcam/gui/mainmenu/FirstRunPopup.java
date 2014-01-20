@@ -22,30 +22,30 @@ public class FirstRunPopup extends GuiDialogBox {
 
 	@Override
 	protected void onInitDialog() {
-		btnCancel.drawButton = false;
+		btnCancel.field_146125_m = false;
 		btnOk.displayString = "OK";
-		forumLink = new GuiButton(-111195, btnCancel.xPosition, btnCancel.yPosition, 60, 20, "More info");
+		forumLink = new GuiButton(-111195, btnCancel.field_146128_h, btnCancel.field_146129_i, 60, 20, "More info");
 		buttonList.add(forumLink);
 	}
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
 		try {
-			drawString(fontRenderer, "Thank you for downloading VoxelCam version " + LiteLoader.getInstance().getMod("VoxelCam").getVersion() + " ", dialogX + 5, dialogY + 5, 0xFFFFFF);
+			drawString(fontRendererObj, "Thank you for downloading VoxelCam version " + LiteLoader.getInstance().getMod("VoxelCam").getVersion() + " ", dialogX + 5, dialogY + 5, 0xFFFFFF);
 		} catch (Exception e) {
 		}
-		drawString(fontRenderer, "Keybindings:", dialogX + 5, dialogY + 20, 0x990000);
-		drawString(fontRenderer, "H - Open the screenshots manager while in game", dialogX + 10, dialogY + 30, 0x990000);
-		drawString(fontRenderer, "Shift + F2 - Take a HUGE screenhsot", dialogX + 10, dialogY + 40, 0x990000);
-		drawString(fontRenderer, "F7 - Open VoxelOptions", dialogX + 10, dialogY + 50, 0x990000);
+		drawString(fontRendererObj, "Keybindings:", dialogX + 5, dialogY + 20, 0x990000);
+		drawString(fontRendererObj, "H - Open the screenshots manager while in game", dialogX + 10, dialogY + 30, 0x990000);
+		drawString(fontRendererObj, "Shift + F2 - Take a HUGE screenhsot", dialogX + 10, dialogY + 40, 0x990000);
+		drawString(fontRendererObj, "F7 - Open VoxelOptions", dialogX + 10, dialogY + 50, 0x990000);
 
-		drawString(fontRenderer, "Developer:", dialogX + 5, dialogY + 70, 0x00FFFF);
+		drawString(fontRendererObj, "Developer:", dialogX + 5, dialogY + 70, 0x00FFFF);
 		drawTexturedModalRect(avatarPNG, dialogX + 10, dialogY + 80, dialogX + 75, dialogY + 140, 0, 0, 259, 256);
-		drawString(fontRenderer, "thatapplefreak", dialogX + 6, dialogY + 141, 0xFFFF00);
+		drawString(fontRendererObj, "thatapplefreak", dialogX + 6, dialogY + 141, 0xFFFF00);
 
-		drawString(fontRenderer, "Twitter: @xApplefreak", dialogX + 80, dialogY + 80, 0x4099FF);
-		drawString(fontRenderer, "Reddit: thatapplefreak", dialogX + 80, dialogY + 90, 0xff4500);
-		drawString(fontRenderer, "MinecraftForum: thatapplefreak", dialogX + 80, dialogY + 100, 0x80ba59);
+		drawString(fontRendererObj, "Twitter: @xApplefreak", dialogX + 80, dialogY + 80, 0x4099FF);
+		drawString(fontRendererObj, "Reddit: thatapplefreak", dialogX + 80, dialogY + 90, 0xff4500);
+		drawString(fontRendererObj, "MinecraftForum: thatapplefreak", dialogX + 80, dialogY + 100, 0x80ba59);
 	}
 	
 	@Override

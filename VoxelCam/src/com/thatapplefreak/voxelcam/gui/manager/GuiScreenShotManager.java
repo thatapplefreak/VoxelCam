@@ -83,7 +83,7 @@ public class GuiScreenShotManager extends GuiScreen {
 			selected = 0;
 			firstInit = false;
 
-			searchBar = new SearchBar(fontRenderer, 11, 14, 50, 13);
+			searchBar = new SearchBar(fontRendererObj, 11, 14, 50, 13);
 
 			selector = new PhotoSelector(this, 125);
 			selector.registerScrollButtons(buttonList, 7, 8);
@@ -115,7 +115,7 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (!mc.isSingleplayer()) {
 			drawDefaultBackground();
 		} else {
-			drawWorldBackground(0);
+			func_146270_b(0);
 		}
 
 		super.drawScreen(par1, par2, par3);
@@ -160,7 +160,7 @@ public class GuiScreenShotManager extends GuiScreen {
 				frame.setPhoto(getScreenShotFiles().get(selected));
 			}
 		}
-		frame.update((int) (btnPost.xPosition + 70 - (width * frameScale)), 13);
+		frame.update((int) (btnPost.field_146128_h + 70 - (width * frameScale)), 13);
 		selector.setDimensionsAndPosition(10, 28, frame.x, frame.y + frame.height);
 		searchBar.setWidth(selector.right - selector.left - 2);
 	}
@@ -191,7 +191,7 @@ public class GuiScreenShotManager extends GuiScreen {
 	}
 
 	public FontRenderer getFontRenderer(GuiScreenShotManager man) {
-		return man.fontRenderer;
+		return man.fontRendererObj;
 	}
 
 	@Override

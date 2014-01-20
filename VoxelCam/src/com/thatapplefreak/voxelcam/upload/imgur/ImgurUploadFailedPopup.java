@@ -17,7 +17,7 @@ public class ImgurUploadFailedPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		btnOk.displayString = "Close";
-		btnCancel.drawButton = false;
+		btnCancel.field_146125_m = false;
 	}
 
 	@Override
@@ -31,7 +31,7 @@ public class ImgurUploadFailedPopup extends GuiDialogBox {
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRenderer, "Upload failed", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
-		drawCenteredString(fontRenderer, this.errorMessage, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFAA00);
+		drawCenteredString(fontRendererObj, "Upload failed", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
+		drawCenteredString(fontRendererObj, this.errorMessage, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFAA00);
 	}
 }

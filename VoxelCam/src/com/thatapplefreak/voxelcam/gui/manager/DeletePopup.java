@@ -39,7 +39,7 @@ public class DeletePopup extends GuiDialogBox {
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
 		super.drawDialog(mouseX, mouseY, f);
-		drawCenteredString(fontRenderer, "Are You Sure?", width / 2, height / 2 - 12, 0xffffff);
+		drawCenteredString(fontRendererObj, "Are You Sure?", width / 2, height / 2 - 12, 0xffffff);
 	}
 
 }
