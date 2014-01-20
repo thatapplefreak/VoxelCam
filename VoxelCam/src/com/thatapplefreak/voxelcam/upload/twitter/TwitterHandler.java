@@ -40,6 +40,7 @@ public abstract class TwitterHandler {
 		String userAuthTokenSecret = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
 		twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
 		new Thread("Twitter_Post_Thread") {
+			@Override
 			public void run() {
 				StatusUpdate statusupdate = new StatusUpdate(text + " #VoxelCam");
 				statusupdate.setMedia(screenshot);

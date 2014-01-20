@@ -37,6 +37,7 @@ public class TwitterUploadSuccessPopup extends GuiDialogBox {
 	protected void actionPerformed(GuiButton guibutton) {
 		if (guibutton.id == btnCancel.id) {
 			new Thread("Twitter Post Undo Thread") {
+				@Override
 				public void run() {
 					try {
 						TwitterHandler.twitter.destroyStatus(postID);

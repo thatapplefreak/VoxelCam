@@ -30,6 +30,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 	@Override
 	public void onSubmit() {
 		new Thread("Twitter_Post_Thread") {
+			@Override
 			public void run() {
 				try {
 					Status status = TwitterHandler.twitter.updateStatus(failedUpdate);
