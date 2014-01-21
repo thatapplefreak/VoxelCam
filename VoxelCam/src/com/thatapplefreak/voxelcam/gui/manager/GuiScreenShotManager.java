@@ -1,11 +1,14 @@
 package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.awt.Desktop;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+
+import javax.imageio.ImageIO;
 
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
@@ -14,6 +17,7 @@ import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.gui.editor.GuiEditScreenshot;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 
@@ -203,7 +207,16 @@ public class GuiScreenShotManager extends GuiScreen {
 		} else if (btn == btnDelete) {
 			mc.displayGuiScreen(new DeletePopup(this));
 		} else if (btn == btnEditPicture) {
-			// TODO
+			try {
+				BufferedImage img  = ImageIO.read(getSelectedPhoto());
+				if (img.getWidth()*img.getHeight() > 9000000) {
+					mc.displayGuiScreen(new GuiEditScreenshot(img));
+				} else {
+					throw new IOException("Image is too Large for VoxelCam to edit!");
+				}
+			} catch (IOException e) {
+				// TODO show a error popup
+			}
 		} else if (btn == btnOpenFolder) {
 			try {
 				Desktop.getDesktop().browse(LiteModVoxelCam.getScreenshotsDir().toURI());
