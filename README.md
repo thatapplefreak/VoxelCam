@@ -5,6 +5,6 @@ VoxelCam is a mod for the popular game Minecraft by Mojang AB. It adds features 
 
 Dependencies:  
 Liteloader: https://www.assembla.com/code/liteloader/subversion/nodes  
-VoxelCommon: https://www.assembla.com/code/voxellibs/subversion/nodes/4/VoxelCommon
+VoxelCommon: https://www.assembla.com/code/voxellibs/subversion/nodes/4/VoxelCommon  
 Twitter4J: https://github.com/yusuke/twitter4j  
 Facebook4J: https://github.com/roundrop/facebook4j  
