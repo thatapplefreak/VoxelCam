@@ -15,7 +15,7 @@ public class VoxelPropertyIntFieldEX extends VoxelPropertyIntField {
 
 	@Override
 	public void keyTyped(char keyChar, int keyCode) {
-		if (this.active) {
+		if (this.focused) {
 			if (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER || keyCode == Keyboard.KEY_ESCAPE) {
 				onLostFocus();
 			}
