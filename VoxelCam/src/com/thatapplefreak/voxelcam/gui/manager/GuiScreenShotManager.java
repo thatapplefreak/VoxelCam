@@ -103,7 +103,6 @@ public class GuiScreenShotManager extends GuiScreen {
 		buttonList.add(btnDelete);
 
 		btnEditPicture = new GuiButton(3, width - (70 * 1) - 5, height - 45, 70, 20, "Edit");
-		btnEditPicture.enabled = false;
 		buttonList.add(btnEditPicture);
 
 		btnOpenFolder = new GuiButton(4, width - (70 * 3) - 5, height - 25, 140, 20, "Open Screenshots Folder");
@@ -207,16 +206,7 @@ public class GuiScreenShotManager extends GuiScreen {
 		} else if (btn == btnDelete) {
 			mc.displayGuiScreen(new DeletePopup(this));
 		} else if (btn == btnEditPicture) {
-			try {
-				BufferedImage img  = ImageIO.read(getSelectedPhoto());
-				if (img.getWidth()*img.getHeight() > 9000000) {
-					mc.displayGuiScreen(new GuiEditScreenshot(img));
-				} else {
-					throw new IOException("Image is too Large for VoxelCam to edit!");
-				}
-			} catch (IOException e) {
-				// TODO show a error popup
-			}
+			mc.displayGuiScreen(new GuiEditScreenshot(this, getSelectedPhoto()));
 		} else if (btn == btnOpenFolder) {
 			try {
 				Desktop.getDesktop().browse(LiteModVoxelCam.getScreenshotsDir().toURI());
@@ -245,7 +235,7 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (b) {
 			btnRename.enabled = true;
 			btnDelete.enabled = true;
-			// btnEditPicture.enabled = true;
+			btnEditPicture.enabled = true;
 			btnPost.enabled = true;
 		} else {
 			btnRename.enabled = false;
