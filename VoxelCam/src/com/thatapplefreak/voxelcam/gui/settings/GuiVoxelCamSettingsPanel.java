@@ -4,6 +4,7 @@ import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.common.gui.GuiVoxelBoxSettingsPanel;
 import com.thevoxelbox.common.util.properties.VoxelPropertyAbstractButton;
+import com.thevoxelbox.common.util.properties.VoxelPropertyCheckBox;
 import com.thevoxelbox.common.util.properties.VoxelPropertyIntField;
 import com.thevoxelbox.common.util.properties.VoxelPropertyLabel;
 
@@ -33,7 +34,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		heightField.setMaxFieldValue(max);
 		heightField.setMinFieldValue(min);
 		properties.add(heightField);
-		properties.add(new VoxelPropertyAbstractButton(LiteModVoxelCam.getConfig(), null, "720p", PANEL_LEFT + 70, PANEL_TOP + 24) {
+		properties.add(new VoxelPropertyAbstractButton(config, null, "720p", PANEL_LEFT + 70, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 1280);
@@ -41,7 +42,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(LiteModVoxelCam.getConfig(), null, "1080p", PANEL_LEFT + 70, PANEL_TOP + 44) {
+		properties.add(new VoxelPropertyAbstractButton(config, null, "1080p", PANEL_LEFT + 70, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 1920);
@@ -49,7 +50,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(LiteModVoxelCam.getConfig(), null, "4K (2160p)", PANEL_LEFT + 145, PANEL_TOP + 24) {
+		properties.add(new VoxelPropertyAbstractButton(config, null, "4K (2160p)", PANEL_LEFT + 145, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 3840);
@@ -57,7 +58,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(LiteModVoxelCam.getConfig(), null, "IMAX", PANEL_LEFT + 145, PANEL_TOP + 44) {
+		properties.add(new VoxelPropertyAbstractButton(config, null, "IMAX", PANEL_LEFT + 145, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 10000);
@@ -66,6 +67,12 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 			}
 		});
 		properties.add(new VoxelPropertyLabel("WARNING! Do not use higher resolutions on low end computers!", PANEL_LEFT + 10, PANEL_TOP + 65, 0xFF0000));
+	
+		properties.add(new VoxelPropertyCheckBox(config, VoxelCamConfig.AUTO_UPLOAD, "Automatically Upload Screenshots to social media", PANEL_LEFT + 10, PANEL_TOP + 80));
+		
+		properties.add(new VoxelPropertyCheckBox(config, VoxelCamConfig.AUTO_UPLOAD_IMGUR, "To Imgur", PANEL_LEFT + 20, PANEL_TOP + 95));
+		properties.add(new VoxelPropertyCheckBox(config, VoxelCamConfig.AUTO_UPLOAD_DROPBOX, "To Dropbox", PANEL_LEFT + 20, PANEL_TOP + 110));
+		properties.add(new VoxelPropertyCheckBox(config, VoxelCamConfig.AUTO_UPLOAD_GOOGLEDRIVE, "To Google Drive", PANEL_LEFT + 20, PANEL_TOP + 125));
 	}
 
 	private void updateFields() {

@@ -17,6 +17,8 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.upload.AutoUploader;
 import com.thevoxelbox.common.util.AbstractionLayer;
 
 public abstract class ScreenshotTaker {
@@ -45,6 +47,9 @@ public abstract class ScreenshotTaker {
 					ImageIO.write(image, "png", screenshotName);
 					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
 					LiteModVoxelCam.screenshotIsSaving = false;
+					if (LiteModVoxelCam.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
+						AutoUploader.upload(screenshotName);
+					}
 				} catch (IOException e) {
 					e.printStackTrace();
 				}

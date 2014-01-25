@@ -13,7 +13,7 @@ public abstract class GoogleDriveHandler {
 	 * Copies a file into the google drive folder /mcScreenshots/ and opens native
 	 * file browser and highlights it
 	 */
-	public static void doGoogleDrive(File screenshot) {
+	public static void doGoogleDrive(File screenshot, boolean openFileManager) {
 		makeGoogleDriveDir();
 		File googleDriveCopy = new File(System.getProperty("user.home") + "/Google Drive/mcScreenshots/", screenshot.getName());
 		FileChannel source = null;
@@ -26,11 +26,15 @@ public abstract class GoogleDriveHandler {
 			source = inputStream.getChannel();
 			destination = outputStream.getChannel();
 			destination.transferFrom(source, 0, source.size());
-			EnumOS os = net.minecraft.util.Util.getOSType();
-			if (os.equals(EnumOS.WINDOWS)) {
-				new ProcessBuilder("explorer.exe", "/select,", googleDriveCopy.toString()).start();
-			} else if (os.equals(EnumOS.MACOS)) {
-				new ProcessBuilder("open", "-R", googleDriveCopy.toString()).start();
+			if (openFileManager) {
+				EnumOS os = net.minecraft.util.Util.getOSType();
+				if (os.equals(EnumOS.WINDOWS)) {
+					new ProcessBuilder("explorer.exe", "/select,",
+							googleDriveCopy.toString()).start();
+				} else if (os.equals(EnumOS.MACOS)) {
+					new ProcessBuilder("open", "-R", googleDriveCopy.toString())
+							.start();
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

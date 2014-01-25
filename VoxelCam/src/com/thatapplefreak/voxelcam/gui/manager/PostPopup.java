@@ -94,7 +94,7 @@ public class PostPopup extends GuiDialogBox {
 			this.uploading = true;
 			break;
 		case 1: // DropBox
-			DropboxHandler.doDropBox(GuiScreenShotManager.getSelectedPhoto());
+			DropboxHandler.doDropBox(GuiScreenShotManager.getSelectedPhoto(), true);
 			mc.displayGuiScreen(getParentScreen());
 			break;
 		case 2: // Facebook
@@ -108,7 +108,7 @@ public class PostPopup extends GuiDialogBox {
 			}
 			break;
 		case 4: // Google Drive
-			GoogleDriveHandler.doGoogleDrive(GuiScreenShotManager.getSelectedPhoto());
+			GoogleDriveHandler.doGoogleDrive(GuiScreenShotManager.getSelectedPhoto(), true);
 			break;
 		}
 	}

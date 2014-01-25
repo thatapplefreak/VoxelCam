@@ -16,7 +16,7 @@ public abstract class DropboxHandler {
 	 * Copies a file into the dropbox folder /mcScreenshots/ and opens native
 	 * file browser and highlights it
 	 */
-	public static void doDropBox(File screenshot) {
+	public static void doDropBox(File screenshot, boolean openFileManager) {
 		makeDropboxDir();
 		File dropboxCopy = new File(System.getProperty("user.home") + "/dropbox/mcScreenshots/", screenshot.getName());
 		FileChannel source = null;
@@ -29,11 +29,15 @@ public abstract class DropboxHandler {
 			source = inputStream.getChannel();
 			destination = outputStream.getChannel();
 			destination.transferFrom(source, 0, source.size());
-			EnumOS os = net.minecraft.util.Util.getOSType();
-			if (os.equals(EnumOS.WINDOWS)) {
-				new ProcessBuilder("explorer.exe", "/select,", dropboxCopy.toString()).start();
-			} else if (os.equals(EnumOS.MACOS)) {
-				new ProcessBuilder("open", "-R", dropboxCopy.toString()).start();
+			if (openFileManager) {
+				EnumOS os = net.minecraft.util.Util.getOSType();
+				if (os.equals(EnumOS.WINDOWS)) {
+					new ProcessBuilder("explorer.exe", "/select,",
+							dropboxCopy.toString()).start();
+				} else if (os.equals(EnumOS.MACOS)) {
+					new ProcessBuilder("open", "-R", dropboxCopy.toString())
+							.start();
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

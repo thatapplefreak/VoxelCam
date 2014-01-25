@@ -26,6 +26,10 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 	public static final String REDDITPASSWORD = "redditPassword";
 	public static final String NORMALSCREENSHOTNAMINGMETHOD = "normalScreenshotNamingMethod";
 	public static final String BIGSCREENSHOTNAMINGMETHOD = "bigScreenshotNamingMehtod";
+	public static final String AUTO_UPLOAD = "autoUplaod";
+	public static final String AUTO_UPLOAD_IMGUR = "autoUploadToImgur";
+	public static final String AUTO_UPLOAD_DROPBOX = "autoUploadToDropbox";
+	public static final String AUTO_UPLOAD_GOOGLEDRIVE = "autoUploadToGoogleDrive";
 
 	public VoxelCamConfig() {
 		super("VoxelCam", "voxelcam.properties");
@@ -48,6 +52,10 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		defaults.put(REDDITPASSWORD, "needLogin");
 		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE");
 		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE");
+		defaults.put(AUTO_UPLOAD, "false");
+		defaults.put(AUTO_UPLOAD_IMGUR, "false");
+		defaults.put(AUTO_UPLOAD_DROPBOX, "false");
+		defaults.put(AUTO_UPLOAD_GOOGLEDRIVE, "false");
 	}
 
 }
