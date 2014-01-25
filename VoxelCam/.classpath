@@ -9,8 +9,8 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/VoxelCommon"/>
 	<classpathentry kind="lib" path="/Client/jars/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar" sourcepath="/Client/lwjgl/java"/>
 	<classpathentry kind="lib" path="/Client/jars/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar"/>
-	<classpathentry kind="lib" path="lib/twitter4j-core-3.0.3.jar"/>
 	<classpathentry kind="lib" path="lib/facebook4j-core-2.0.0.jar"/>
 	<classpathentry kind="lib" path="/Client/jars/libraries/com/google/code/gson/gson/2.2.4/gson-2.2.4.jar"/>
+	<classpathentry kind="lib" path="lib/twitter4j-core-3.0.6-SNAPSHOT.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
