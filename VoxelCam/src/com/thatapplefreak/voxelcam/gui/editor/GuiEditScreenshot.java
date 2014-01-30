@@ -43,6 +43,7 @@ public class GuiEditScreenshot extends AdvancedDrawGui {
 	@Override
 	public void initGui() {
 		new Thread("Editor Loading Thread") {
+			@Override
 			public void run() {
 				try {
 					uneditedScreenshot = ImageIO.read(screenshotFile);

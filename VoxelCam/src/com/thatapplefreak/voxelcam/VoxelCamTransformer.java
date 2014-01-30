@@ -1,9 +1,9 @@
 package com.thatapplefreak.voxelcam;
 
 import com.mumfrey.liteloader.core.runtime.Obf;
-import com.mumfrey.liteloader.core.transformers.Callback;
-import com.mumfrey.liteloader.core.transformers.CallbackInjectionTransformer;
-import com.mumfrey.liteloader.core.transformers.Callback.CallBackType;
+import com.mumfrey.liteloader.transformers.Callback;
+import com.mumfrey.liteloader.transformers.Callback.CallbackType;
+import com.mumfrey.liteloader.transformers.CallbackInjectionTransformer;
 
 public class VoxelCamTransformer extends CallbackInjectionTransformer {
 	
@@ -13,10 +13,10 @@ public class VoxelCamTransformer extends CallbackInjectionTransformer {
 	private static final String screenShotListener = "screenshotListener";
 
 	@Override
-	protected void addMappings()
+	protected void addCallbacks()
 	{
-		this.addCallbackMapping(Obf.Minecraft.name, screenShotListener, "()V", CallBackType.REDIRECT, new Callback(screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam", true));
-		this.addCallbackMapping(Obf.Minecraft.srg, screenShotListenerSrg, "()V", CallBackType.REDIRECT, new Callback(screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam", true));
-		this.addCallbackMapping(Obf.Minecraft.obf, screenShotListenerObf, "()V", CallBackType.REDIRECT, new Callback(screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam", true));
+		this.addCallback(Obf.Minecraft.name, screenShotListener,    "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
+		this.addCallback(Obf.Minecraft.srg,  screenShotListenerSrg, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
+		this.addCallback(Obf.Minecraft.obf,  screenShotListenerObf, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
 	}
 }
