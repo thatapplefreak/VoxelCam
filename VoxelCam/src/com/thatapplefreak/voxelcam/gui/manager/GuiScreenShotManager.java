@@ -104,6 +104,7 @@ public class GuiScreenShotManager extends GuiScreen {
 
 		btnEditPicture = new GuiButton(3, width - (70 * 1) - 5, height - 45, 70, 20, "Edit");
 		buttonList.add(btnEditPicture);
+		btnEditPicture.enabled = false;
 
 		btnOpenFolder = new GuiButton(4, width - (70 * 3) - 5, height - 25, 140, 20, "Open Screenshots Folder");
 		buttonList.add(btnOpenFolder);
@@ -235,7 +236,7 @@ public class GuiScreenShotManager extends GuiScreen {
 		if (b) {
 			btnRename.enabled = true;
 			btnDelete.enabled = true;
-			btnEditPicture.enabled = true;
+//			btnEditPicture.enabled = true;
 			btnPost.enabled = true;
 		} else {
 			btnRename.enabled = false;
