@@ -11,6 +11,7 @@ import net.minecraft.client.gui.GuiScreen;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
@@ -22,7 +23,7 @@ import com.thatapplefreak.voxelcam.upload.twitter.TwitterLoginPopup;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterPostPopup;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
-public class PostPopup extends GuiDialogBox {
+public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	GuiButton btnImgur, btnFacebook, btnTwitter, btnDropBox, btnGoogleDrive, btnReddit;
 

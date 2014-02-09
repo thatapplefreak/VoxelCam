@@ -20,6 +20,7 @@ import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.gui.editor.GuiEditScreenshot;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can
@@ -28,7 +29,7 @@ import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
  * @author thatapplefreak
  * 
  */
-public class GuiScreenShotManager extends GuiScreen {
+public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapable {
 
 	/**
 	 * List of all PNG files in the screenshot directory

@@ -22,6 +22,7 @@ import com.thatapplefreak.voxelcam.gui.mainmenu.GuiMainMenuWithPhotoButton;
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.gui.settings.GuiVoxelCamSettingsPanel;
 import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.common.util.AbstractionLayer;
@@ -217,7 +218,7 @@ public class LiteModVoxelCam implements Tickable, RenderListener, Configurable {
 	public static void screenshotListener(Minecraft minecraft) {
 		int key = minecraft.gameSettings.keyBindScreenshot.getKeyCode();
 		if (isKeyDown(key)) {
-			if (!(minecraft.currentScreen instanceof GuiScreenShotManager)) {
+			if (!(minecraft.currentScreen instanceof ScreenshotIncapable)) {
 				if (!heldKeys.contains(key)) {
 					if (isKeyDown(Keyboard.KEY_LSHIFT) || isKeyDown(Keyboard.KEY_RSHIFT)) {
 						heldKeys.add(key);

@@ -3,9 +3,10 @@ package com.thatapplefreak.voxelcam.gui.manager;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
-public class RenamePopup extends GuiDialogBox {
+public class RenamePopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	private GuiTextField renameBox;
 

@@ -2,9 +2,10 @@ package com.thatapplefreak.voxelcam.gui.manager;
 
 import net.minecraft.client.gui.GuiScreen;
 
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
-public class DeletePopup extends GuiDialogBox {
+public class DeletePopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	public DeletePopup(GuiScreen parentScreen) {
 		super(parentScreen, 200, 75, "Delete");
