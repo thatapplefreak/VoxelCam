@@ -21,7 +21,7 @@ public class PhotoButton extends GuiButton {
 	public void drawButton(Minecraft p_146112_1_, int p_146112_2_, int p_146112_3_) {
 		super.drawButton(p_146112_1_, p_146112_2_, p_146112_3_);
 		AbstractionLayer.bindTexture(photoBtnPic);
-		drawTexturedModalRect(this.field_146128_h, this.field_146129_i, 0, 0, this.field_146120_f, this.field_146121_g);
-		// TODO Why is this not drawing for some reason?
+		GL11.glColor4f(1, 1, 1, 1);
+		drawTexturedModalRect(this.field_146128_h + 2, this.field_146129_i + 1, 0, 0, this.field_146120_f, this.field_146121_g);
 	}
 }
