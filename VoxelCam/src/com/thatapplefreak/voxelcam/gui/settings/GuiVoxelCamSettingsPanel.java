@@ -10,7 +10,7 @@ import com.thevoxelbox.common.util.properties.VoxelPropertyLabel;
 
 public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 
-	private static final int max = (int) ((Runtime.getRuntime().totalMemory() / 1.074e9) * 5000);
+	private static final int max = 999999999;
 	private static final int min = 30;
 
 	private VoxelPropertyIntField widthField;

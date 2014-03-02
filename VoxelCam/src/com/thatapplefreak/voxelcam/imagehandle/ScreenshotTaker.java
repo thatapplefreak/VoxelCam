@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -18,6 +19,7 @@ import org.lwjgl.opengl.GL11;
 
 import com.thatapplefreak.voxelcam.LiteModVoxelCam;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 import com.thatapplefreak.voxelcam.upload.AutoUploader;
 import com.thevoxelbox.common.util.AbstractionLayer;
 
@@ -45,6 +47,7 @@ public abstract class ScreenshotTaker {
 				}
 				try {
 					ImageIO.write(image, "png", screenshotName);
+					MetaDataHandler.writeMetaData(screenshotName);
 					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
 					LiteModVoxelCam.screenshotIsSaving = false;
 					if (LiteModVoxelCam.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {

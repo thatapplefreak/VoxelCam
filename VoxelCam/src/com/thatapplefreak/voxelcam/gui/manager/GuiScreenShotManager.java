@@ -21,6 +21,7 @@ import com.thatapplefreak.voxelcam.gui.editor.GuiEditScreenshot;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can
@@ -221,12 +222,13 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	public void rename(String string) {
-		getScreenShotFiles().get(selected).renameTo(new File(LiteModVoxelCam.getScreenshotsDir(), string + ".png"));
+		File newFile = new File(LiteModVoxelCam.getScreenshotsDir(), string + ".png");
+		getSelectedPhoto().renameTo(newFile);
 	}
 
 	public void delete() {
 		GLImageMemoryHandler.requestImageRemovalFromMem(getScreenShotFiles().get(selected));
-		getScreenShotFiles().get(selected).delete(); // EXTERMINATE!
+		getSelectedPhoto().delete(); // EXTERMINATE!
 		getScreenShotFiles().remove(selected); // remove refrence
 		if (selected > 0) {
 			selected--;
