@@ -4,14 +4,13 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 
 import javax.imageio.ImageIO;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.ChatStyle;
+import net.minecraft.event.ClickEvent;
+import net.minecraft.event.ClickEvent.Action;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 import org.lwjgl.BufferUtils;
@@ -48,7 +47,15 @@ public abstract class ScreenshotTaker {
 				try {
 					ImageIO.write(image, "png", screenshotName);
 					MetaDataHandler.writeMetaData(screenshotName);
-					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+					IChatComponent msg = new ChatComponentText("");
+					IChatComponent vc = new ChatComponentText("[VoxelCam]");
+					vc.getChatStyle().setColor(EnumChatFormatting.DARK_RED);
+					IChatComponent text = new ChatComponentText(" Saved Screenshot as: ");
+					IChatComponent screenshot = new ChatComponentText(screenshotName.getName());
+					screenshot.getChatStyle().setUnderlined(true);
+					screenshot.getChatStyle().setChatClickEvent(new ClickEvent(Action.OPEN_FILE, screenshotName.getPath()));
+					msg.appendSibling(vc).appendSibling(text).appendSibling(screenshot);
+					AbstractionLayer.getMinecraft().ingameGUI.getChatGUI().printChatMessage(msg);
 					LiteModVoxelCam.screenshotIsSaving = false;
 					if (LiteModVoxelCam.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
 						AutoUploader.upload(screenshotName);
