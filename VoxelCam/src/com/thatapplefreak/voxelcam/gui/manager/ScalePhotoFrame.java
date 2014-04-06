@@ -63,12 +63,12 @@ public class ScalePhotoFrame extends Gui {
 		
 		if (currentPhoto != null && GLImageMemoryHandler.loadingImage(GLImageMemoryHandler.getImageGLName(currentPhoto))) {
 			drawBackground();
-			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, "Loading Image...", x + width / 2, y + height / 2, 0xffffff);
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, "Loading Image...", x + width / 2, y + height / 2, 0xffffff);
 			return;
 		}
 		
 		if (currentPhoto != null && img != null) {
-			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, currentPhoto.getName().replace(".png", ""), x + width / 2, y - 10, 0xffffff);
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, currentPhoto.getName().replace(".png", ""), x + width / 2, y - 10, 0xffffff);
 			float frameAspect = (float) width / (float) height;
 			float picAspect = (float) img.getWidth() / (float) img.getHeight();
 			int photoX = 0;
@@ -98,7 +98,7 @@ public class ScalePhotoFrame extends Gui {
 			parentScreen.enableButtons(true);
 		} else {
 			drawBackground();
-			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRenderer, "No ScreenShots", x + width / 2, y + height / 2, 0xffffff);
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, "No ScreenShots", x + width / 2, y + height / 2, 0xffffff);
 			parentScreen.enableButtons(false);
 		}
 	}

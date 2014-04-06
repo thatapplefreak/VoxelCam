@@ -22,9 +22,9 @@ public class FirstRunPopup extends GuiDialogBox {
 
 	@Override
 	protected void onInitDialog() {
-		btnCancel.field_146125_m = false;
+		btnCancel.visible = false;
 		btnOk.displayString = "OK";
-		forumLink = new GuiButton(-111195, btnCancel.field_146128_h, btnCancel.field_146129_i, 60, 20, "More info");
+		forumLink = new GuiButton(-111195, btnCancel.xPosition, btnCancel.yPosition, 60, 20, "More info");
 		buttonList.add(forumLink);
 	}
 

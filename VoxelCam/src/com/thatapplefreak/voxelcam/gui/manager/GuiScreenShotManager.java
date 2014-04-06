@@ -121,7 +121,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 		if (!mc.isSingleplayer()) {
 			drawDefaultBackground();
 		} else {
-			func_146270_b(0);
+			drawBackground(0);
 		}
 
 		super.drawScreen(par1, par2, par3);
@@ -166,7 +166,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 				frame.setPhoto(getScreenShotFiles().get(selected));
 			}
 		}
-		frame.update((int) (btnPost.field_146128_h + 70 - (width * frameScale)), 13);
+		frame.update((int) (btnPost.xPosition + 70 - (width * frameScale)), 13);
 		selector.setDimensionsAndPosition(10, 28, frame.x, frame.y + frame.height);
 		searchBar.setWidth(selector.right - selector.left - 2);
 	}

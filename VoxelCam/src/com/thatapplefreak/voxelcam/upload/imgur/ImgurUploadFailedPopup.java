@@ -17,7 +17,7 @@ public class ImgurUploadFailedPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		btnOk.displayString = "Close";
-		btnCancel.field_146125_m = false;
+		btnCancel.enabled = false;
 	}
 
 	@Override

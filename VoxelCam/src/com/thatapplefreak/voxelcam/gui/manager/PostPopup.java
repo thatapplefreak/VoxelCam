@@ -39,7 +39,7 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 	@Override
 	protected void onInitDialog() {
 		buttonList.remove(btnOk);
-		btnCancel.field_146128_h = dialogX + 60;
+		btnCancel.xPosition = dialogX + 60;
 		btnImgur = new GuiButton(0, dialogX + 15, dialogY + 40, 70, 20, "Imgur");
 		btnDropBox = new GuiButton(1, dialogX + 15, dialogY + 70, 70, 20, "Dropbox");
 		btnFacebook = new GuiButton(2, dialogX + 95, dialogY + 10, 70, 20, "Facebook");

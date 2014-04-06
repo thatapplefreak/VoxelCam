@@ -22,6 +22,6 @@ public class PhotoButton extends GuiButton {
 		super.drawButton(p_146112_1_, p_146112_2_, p_146112_3_);
 		AbstractionLayer.bindTexture(photoBtnPic);
 		GL11.glColor4f(1, 1, 1, 1);
-		drawTexturedModalRect(this.field_146128_h + 2, this.field_146129_i + 1, 0, 0, this.field_146120_f, this.field_146121_g);
+		drawTexturedModalRect(this.xPosition + 2, this.yPosition + 1, 0, 0, this.width, this.height);
 	}
 }
