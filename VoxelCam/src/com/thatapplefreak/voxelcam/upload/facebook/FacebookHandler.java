@@ -1,6 +1,6 @@
 package com.thatapplefreak.voxelcam.upload.facebook;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterPINPopup;

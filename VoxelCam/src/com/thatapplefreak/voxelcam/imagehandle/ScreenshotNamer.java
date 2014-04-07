@@ -6,7 +6,7 @@ import java.util.Date;
 
 import net.minecraft.client.Minecraft;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thevoxelbox.common.util.PrivateFields;
 
 public abstract class ScreenshotNamer {
@@ -20,7 +20,7 @@ public abstract class ScreenshotNamer {
 		int var3 = 1;
 
 		while (true) {
-			File var1 = new File(LiteModVoxelCam.getScreenshotsDir(), s + (var3 == 1 ? "" : "_" + var3) + ".png");
+			File var1 = new File(VoxelCamCore.getScreenshotsDir(), s + (var3 == 1 ? "" : "_" + var3) + ".png");
 
 			if (!var1.exists()) {
 				return var1;

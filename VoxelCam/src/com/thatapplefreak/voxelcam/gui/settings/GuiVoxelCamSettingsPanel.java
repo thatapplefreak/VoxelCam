@@ -1,6 +1,6 @@
 package com.thatapplefreak.voxelcam.gui.settings;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.common.gui.GuiVoxelBoxSettingsPanel;
 import com.thevoxelbox.common.util.properties.VoxelPropertyAbstractButton;
@@ -17,7 +17,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 	private VoxelPropertyIntField heightField;
 
 	public GuiVoxelCamSettingsPanel() {
-		config = LiteModVoxelCam.getConfig();
+		config = VoxelCamCore.getConfig();
 	}
 
 	@Override
@@ -26,8 +26,8 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 
 		// Mega Screenshot settings
 		properties.add(new VoxelPropertyLabel("Mega-Screenshot Settings", PANEL_LEFT + 15, PANEL_TOP + 10));
-		widthField = new VoxelPropertyIntFieldEX(LiteModVoxelCam.getConfig(), VoxelCamConfig.PHOTOWIDTH, "Width", PANEL_LEFT + 20, PANEL_TOP + 25, 40);
-		heightField = new VoxelPropertyIntFieldEX(LiteModVoxelCam.getConfig(), VoxelCamConfig.PHOTOHEIGHT, "Height", PANEL_LEFT + 20, PANEL_TOP + 45, 40);
+		widthField = new VoxelPropertyIntFieldEX(VoxelCamCore.getConfig(), VoxelCamConfig.PHOTOWIDTH, "Width", PANEL_LEFT + 20, PANEL_TOP + 25, 40);
+		heightField = new VoxelPropertyIntFieldEX(VoxelCamCore.getConfig(), VoxelCamConfig.PHOTOHEIGHT, "Height", PANEL_LEFT + 20, PANEL_TOP + 45, 40);
 		widthField.setMaxFieldValue(max);
 		widthField.setMinFieldValue(min);
 		properties.add(widthField);

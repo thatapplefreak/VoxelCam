@@ -13,10 +13,9 @@ public class VoxelCamTransformer extends CallbackInjectionTransformer {
 	private static final String screenShotListener = "screenshotListener";
 
 	@Override
-	protected void addCallbacks()
-	{
-		this.addCallback(Obf.Minecraft.name, screenShotListener,    "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
-		this.addCallback(Obf.Minecraft.srg,  screenShotListenerSrg, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
-		this.addCallback(Obf.Minecraft.obf,  screenShotListenerObf, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.LiteModVoxelCam"));
+	protected void addCallbacks() {
+		this.addCallback(Obf.Minecraft.name, screenShotListener,    "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.VoxelCamCore"));
+		this.addCallback(Obf.Minecraft.srg,  screenShotListenerSrg, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.VoxelCamCore"));
+		this.addCallback(Obf.Minecraft.obf,  screenShotListenerObf, "()V", new Callback(CallbackType.REDIRECT, screenShotListener, "com.thatapplefreak.voxelcam.VoxelCamCore"));
 	}
 }

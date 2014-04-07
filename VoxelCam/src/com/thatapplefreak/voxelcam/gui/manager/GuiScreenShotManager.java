@@ -16,7 +16,7 @@ import net.minecraft.client.gui.GuiScreen;
 
 import org.lwjgl.input.Keyboard;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.gui.editor.GuiEditScreenshot;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
@@ -68,7 +68,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	private boolean firstInit = true;
 
 	public GuiScreenShotManager() {
-		setScreenShotFiles(new ArrayList<File>(Arrays.asList(LiteModVoxelCam.getScreenshotsDir().listFiles())));
+		setScreenShotFiles(new ArrayList<File>(Arrays.asList(VoxelCamCore.getScreenshotsDir().listFiles())));
 		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
 			if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
 				getScreenShotFiles().remove(i); // Remove all files that are not
@@ -172,7 +172,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	private ArrayList<File> getSortedScreenshots() {
-		File[] filesInScreenshotDir = LiteModVoxelCam.getScreenshotsDir().listFiles();
+		File[] filesInScreenshotDir = VoxelCamCore.getScreenshotsDir().listFiles();
 		Arrays.sort(filesInScreenshotDir, new Comparator<File>() {
 			@Override
 			public int compare(File f, File g) {
@@ -212,7 +212,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			mc.displayGuiScreen(new GuiEditScreenshot(this, getSelectedPhoto()));
 		} else if (btn == btnOpenFolder) {
 			try {
-				Desktop.getDesktop().browse(LiteModVoxelCam.getScreenshotsDir().toURI());
+				Desktop.getDesktop().browse(VoxelCamCore.getScreenshotsDir().toURI());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -222,7 +222,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	public void rename(String string) {
-		File newFile = new File(LiteModVoxelCam.getScreenshotsDir(), string + ".png");
+		File newFile = new File(VoxelCamCore.getScreenshotsDir(), string + ".png");
 		getSelectedPhoto().renameTo(newFile);
 	}
 

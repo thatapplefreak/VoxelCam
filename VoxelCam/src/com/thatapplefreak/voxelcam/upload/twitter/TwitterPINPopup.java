@@ -6,7 +6,7 @@ import net.minecraft.client.gui.GuiTextField;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.common.util.BrowserOpener;

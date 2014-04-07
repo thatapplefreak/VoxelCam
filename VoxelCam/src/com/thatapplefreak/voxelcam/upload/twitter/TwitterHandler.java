@@ -2,7 +2,7 @@ package com.thatapplefreak.voxelcam.upload.twitter;
 
 import java.io.File;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
@@ -35,9 +35,9 @@ public abstract class TwitterHandler {
 	}
 
 	public static void doTwitter(final TwitterPostPopup callbackGui, final File screenshot, final String text) {
-		Long twitterUserID = Long.parseLong(LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERUSERID));
-		String userAuthToken = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN);
-		String userAuthTokenSecret = LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
+		Long twitterUserID = Long.parseLong(VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.TWITTERUSERID));
+		String userAuthToken = VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN);
+		String userAuthTokenSecret = VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET);
 		twitter.setOAuthAccessToken(new AccessToken(userAuthToken, userAuthTokenSecret, twitterUserID));
 		new Thread("Twitter_Post_Thread") {
 			@Override
@@ -84,9 +84,9 @@ public abstract class TwitterHandler {
 
 		private void storeAccessToken(AccessToken accessToken) {
 			System.out.println("[VoxelCam] Setting Twitter access token");
-			LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKEN, accessToken.getToken());
-			LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET, accessToken.getTokenSecret());
-			LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.TWITTERUSERID, String.valueOf(accessToken.getUserId()));
+			VoxelCamCore.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKEN, accessToken.getToken());
+			VoxelCamCore.getConfig().setProperty(VoxelCamConfig.TWITTERAUTHTOKENSECRET, accessToken.getTokenSecret());
+			VoxelCamCore.getConfig().setProperty(VoxelCamConfig.TWITTERUSERID, String.valueOf(accessToken.getUserId()));
 		}
 	}
 }

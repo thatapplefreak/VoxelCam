@@ -14,7 +14,7 @@ import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.common.gl.FBO;
 import com.thevoxelbox.common.util.PrivateFields;
@@ -52,9 +52,9 @@ public abstract class BigScreenshotTaker {
 		Minecraft.getMinecraft().gameSettings.hideGUI = true;
 		originalWidthOfScreen = Minecraft.getMinecraft().displayWidth;
 		originalHeightOfScreen = Minecraft.getMinecraft().displayHeight;
-		resizeMinecraft(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
+		resizeMinecraft(VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
 		fbo = new FBO();
-		fbo.begin(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
+		fbo.begin(VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
 		waiting = true;
 	}
 
@@ -74,7 +74,7 @@ public abstract class BigScreenshotTaker {
 
 	public static void onTick() {
 		if (waiting) {
-			ScreenshotTaker.capture(LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), LiteModVoxelCam.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
+			ScreenshotTaker.capture(VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();

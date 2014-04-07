@@ -17,7 +17,7 @@ import net.minecraft.util.IChatComponent;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 import com.thatapplefreak.voxelcam.upload.AutoUploader;
@@ -34,7 +34,7 @@ public abstract class ScreenshotTaker {
 		Thread imageSaveThread = new Thread("ImageSaver") {
 			@Override
 			public void run() {
-				LiteModVoxelCam.screenshotIsSaving = true;
+				VoxelCamCore.screenshotIsSaving = true;
 				BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 				for (int x = 0; x < width; x++) {
 					for (int y = 0; y < height; y++) {
@@ -49,8 +49,8 @@ public abstract class ScreenshotTaker {
 					ImageIO.write(image, "png", screenshotName);
 					MetaDataHandler.writeMetaData(screenshotName);
 					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
-					LiteModVoxelCam.screenshotIsSaving = false;
-					if (LiteModVoxelCam.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
+					VoxelCamCore.screenshotIsSaving = false;
+					if (VoxelCamCore.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
 						AutoUploader.upload(screenshotName);
 					}
 				} catch (IOException e) {

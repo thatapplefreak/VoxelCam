@@ -2,7 +2,7 @@ package com.thatapplefreak.voxelcam.upload;
 
 import java.io.File;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
@@ -15,7 +15,7 @@ import com.thevoxelbox.common.util.AbstractionLayer;
 public abstract class AutoUploader {
 
 	public static void upload(File image) {
-		VoxelCamConfig config = LiteModVoxelCam.getConfig();
+		VoxelCamConfig config = VoxelCamCore.getConfig();
 		if (config.getBoolProperty(config.AUTO_UPLOAD_IMGUR)) {
 			uploadToImgur(image);
 		}

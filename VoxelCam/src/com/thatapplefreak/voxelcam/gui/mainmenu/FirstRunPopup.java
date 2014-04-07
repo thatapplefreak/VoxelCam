@@ -5,7 +5,7 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.ResourceLocation;
 
 import com.mumfrey.liteloader.core.LiteLoader;
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
@@ -58,7 +58,7 @@ public class FirstRunPopup extends GuiDialogBox {
 
 	@Override
 	public void onSubmit() {
-		LiteModVoxelCam.getConfig().setProperty(VoxelCamConfig.FIRSTRUN, false);
+		VoxelCamCore.getConfig().setProperty(VoxelCamConfig.FIRSTRUN, false);
 	}
 
 	@Override

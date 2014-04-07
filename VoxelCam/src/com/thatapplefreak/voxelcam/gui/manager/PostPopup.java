@@ -9,7 +9,7 @@ import java.nio.channels.FileChannel;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 
-import com.thatapplefreak.voxelcam.LiteModVoxelCam;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
@@ -102,7 +102,7 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 			// TODO
 			break;
 		case 3: // Twitter
-			if (LiteModVoxelCam.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN).equals("needLogin")) {
+			if (VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN).equals("needLogin")) {
 				mc.displayGuiScreen(new TwitterLoginPopup(getParentScreen()));
 			} else {
 				mc.displayGuiScreen(new TwitterPostPopup(getParentScreen()));

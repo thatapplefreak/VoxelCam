@@ -10,7 +10,7 @@
     <property name="author" value="thatapplefreak" />
 
     <!-- Project definitions and dependencies -->
-    <property name="upstream" value="LiteLoader,VoxelCommon" />
+    <property name="upstream" value="LiteLoader,VoxelCommon,VoxelCommonMods" />
     <property name="project" value="VoxelCam" />
     
     <property name="mcp.dir" location="./../../../" />
