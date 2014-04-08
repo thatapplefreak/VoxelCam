@@ -66,7 +66,7 @@ public abstract class AutoUploader {
 				ChatMessageBuilder cmb = new ChatMessageBuilder();
 				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
 				cmb.appendText(" Auto upload to Imgur succeded: ");
-				cmb.appendLink(uploadResponse.getLink(), uploadResponse.getLink());
+				cmb.appendLink(uploadResponse.getLink(), uploadResponse.getLink(), true);
 				cmb.showChatMessageIngame();
 			}
 		});
@@ -77,7 +77,7 @@ public abstract class AutoUploader {
 		ChatMessageBuilder cmb = new ChatMessageBuilder();
 		cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
 		cmb.appendText(" Auto upload to Dropbox succeded ");
-		cmb.appendLink("Click to view", dropbox.getPath());
+		cmb.appendLink("Click to view", dropbox.getPath(), false);
 		cmb.showChatMessageIngame();
 	}
 
@@ -86,7 +86,7 @@ public abstract class AutoUploader {
 		ChatMessageBuilder cmb = new ChatMessageBuilder();
 		cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
 		cmb.appendText(" Auto upload to Google Drive succeded ");
-		cmb.appendLink("Click to view", googleDrive.getPath());
+		cmb.appendLink("Click to view", googleDrive.getPath(), false);
 		cmb.showChatMessageIngame();
 	}
 
