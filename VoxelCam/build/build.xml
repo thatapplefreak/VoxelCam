@@ -11,14 +11,14 @@
 
     <!-- Project definitions and dependencies -->
     <property name="upstream" value="LiteLoader,VoxelCommon,VoxelCommonMods" />
-    <property name="project" value="VoxelCam" />
+    <property name="project" value="VoxelCam"/>
     
-    <property name="mcp.dir" location="./../../../" />
+    <property name="mcp.dir" location="F:\Minecraft Coder Pack\mcp903" />
     <property name="eclipse" location="${mcp.dir}/eclipse" />
     <property name="src" location="${mcp.dir}/src/minecraft" />
     <property name="temp" location="${mcp.dir}/temp" />
     <property name="mc.src" location="${mcp.dir}/src/mcp" />
-    <property name="project.dir" location="./../" />
+    <property name="project.dir" location="C:\Users\Byron\git\VoxelCam\VoxelCam"/>
 
     <property name="dist.dir" location="./dist" />
     <property name="stage.dir" location="./stage/${ant.project.name}/${version}" />
@@ -49,7 +49,7 @@
     <target name="contributeresources" description="Contribute resources to the staging path">
         <echo level="info" message="Contributing project resources for ${lib}" />
         <copy todir="${stage.dir}" verbose="false" failonerror="false">
-            <fileset dir="${eclipse}/${lib}/res" excludes=".svn/**">
+            <fileset dir="${project.dir}/res" excludes=".svn/**">
                 <exclude name="**/Thumbs.db" />             
                 <exclude name="**/classes" />             
                 <exclude name="liteloader.properties" />             
@@ -66,9 +66,9 @@
         
         <foreach list="${upstream}" param="lib" target="contributesource" />
 
-        <antcall target="contributesource">
-            <param name="lib" value="${project}" />
-        </antcall>
+    	<copy todir="${src}" verbose="false" overwrite="true" failonerror="false">
+    	    <fileset dir="${project.dir}/src" />
+    	</copy>
     </target>
 
     <target name="init" description="Initialize build environment" depends="prepare">
@@ -114,10 +114,10 @@
             <param name="lib" value="${project}" />
         </antcall>
         
-        <buildnumber file="${eclipse}/${project}/build/buildnumber.txt" />
+        <buildnumber file="${project.dir}/build/buildnumber.txt" />
 
         <concat destfile="${stage.dir}/litemod.json" append="false">
-            <fileset file="${eclipse}/${project}/build/litemod.template.json" />
+            <fileset file="${project.dir}/build/litemod.template.json" />
             <filterchain><expandproperties /></filterchain>
         </concat>
     </target>
