@@ -12,6 +12,7 @@ import javax.imageio.ImageIO;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.ChatStyle;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 import org.lwjgl.BufferUtils;
@@ -22,6 +23,7 @@ import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 import com.thatapplefreak.voxelcam.upload.AutoUploader;
 import com.thevoxelbox.common.util.AbstractionLayer;
+import com.thevoxelbox.common.util.ChatMessageBuilder;
 
 public abstract class ScreenshotTaker {
 	
@@ -48,7 +50,11 @@ public abstract class ScreenshotTaker {
 				try {
 					ImageIO.write(image, "png", screenshotName);
 					MetaDataHandler.writeMetaData(screenshotName);
-					AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saved Screenshot as: " + screenshotName.getName());
+					ChatMessageBuilder cmb = new ChatMessageBuilder();
+					cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+					cmb.appendText(" Saved screenshot as: ");
+					cmb.appendLink(screenshotName.getName(), screenshotName.getPath());
+					cmb.showChatMessageIngame();
 					VoxelCamCore.screenshotIsSaving = false;
 					if (VoxelCamCore.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
 						AutoUploader.upload(screenshotName);

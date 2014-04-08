@@ -13,7 +13,7 @@ public abstract class GoogleDriveHandler {
 	 * Copies a file into the google drive folder /mcScreenshots/ and opens native
 	 * file browser and highlights it
 	 */
-	public static void doGoogleDrive(File screenshot, boolean openFileManager) {
+	public static File doGoogleDrive(File screenshot, boolean openFileManager) {
 		makeGoogleDriveDir();
 		File googleDriveCopy = new File(System.getProperty("user.home") + "/Google Drive/mcScreenshots/", screenshot.getName());
 		FileChannel source = null;
@@ -56,6 +56,7 @@ public abstract class GoogleDriveHandler {
 			} catch (IOException e) {
 			}
 		}
+		return googleDriveCopy;
 	}
 	
 

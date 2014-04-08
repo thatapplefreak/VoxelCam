@@ -16,7 +16,7 @@ public abstract class DropboxHandler {
 	 * Copies a file into the dropbox folder /mcScreenshots/ and opens native
 	 * file browser and highlights it
 	 */
-	public static void doDropBox(File screenshot, boolean openFileManager) {
+	public static File doDropBox(File screenshot, boolean openFileManager) {
 		makeDropboxDir();
 		File dropboxCopy = new File(System.getProperty("user.home") + "/dropbox/mcScreenshots/", screenshot.getName());
 		FileChannel source = null;
@@ -59,6 +59,7 @@ public abstract class DropboxHandler {
 			} catch (IOException e) {
 			}
 		}
+		return dropboxCopy;
 	}
 	
 

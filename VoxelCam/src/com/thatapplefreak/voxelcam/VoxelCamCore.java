@@ -7,6 +7,9 @@ import java.util.HashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -26,6 +29,7 @@ import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.common.util.AbstractionLayer;
+import com.thevoxelbox.common.util.ChatMessageBuilder;
 
 /**
  * Main hook class for VoxelCam
@@ -71,7 +75,7 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 		}
 
 		// Register the Keys that VoxelCam uses
-		ModUtilities.registerKey(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER);
+		LiteLoader.getInput().registerKeyBinding(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER);
 
 		// Add the configuation panel to VoxelCommons awareness
 		SettingsPanelManager.addSettingsPanel("Camera", GuiVoxelCamSettingsPanel.class);
@@ -112,7 +116,10 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 					if (!screenshotIsSaving) {
 						minecraft.displayGuiScreen(new GuiScreenShotManager());
 					} else {
-						AbstractionLayer.addChatMessage("§4[VoxelCam]§F Saving Screenshot right now, please wait");
+						ChatMessageBuilder cmb = new ChatMessageBuilder();
+						cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+						cmb.appendText(" Saving Screenshot right now, please wait");
+						cmb.showChatMessageIngame();
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
 					// Dont turn the screenshot manager off if the user is
