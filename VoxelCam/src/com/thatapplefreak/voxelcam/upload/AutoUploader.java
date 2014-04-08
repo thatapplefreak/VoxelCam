@@ -67,6 +67,7 @@ public abstract class AutoUploader {
 				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
 				cmb.appendText(" Auto upload to Imgur succeded: ");
 				cmb.appendLink(uploadResponse.getLink(), uploadResponse.getLink());
+				cmb.showChatMessageIngame();
 			}
 		});
 	}
