@@ -110,7 +110,7 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 		// Tell the bigscreenshot taker that the next tick has happend
 		BigScreenshotTaker.onTick();
 		// Check to see if the user wants to open the screenshot manager
-		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode())) {
+		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode()) && !isKeyDown(KeyBoard.KEY_F3)) {
 			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode())) {
 				if (minecraft.currentScreen instanceof GuiMainMenu || minecraft.currentScreen == null) {
 					if (!screenshotIsSaving) {
