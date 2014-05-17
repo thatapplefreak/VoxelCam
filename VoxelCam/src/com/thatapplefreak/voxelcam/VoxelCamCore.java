@@ -15,6 +15,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
 import com.mumfrey.liteloader.Configurable;
+import com.mumfrey.liteloader.InitCompleteListener;
 import com.mumfrey.liteloader.RenderListener;
 import com.mumfrey.liteloader.Tickable;
 import com.mumfrey.liteloader.core.LiteLoader;
@@ -28,6 +29,8 @@ import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
+import com.thevoxelbox.common.status.StatusMessage;
+import com.thevoxelbox.common.status.StatusMessageManager;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.ChatMessageBuilder;
 
@@ -37,7 +40,7 @@ import com.thevoxelbox.common.util.ChatMessageBuilder;
  * @author thatapplefreak
  * 
  */
-public class VoxelCamCore implements Tickable, RenderListener, Configurable {
+public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListener, Configurable {
 
 	/**
 	 * This is the configuration file for the mod
@@ -62,6 +65,8 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 	public static boolean voxelMenuExists = false;
 	
 	public static boolean screenshotIsSaving = false;
+	
+	private static StatusMessage savingStatusMessage;
 
 	/**
 	 * Initialize the mod
@@ -110,7 +115,7 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 		// Tell the bigscreenshot taker that the next tick has happend
 		BigScreenshotTaker.onTick();
 		// Check to see if the user wants to open the screenshot manager
-		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode()) && !isKeyDown(KeyBoard.KEY_F3)) {
+		if (isKeyDown(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode()) && !isKeyDown(Keyboard.KEY_F3)) {
 			if (!heldKeys.contains(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode())) {
 				if (minecraft.currentScreen instanceof GuiMainMenu || minecraft.currentScreen == null) {
 					if (!screenshotIsSaving) {
@@ -132,6 +137,10 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 			}
 		} else {
 			heldKeys.remove(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode());
+		}
+		
+		if (minecraft.inGameHasFocus && !minecraft.gameSettings.showDebugInfo) {
+			savingStatusMessage.setVisible(screenshotIsSaving);
 		}
 	}
 
@@ -223,6 +232,13 @@ public class VoxelCamCore implements Tickable, RenderListener, Configurable {
 		} else {
 			heldKeys.remove(key);
 		}
+	}
+
+	@Override
+	public void onInitCompleted(Minecraft minecraft, LiteLoader loader) {
+		savingStatusMessage = StatusMessageManager.getInstance().getStatusMessage("savingStatus", 1);
+		savingStatusMessage.setTitle("VoxelCam");
+		savingStatusMessage.setText("Saving Screenshot...");
 	}
 
 	//Leave empty
