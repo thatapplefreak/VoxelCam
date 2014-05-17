@@ -4,6 +4,6 @@ import java.awt.image.BufferedImage;
 
 public interface Filter {
 	
-	public abstract BufferedImage getFilteredImage(BufferedImage img);
+	public BufferedImage getFilteredImage(BufferedImage img);
 	
 }
