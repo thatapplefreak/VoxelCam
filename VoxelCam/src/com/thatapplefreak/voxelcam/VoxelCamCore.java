@@ -90,10 +90,10 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		try {
 			Class<? extends GuiMainMenu> customMainMenuClass = (Class<? extends GuiMainMenu>) Class.forName("com.thevoxelbox.voxelmenu.GuiMainMenuVoxelBox");
 			Method mRegisterCustomScreen = customMainMenuClass.getDeclaredMethod("registerCustomScreen", String.class, Class.class, String.class);
-			mRegisterCustomScreen.invoke(null, "right", GuiScreenShotManager.class, Translator.translate("word.screenshots"));
+			mRegisterCustomScreen.invoke(null, "right", GuiScreenShotManager.class, Translator.translate("screenshots"));
 			Class<? extends GuiMainMenu> ingameGuiClass = (Class<? extends GuiMainMenu>) Class.forName("com.thevoxelbox.voxelmenu.ingame.GuiIngameMenu");
 			mRegisterCustomScreen = ingameGuiClass.getDeclaredMethod("registerCustomScreen", String.class, Class.class, String.class);
-			mRegisterCustomScreen.invoke(null, "", GuiScreenShotManager.class, Translator.translate("word.screenshots"));
+			mRegisterCustomScreen.invoke(null, "", GuiScreenShotManager.class, Translator.translate("screenshots"));
 			voxelMenuExists = true;
 		} catch (ClassNotFoundException ex) { // This means VoxelMenu does not
 												// exist
@@ -124,7 +124,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 					} else {
 						ChatMessageBuilder cmb = new ChatMessageBuilder();
 						cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-						cmb.appendText(" " + Translator.translate("saving.pleasewait"));
+						cmb.appendText(" " + Translator.translate("savingpleasewait"));
 						cmb.showChatMessageIngame();
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
@@ -143,7 +143,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		
 		//Status Message
 		if (minecraft.inGameHasFocus && !minecraft.gameSettings.showDebugInfo) {
-			savingStatusMessage.setText(Translator.translate("saving.saving") + " (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? Translator.translate("word.writing") + "..." : ""));
+			savingStatusMessage.setText(Translator.translate("savingscreenshot") + " (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? Translator.translate("writing") + "..." : ""));
 			savingStatusMessage.setVisible(screenshotIsSaving);
 		}
 	}
