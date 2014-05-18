@@ -123,7 +123,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 					} else {
 						ChatMessageBuilder cmb = new ChatMessageBuilder();
 						cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-						cmb.append(" Saving Screenshot right now, please wait");
+						cmb.append(" " + Translator.translate("saving.pleasewait"));
 						cmb.showChatMessageIngame();
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
@@ -142,7 +142,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		
 		//Status Message
 		if (minecraft.inGameHasFocus && !minecraft.gameSettings.showDebugInfo) {
-			savingStatusMessage.setText("Saving Screenshot (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? "writing..." : ""));
+			savingStatusMessage.setText(Translator.translate("saving.saving") + " (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? Translator.translate("word.writing") + "..." : ""));
 			savingStatusMessage.setVisible(screenshotIsSaving);
 		}
 	}
