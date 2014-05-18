@@ -139,7 +139,10 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 			heldKeys.remove(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER.getKeyCode());
 		}
 		
+		
+		//Status Message
 		if (minecraft.inGameHasFocus && !minecraft.gameSettings.showDebugInfo) {
+			savingStatusMessage.setText("Saving Screenshot (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? "writing..." : ""));
 			savingStatusMessage.setVisible(screenshotIsSaving);
 		}
 	}
@@ -238,7 +241,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 	public void onInitCompleted(Minecraft minecraft, LiteLoader loader) {
 		savingStatusMessage = StatusMessageManager.getInstance().getStatusMessage("savingStatus", 1);
 		savingStatusMessage.setTitle("VoxelCam");
-		savingStatusMessage.setText("Saving Screenshot...");
+		savingStatusMessage.setText("Saving Screenshot");
 	}
 
 	//Leave empty

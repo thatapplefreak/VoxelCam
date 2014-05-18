@@ -60,6 +60,9 @@ public abstract class ScreenshotTaker {
 		save(pixelValues, width, height, screenshotName);
 	}
 	
+	private static int savepercent = 0;
+	private static boolean isWritingToFile = false;
+	
 	private static void save(final int[] pixelValues, final int width, final int height, final File saveTo) {
 		Thread imageSaveThread = new Thread("ImageSaver") {
 			@Override
@@ -69,17 +72,25 @@ public abstract class ScreenshotTaker {
 				if (OpenGlHelper.isFramebufferEnabled()) {
 	                image = new BufferedImage(width, height, 1);
 
+	                double currentPixel = 0;
+	                double totalPixels = pixelValues.length;
+	                
 	                for (int h = 0; h < height; ++h) {
 	                    for (int w = 0; w < width; ++w) {
 	                        image.setRGB(w, h, pixelValues[h * width + w]);
+	                        currentPixel++;
+	                        savepercent = (int) ((currentPixel / totalPixels) * 100);
 	                    }
-	                }
+	                }	                
+	                
 	            } else {
 	                image = new BufferedImage(width, height, 1);
+	                savepercent = 100;
 	                image.setRGB(0, 0, width, height, pixelValues, 0, width);
 	            }
 								
 				try {
+					isWritingToFile = true;
 					ImageIO.write(image, "png", saveTo);
 					MetaDataHandler.writeMetaData(saveTo);
 					ChatMessageBuilder cmb = new ChatMessageBuilder();
@@ -88,6 +99,7 @@ public abstract class ScreenshotTaker {
 					cmb.appendLink(saveTo.getName(), saveTo.getPath(), false);
 					cmb.showChatMessageIngame();
 					VoxelCamCore.screenshotIsSaving = false;
+					isWritingToFile = false;
 					upload(saveTo);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -96,6 +108,14 @@ public abstract class ScreenshotTaker {
 		};
 		imageSaveThread.setPriority(5);
 		imageSaveThread.start();
+	}
+	
+	public static boolean isWritingToFile() {
+		return isWritingToFile;
+	}
+	
+	public static int getSavePercent() {
+		return savepercent;
 	}
 
 	private static void upload(final File saveTo) {
