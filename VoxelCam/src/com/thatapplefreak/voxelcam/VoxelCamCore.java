@@ -28,6 +28,7 @@ import com.thatapplefreak.voxelcam.gui.settings.GuiVoxelCamSettingsPanel;
 import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.common.status.StatusMessage;
 import com.thevoxelbox.common.status.StatusMessageManager;
@@ -89,10 +90,10 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		try {
 			Class<? extends GuiMainMenu> customMainMenuClass = (Class<? extends GuiMainMenu>) Class.forName("com.thevoxelbox.voxelmenu.GuiMainMenuVoxelBox");
 			Method mRegisterCustomScreen = customMainMenuClass.getDeclaredMethod("registerCustomScreen", String.class, Class.class, String.class);
-			mRegisterCustomScreen.invoke(null, "right", GuiScreenShotManager.class, "Screenshots");
+			mRegisterCustomScreen.invoke(null, "right", GuiScreenShotManager.class, Translator.translate("word.screenshots"));
 			Class<? extends GuiMainMenu> ingameGuiClass = (Class<? extends GuiMainMenu>) Class.forName("com.thevoxelbox.voxelmenu.ingame.GuiIngameMenu");
 			mRegisterCustomScreen = ingameGuiClass.getDeclaredMethod("registerCustomScreen", String.class, Class.class, String.class);
-			mRegisterCustomScreen.invoke(null, "", GuiScreenShotManager.class, "Screenshots");
+			mRegisterCustomScreen.invoke(null, "", GuiScreenShotManager.class, Translator.translate("word.screenshots"));
 			voxelMenuExists = true;
 		} catch (ClassNotFoundException ex) { // This means VoxelMenu does not
 												// exist
@@ -123,7 +124,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 					} else {
 						ChatMessageBuilder cmb = new ChatMessageBuilder();
 						cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-						cmb.appendText(" Saving Screenshot right now, please wait");
+						cmb.appendText(" " + Translator.translate("saving.pleasewait"));
 						cmb.showChatMessageIngame();
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {
@@ -142,7 +143,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		
 		//Status Message
 		if (minecraft.inGameHasFocus && !minecraft.gameSettings.showDebugInfo) {
-			savingStatusMessage.setText("Saving Screenshot (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? "writing..." : ""));
+			savingStatusMessage.setText(Translator.translate("saving.saving") + " (" + ScreenshotTaker.getSavePercent() + "%) " + (ScreenshotTaker.isWritingToFile() ? Translator.translate("word.writing") + "..." : ""));
 			savingStatusMessage.setVisible(screenshotIsSaving);
 		}
 	}
@@ -241,7 +242,6 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 	public void onInitCompleted(Minecraft minecraft, LiteLoader loader) {
 		savingStatusMessage = StatusMessageManager.getInstance().getStatusMessage("savingStatus", 1);
 		savingStatusMessage.setTitle("VoxelCam");
-		savingStatusMessage.setText("Saving Screenshot");
 	}
 
 	//Leave empty
