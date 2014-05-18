@@ -1,7 +1,7 @@
-word.camera=Camera
-word.screenshot=Screenshot
-word.screenshots=Screenshots
-word.writing=writing
-word.loading=Loading
-saving.saving=Saving Screenshot
-saving.pleasewait=Saving Screenshot right now, please wait
+camera=Camera
+screenshot=Screenshot
+screenshots=Screenshots
+writing=writing
+loading=Loading
+savingscreenshot=Saving Screenshot
+savingpleasewait=Saving Screenshot right now, please wait
