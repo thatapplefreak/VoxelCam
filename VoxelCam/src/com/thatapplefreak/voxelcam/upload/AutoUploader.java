@@ -24,8 +24,8 @@ public abstract class AutoUploader {
 				uploadToDropbox(image);
 			} else {
 				ChatMessageBuilder cmb = new ChatMessageBuilder();
-				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-				cmb.appendText(" Error uploading to dropbox! Dropbox not installed!");
+				cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+				cmb.append(" Error uploading to dropbox! Dropbox not installed!");
 				cmb.showChatMessageIngame();
 			}
 		}
@@ -34,8 +34,8 @@ public abstract class AutoUploader {
 				uploadToGoogleDrive(image);
 			} else {
 				ChatMessageBuilder cmb = new ChatMessageBuilder();
-				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-				cmb.appendText(" Error uploading to Google Drive! Google Drive not installed!");
+				cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+				cmb.append(" Error uploading to Google Drive! Google Drive not installed!");
 				cmb.showChatMessageIngame();
 			}
 		}
@@ -52,11 +52,11 @@ public abstract class AutoUploader {
 			@Override
 			public void onHTTPFailure(int responseCode, String responseMessage) {
 				ChatMessageBuilder cmb = new ChatMessageBuilder();
-				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-				cmb.appendText(" Error uploading image to imgur (");
-				cmb.appendText(String.valueOf(responseCode));
-				cmb.appendText("): ");
-				cmb.appendText(responseMessage);
+				cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+				cmb.append(" Error uploading image to imgur (");
+				cmb.append(String.valueOf(responseCode));
+				cmb.append("): ");
+				cmb.append(responseMessage);
 				cmb.showChatMessageIngame();
 			}
 			
@@ -64,9 +64,9 @@ public abstract class AutoUploader {
 			public void onCompleted(ImgurResponse response) {
 				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
 				ChatMessageBuilder cmb = new ChatMessageBuilder();
-				cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-				cmb.appendText(" Auto upload to Imgur succeded: ");
-				cmb.appendLink(uploadResponse.getLink(), uploadResponse.getLink(), true);
+				cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+				cmb.append(" Auto upload to Imgur succeded: ");
+				cmb.append(uploadResponse.getLink(), uploadResponse.getLink(), true);
 				cmb.showChatMessageIngame();
 			}
 		});
@@ -75,18 +75,18 @@ public abstract class AutoUploader {
 	private static void uploadToDropbox(File image) {
 		File dropbox = DropboxHandler.doDropBox(image, false);
 		ChatMessageBuilder cmb = new ChatMessageBuilder();
-		cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-		cmb.appendText(" Auto upload to Dropbox succeded ");
-		cmb.appendLink("Click to view", dropbox.getPath(), false);
+		cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+		cmb.append(" Auto upload to Dropbox succeded ");
+		cmb.append("Click to view", dropbox.getPath(), false);
 		cmb.showChatMessageIngame();
 	}
 
 	private static void uploadToGoogleDrive(File image) {
 		File googleDrive = GoogleDriveHandler.doGoogleDrive(image, false);
 		ChatMessageBuilder cmb = new ChatMessageBuilder();
-		cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-		cmb.appendText(" Auto upload to Google Drive succeded ");
-		cmb.appendLink("Click to view", googleDrive.getPath(), false);
+		cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+		cmb.append(" Auto upload to Google Drive succeded ");
+		cmb.append("Click to view", googleDrive.getPath(), false);
 		cmb.showChatMessageIngame();
 	}
 

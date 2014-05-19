@@ -122,8 +122,8 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 						minecraft.displayGuiScreen(new GuiScreenShotManager());
 					} else {
 						ChatMessageBuilder cmb = new ChatMessageBuilder();
-						cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-						cmb.appendText(" Saving Screenshot right now, please wait");
+						cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+						cmb.append(" Saving Screenshot right now, please wait");
 						cmb.showChatMessageIngame();
 					}
 				} else if (minecraft.currentScreen instanceof GuiScreenShotManager) {

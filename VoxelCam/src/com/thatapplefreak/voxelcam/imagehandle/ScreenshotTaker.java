@@ -94,9 +94,9 @@ public abstract class ScreenshotTaker {
 					ImageIO.write(image, "png", saveTo);
 					MetaDataHandler.writeMetaData(saveTo);
 					ChatMessageBuilder cmb = new ChatMessageBuilder();
-					cmb.appendText("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-					cmb.appendText(" Saved screenshot as: ");
-					cmb.appendLink(saveTo.getName(), saveTo.getPath(), false);
+					cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+					cmb.append(" Saved screenshot as: ");
+					cmb.append(saveTo.getName(), saveTo.getPath(), false);
 					cmb.showChatMessageIngame();
 					VoxelCamCore.screenshotIsSaving = false;
 					isWritingToFile = false;
