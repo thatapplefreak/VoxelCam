@@ -55,7 +55,7 @@ public class GuiEditScreenshot extends AdvancedDrawGui {
 			};
 		}.start();
 		
-		buttonList.add(btnDone = new GuiButton(0, 10, height - 30, 70, 20, "Done"));
+		buttonList.add(btnDone = new GuiButton(0, 10, height - 30, 70, 20, Translator.translate("done")));
 	}
 	
 	@Override

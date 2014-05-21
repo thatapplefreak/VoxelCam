@@ -5,6 +5,7 @@ import java.io.File;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
@@ -49,7 +50,7 @@ public abstract class TwitterHandler {
 					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
 					callbackGui.onUploadComplete(new TwitterUploadSuccessPopup(callbackGui.getParentScreen(), status.getId(), address));
 				} catch (TwitterException e) {
-					callbackGui.onUploadComplete(new TwitterUploadFailedPopup(callbackGui, statusupdate, "Error Code: " + Integer.toString(e.getErrorCode())));
+					callbackGui.onUploadComplete(new TwitterUploadFailedPopup(callbackGui, statusupdate, Translator.translate("errorcode") + ": " + Integer.toString(e.getErrorCode())));
 				}
 			}
 		}.start();		

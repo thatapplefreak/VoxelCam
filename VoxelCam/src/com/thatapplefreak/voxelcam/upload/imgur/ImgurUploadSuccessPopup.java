@@ -6,6 +6,7 @@ import java.awt.datatransfer.StringSelection;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
@@ -17,17 +18,17 @@ public class ImgurUploadSuccessPopup  extends GuiDialogBox {
 	private GuiButton btnView, btnClipboard;
 
 	public ImgurUploadSuccessPopup(GuiScreen parentScreen, String deleteHash, String url) {
-		super(parentScreen, 300, 80, "Upload to Imgur succeeded");
+		super(parentScreen, 300, 80, Translator.translate("imguruploadsuccess"));
 		this.deleteHash = deleteHash;
 		this.url = url;
 	}
 	
 	@Override
 	protected void onInitDialog() {
-		btnCancel.displayString = "Undo";
-		btnView = new GuiButton(100, dialogX + dialogWidth - 248, dialogY + dialogHeight - 22, 60, 20, "Open");
+		btnCancel.displayString = Translator.translate("undo");
+		btnView = new GuiButton(100, dialogX + dialogWidth - 248, dialogY + dialogHeight - 22, 60, 20, Translator.translate("open"));
 		buttonList.add(btnView);
-		btnClipboard = new GuiButton(200, dialogX + dialogWidth - 186, dialogY + dialogHeight - 22, 60, 20, "Copy Link");
+		btnClipboard = new GuiButton(200, dialogX + dialogWidth - 186, dialogY + dialogHeight - 22, 60, 20, Translator.translate("copylink"));
 		buttonList.add(btnClipboard);
 	}
 	
@@ -47,7 +48,7 @@ public class ImgurUploadSuccessPopup  extends GuiDialogBox {
 	
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRendererObj, "Upload completed successfully", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
+		drawCenteredString(fontRendererObj, Translator.translate("uploadsuccess"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
 		drawCenteredString(fontRendererObj, this.url, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFFF55);
 	}
 

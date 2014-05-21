@@ -6,6 +6,7 @@ import twitter4j.TwitterException;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class TwitterUploadFailedPopup extends GuiDialogBox {
@@ -17,7 +18,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 	private boolean retrying = false;
 
 	public TwitterUploadFailedPopup(TwitterPostPopup parentScreen, StatusUpdate failedUpdate, String errorMessage) {
-		super(parentScreen, 320, 80, "Post to Twitter failed");
+		super(parentScreen, 320, 80, Translator.translate("twitterpostfailed"));
 		this.failedUpdate = failedUpdate;
 		this.errorMessage = errorMessage;
 	}
@@ -37,7 +38,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
 					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadSuccessPopup(((TwitterPostPopup)getParentScreen()).getParentScreen(), status.getId(), address));
 				} catch (TwitterException e) {
-					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadFailedPopup(((TwitterPostPopup)getParentScreen()), failedUpdate, "Error Code: " + Integer.toString(e.getErrorCode())));
+					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadFailedPopup(((TwitterPostPopup)getParentScreen()), failedUpdate, Translator.translate("errorcode") + ": " + Integer.toString(e.getErrorCode())));
 				}
 			}
 		}.start();	
@@ -50,7 +51,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRendererObj, "Post failed", dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
+		drawCenteredString(fontRendererObj, Translator.translate("postfailed"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
 		drawCenteredString(fontRendererObj, this.errorMessage, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFAA00);
 	}
 	

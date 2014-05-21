@@ -7,6 +7,7 @@ import net.minecraft.util.ResourceLocation;
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
@@ -23,23 +24,23 @@ public class FirstRunPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		btnCancel.visible = false;
-		btnOk.displayString = "OK";
-		forumLink = new GuiButton(-111195, btnCancel.xPosition, btnCancel.yPosition, 60, 20, "More info");
+		btnOk.displayString = Translator.translate("ok");
+		forumLink = new GuiButton(-111195, btnCancel.xPosition, btnCancel.yPosition, 60, 20, Translator.translate("moreinfo"));
 		buttonList.add(forumLink);
 	}
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
 		try {
-			drawString(fontRendererObj, "Thank you for downloading VoxelCam version " + LiteLoader.getInstance().getMod("VoxelCam").getVersion() + " ", dialogX + 5, dialogY + 5, 0xFFFFFF);
+			drawString(fontRendererObj, Translator.translate("welcomeline1") + " " + LiteLoader.getInstance().getMod("VoxelCam").getVersion() + " ", dialogX + 5, dialogY + 5, 0xFFFFFF);
 		} catch (Exception e) {
 		}
-		drawString(fontRendererObj, "Keybindings:", dialogX + 5, dialogY + 20, 0x990000);
-		drawString(fontRendererObj, "H - Open the screenshots manager while in game", dialogX + 10, dialogY + 30, 0x990000);
-		drawString(fontRendererObj, "Shift + F2 - Take a HUGE screenhsot", dialogX + 10, dialogY + 40, 0x990000);
-		drawString(fontRendererObj, "F7 - Open VoxelOptions", dialogX + 10, dialogY + 50, 0x990000);
+		drawString(fontRendererObj, Translator.translate("keybindings") + ":", dialogX + 5, dialogY + 20, 0x990000);
+		drawString(fontRendererObj, "H - " + Translator.translate("welcomeline2"), dialogX + 10, dialogY + 30, 0x990000);
+		drawString(fontRendererObj, "Shift + F2 - " + Translator.translate("welcomeline3"), dialogX + 10, dialogY + 40, 0x990000);
+		drawString(fontRendererObj, "F7 - " + Translator.translate("welcomeline4"), dialogX + 10, dialogY + 50, 0x990000);
 
-		drawString(fontRendererObj, "Developer:", dialogX + 5, dialogY + 70, 0x00FFFF);
+		drawString(fontRendererObj, Translator.translate("developer") + ":", dialogX + 5, dialogY + 70, 0x00FFFF);
 		drawTexturedModalRect(avatarPNG, dialogX + 10, dialogY + 80, dialogX + 75, dialogY + 140, 0, 0, 259, 256);
 		drawString(fontRendererObj, "thatapplefreak", dialogX + 6, dialogY + 141, 0xFFFF00);
 
