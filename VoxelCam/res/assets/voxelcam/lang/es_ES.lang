@@ -1,4 +1,3 @@
-//I tried, wouldn't be a bad idea to get someone to check this before you use it.
 camera=Cámara
 screenshot=Captura de pantalla
 screenshots=Capturas de pantalla
@@ -24,9 +23,9 @@ search=Buscar
 megascreenshotsettings=El ajuste de capturas de pantalla grandes
 width=La ancho
 height=La altura
-memorywarning=¡ADVERTENCIA! Do not use higher resolutions on low end computers! ¡No use las resolucións mayor en las computadoras de gama baja!
+memorywarning=¡ADVERTENCIA! ¡No use las resolucións mayor en las computadoras de gama baja!
 autouploadsocialmedia= Automáticamente suba las capturas de pantalla a los medios de comunicación social
-to=¿A...?
+to=A
 savedscreenshotas=Guardó la captura de pantalla como
 dropboxnoinstallerror=¡Tiene un error a subir a Dropbox! ¡Dropbox no está instalando!
 googledrivenoinstallerror=¡Tiene un error a subir a Google Drive! ¡Google Drive no está instalando!
