@@ -7,13 +7,21 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Properties;
 
+import net.minecraft.client.Minecraft;
+
 public class Translator {
 	
 	private static Properties english_US = getTranslation("english_US");
 	
 	public static String translate(String key) {
-		//Find 
-		return "filler";
+		String language = Minecraft.getMinecraft().gameSettings.language;
+		
+		if (language.equals("en_US")) {
+			return english_US.getProperty(key);
+		}		
+		
+		//Default to US English
+		return english_US.getProperty(key);
 	}
 	
 	private static Properties getTranslation(String fileName) {
