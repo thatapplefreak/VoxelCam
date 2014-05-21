@@ -8,6 +8,7 @@ import twitter4j.auth.AccessToken;
 
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
@@ -20,7 +21,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 	private boolean b = false;
 
 	public TwitterPINPopup(GuiScreen parentScreen) {
-		super(parentScreen, 200, 75, "Please enter the PIN you received");
+		super(parentScreen, 200, 75, Translator.translate("pleaseenterpin"));
 	}
 
 	@Override

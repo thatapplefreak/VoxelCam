@@ -25,6 +25,7 @@ import org.lwjgl.opengl.GL12;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thatapplefreak.voxelcam.upload.AutoUploader;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.ChatMessageBuilder;
@@ -95,7 +96,7 @@ public abstract class ScreenshotTaker {
 					MetaDataHandler.writeMetaData(saveTo);
 					ChatMessageBuilder cmb = new ChatMessageBuilder();
 					cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
-					cmb.append(" Saved screenshot as: ");
+					cmb.append(" " + Translator.translate("savedscreenshotas") + ": ");
 					cmb.append(saveTo.getName(), saveTo.getPath(), false);
 					cmb.showChatMessageIngame();
 					VoxelCamCore.screenshotIsSaving = false;

@@ -12,6 +12,7 @@ import net.minecraft.client.gui.GuiScreen;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
@@ -32,7 +33,7 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 	private boolean uploading = false;
 
 	public PostPopup(GuiScreen parentScreen) {
-		super(parentScreen, 180, 120, "Post to...");
+		super(parentScreen, 180, 120, Translator.translate("postto") + "...");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -77,7 +78,7 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 
 		if (uploading) {
 			buttonList.clear();
-			drawCenteredString(fontRendererObj, "Uploading...", width / 2, height / 2, 0xffffff);
+			drawCenteredString(fontRendererObj, Translator.translate("uploading") + "...", width / 2, height / 2, 0xffffff);
 		}
 
 		if (this.completeDialog != null) {

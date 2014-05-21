@@ -22,6 +22,7 @@ import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
+import com.thatapplefreak.voxelcam.lang.Translator;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can
@@ -95,23 +96,23 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			selector.registerScrollButtons(buttonList, 7, 8);
 		}
 
-		btnBack = new GuiButton(0, 10, height - 30, 70, 20, "Back");
+		btnBack = new GuiButton(0, 10, height - 30, 70, 20, Translator.translate("back"));
 		buttonList.add(btnBack);
 
-		btnRename = new GuiButton(1, width - (70 * 3) - 5, height - 45, 70, 20, "Rename");
+		btnRename = new GuiButton(1, width - (70 * 3) - 5, height - 45, 70, 20, Translator.translate("rename"));
 		buttonList.add(btnRename);
 
-		btnDelete = new GuiButton(2, width - (70 * 2) - 5, height - 45, 70, 20, "Delete");
+		btnDelete = new GuiButton(2, width - (70 * 2) - 5, height - 45, 70, 20, Translator.translate("delete"));
 		buttonList.add(btnDelete);
 
-		btnEditPicture = new GuiButton(3, width - (70 * 1) - 5, height - 45, 70, 20, "Edit");
+		btnEditPicture = new GuiButton(3, width - (70 * 1) - 5, height - 45, 70, 20, Translator.translate("edit"));
 		buttonList.add(btnEditPicture);
 		btnEditPicture.enabled = false;
 
-		btnOpenFolder = new GuiButton(4, width - (70 * 3) - 5, height - 25, 140, 20, "Open Screenshots Folder");
+		btnOpenFolder = new GuiButton(4, width - (70 * 3) - 5, height - 25, 140, 20, Translator.translate("openscreenshotsfolder"));
 		buttonList.add(btnOpenFolder);
 
-		btnPost = new GuiButton(5, width - (70 * 1) - 5, height - 25, 70, 20, "Post to...");
+		btnPost = new GuiButton(5, width - (70 * 1) - 5, height - 25, 70, 20, Translator.translate("postto") + "...");
 		buttonList.add(btnPost);
 
 	}
