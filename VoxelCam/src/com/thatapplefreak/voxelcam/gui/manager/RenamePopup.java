@@ -2,9 +2,9 @@ package com.thatapplefreak.voxelcam.gui.manager;
 
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
-import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class RenamePopup extends GuiDialogBox implements ScreenshotIncapable {
@@ -14,7 +14,7 @@ public class RenamePopup extends GuiDialogBox implements ScreenshotIncapable {
 	private String oldText;
 
 	public RenamePopup(GuiScreen parentScreen, String oldName) {
-		super(parentScreen, 200, 75, Translator.translate("rename"));
+		super(parentScreen, 200, 75, I18n.format("rename"));
 		this.oldText = oldName.replaceAll(".png", "");
 	}
 

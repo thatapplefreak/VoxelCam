@@ -3,12 +3,12 @@ package com.thatapplefreak.voxelcam.upload.twitter;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.resources.I18n;
 import twitter4j.TwitterException;
 import twitter4j.auth.AccessToken;
 
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
@@ -21,7 +21,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 	private boolean b = false;
 
 	public TwitterPINPopup(GuiScreen parentScreen) {
-		super(parentScreen, 200, 75, Translator.translate("pleaseenterpin"));
+		super(parentScreen, 200, 75, I18n.format("pleaseenterpin"));
 	}
 
 	@Override

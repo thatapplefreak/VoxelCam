@@ -1,8 +1,8 @@
 package com.thatapplefreak.voxelcam.upload.twitter;
 
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 
-import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 
@@ -20,11 +20,11 @@ public class TwitterLoginPopup extends GuiDialogBox {
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
 		super.drawDialog(mouseX, mouseY, f);
-		drawString(fontRendererObj, Translator.translate("twitauthline1"), width / 2 - (150 / 2), height / 2 - 37, 0xFFFFFF);
-		drawString(fontRendererObj, Translator.translate("twitauthline2"), width / 2 - (150 / 2) - 25, height / 2 - 27, 0xFFFFFF);
-		drawString(fontRendererObj, Translator.translate("twitauthline3"), width / 2 - (150 / 2) - 25, height / 2 - 17, 0xFFFFFF);
-		drawString(fontRendererObj, Translator.translate("twitauthline4"), width / 2 - (150 / 2) - 25, height / 2 - 7, 0xFFFFFF);
-		drawString(fontRendererObj, Translator.translate("twitauthline5"), width / 2 - (150 / 2) - 25, height / 2 + 3, 0xFFFFFF);
+		drawString(fontRendererObj, I18n.format("twitauthline1"), width / 2 - (150 / 2), height / 2 - 37, 0xFFFFFF);
+		drawString(fontRendererObj, I18n.format("twitauthline2"), width / 2 - (150 / 2) - 25, height / 2 - 27, 0xFFFFFF);
+		drawString(fontRendererObj, I18n.format("twitauthline3"), width / 2 - (150 / 2) - 25, height / 2 - 17, 0xFFFFFF);
+		drawString(fontRendererObj, I18n.format("twitauthline4"), width / 2 - (150 / 2) - 25, height / 2 - 7, 0xFFFFFF);
+		drawString(fontRendererObj, I18n.format("twitauthline5"), width / 2 - (150 / 2) - 25, height / 2 + 3, 0xFFFFFF);
 	}
 
 	@Override

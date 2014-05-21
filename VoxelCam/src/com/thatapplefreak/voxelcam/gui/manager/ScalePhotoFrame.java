@@ -12,10 +12,10 @@ import javax.imageio.ImageIO;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
-import com.thatapplefreak.voxelcam.lang.Translator;
 
 public class ScalePhotoFrame extends Gui {
 
@@ -64,7 +64,7 @@ public class ScalePhotoFrame extends Gui {
 		
 		if (currentPhoto != null && GLImageMemoryHandler.loadingImage(GLImageMemoryHandler.getImageGLName(currentPhoto))) {
 			drawBackground();
-			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, Translator.translate("loadingiamge") + "...", x + width / 2, y + height / 2, 0xffffff);
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, I18n.format("loadingiamge") + "...", x + width / 2, y + height / 2, 0xffffff);
 			return;
 		}
 		
@@ -99,7 +99,7 @@ public class ScalePhotoFrame extends Gui {
 			parentScreen.enableButtons(true);
 		} else {
 			drawBackground();
-			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, Translator.translate("noscreenshots"), x + width / 2, y + height / 2, 0xffffff);
+			parentScreen.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, I18n.format("noscreenshots"), x + width / 2, y + height / 2, 0xffffff);
 			parentScreen.enableButtons(false);
 		}
 	}

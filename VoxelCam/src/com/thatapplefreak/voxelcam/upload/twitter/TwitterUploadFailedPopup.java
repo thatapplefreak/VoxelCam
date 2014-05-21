@@ -5,8 +5,8 @@ import twitter4j.StatusUpdate;
 import twitter4j.TwitterException;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 
-import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class TwitterUploadFailedPopup extends GuiDialogBox {
@@ -18,7 +18,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 	private boolean retrying = false;
 
 	public TwitterUploadFailedPopup(TwitterPostPopup parentScreen, StatusUpdate failedUpdate, String errorMessage) {
-		super(parentScreen, 320, 80, Translator.translate("twitterpostfailed"));
+		super(parentScreen, 320, 80, I18n.format("twitterpostfailed"));
 		this.failedUpdate = failedUpdate;
 		this.errorMessage = errorMessage;
 	}
@@ -38,7 +38,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 					String address = "http://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
 					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadSuccessPopup(((TwitterPostPopup)getParentScreen()).getParentScreen(), status.getId(), address));
 				} catch (TwitterException e) {
-					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadFailedPopup(((TwitterPostPopup)getParentScreen()), failedUpdate, Translator.translate("errorcode") + ": " + Integer.toString(e.getErrorCode())));
+					((TwitterPostPopup)getParentScreen()).onUploadComplete(new TwitterUploadFailedPopup(((TwitterPostPopup)getParentScreen()), failedUpdate, I18n.format("errorcode") + ": " + Integer.toString(e.getErrorCode())));
 				}
 			}
 		}.start();	
@@ -51,7 +51,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRendererObj, Translator.translate("postfailed"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
+		drawCenteredString(fontRendererObj, I18n.format("postfailed"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFF5555);
 		drawCenteredString(fontRendererObj, this.errorMessage, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFAA00);
 	}
 	

@@ -4,11 +4,10 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ChatAllowedCharacters;
 
 import org.lwjgl.opengl.GL11;
-
-import com.thatapplefreak.voxelcam.lang.Translator;
 
 
 public class SearchBar extends Gui {
@@ -430,7 +429,7 @@ public class SearchBar extends Gui {
 				var9 = this.fontRenderer.drawStringWithShadow(var10, var7, var8, var1);
 			} else {
 				if (!isFocused) {
-					drawString(fontRenderer, Translator.translate("search"), var7, var8, 0xa0a0a0);
+					drawString(fontRenderer, I18n.format("search"), var7, var8, 0xa0a0a0);
 				}
 			}
 

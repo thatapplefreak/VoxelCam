@@ -9,8 +9,8 @@ import javax.imageio.ImageIO;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 
-import com.thatapplefreak.voxelcam.lang.Translator;
 import com.thevoxelbox.common.util.gui.AdvancedDrawGui;
 
 public class GuiEditScreenshot extends AdvancedDrawGui {
@@ -55,14 +55,14 @@ public class GuiEditScreenshot extends AdvancedDrawGui {
 			};
 		}.start();
 		
-		buttonList.add(btnDone = new GuiButton(0, 10, height - 30, 70, 20, Translator.translate("done")));
+		buttonList.add(btnDone = new GuiButton(0, 10, height - 30, 70, 20, I18n.format("done")));
 	}
 	
 	@Override
 	public void drawScreen(int par1, int par2, float par3) {
 		drawDefaultBackground();
 		if (loading) {
-			drawCenteredString(fontRendererObj, Translator.translate("loading") + "...", width / 2, height / 2, 0xffffff);
+			drawCenteredString(fontRendererObj, I18n.format("loading") + "...", width / 2, height / 2, 0xffffff);
 			return;
 		}
 		
