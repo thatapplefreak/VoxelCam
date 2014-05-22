@@ -240,7 +240,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 		if (b) {
 			btnRename.enabled = true;
 			btnDelete.enabled = true;
-//			btnEditPicture.enabled = true;
+			btnEditPicture.enabled = true;
 			btnPost.enabled = true;
 		} else {
 			btnRename.enabled = false;
