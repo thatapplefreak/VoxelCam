@@ -32,7 +32,7 @@ import com.thevoxelbox.common.util.ChatMessageBuilder;
 
 public abstract class ScreenshotTaker {
 	
-	public static void capture(int width, int height, String s) {
+	public static void capture(int width, int height) {
 		Minecraft mc = Minecraft.getMinecraft();
 		if (OpenGlHelper.isFramebufferEnabled()) {
 			width = mc.getFramebuffer().framebufferTextureWidth;
@@ -57,7 +57,7 @@ public abstract class ScreenshotTaker {
         TextureUtil.func_147953_a(pixelValues, width, height);    
         
 		
-		final File screenshotName = ScreenshotNamer.getScreenshotName(s);
+		final File screenshotName = ScreenshotNamer.getScreenshotName();
 		save(pixelValues, width, height, screenshotName);
 	}
 	
