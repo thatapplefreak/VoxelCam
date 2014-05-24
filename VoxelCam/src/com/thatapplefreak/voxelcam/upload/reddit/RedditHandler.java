@@ -23,7 +23,7 @@ public abstract class RedditHandler {
 	 * @param PostTitle
 	 * @param screenshot
 	 */
-	public static void doRedditPost(final String PostTitle, final File screenshot, IRedditPostCallback callback) {
+	public static void doRedditPost(final String PostTitle, final String subreddit, final File screenshot, IRedditPostCallback callback) {
 		
 	}
 	

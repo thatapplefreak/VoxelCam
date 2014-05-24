@@ -1,11 +1,14 @@
 package com.thatapplefreak.voxelcam.upload.reddit;
 
+import java.net.URL;
+
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
 import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
@@ -90,6 +93,7 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 	@Override
 	public void onSubmit() {
 		posting = true;
+		RedditHandler.doRedditPost(titleField.getText(), subredditField.getText(), GuiScreenShotManager.getSelectedPhoto(), this);
 	}
 
 	@Override
@@ -98,8 +102,8 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 	}
 
 	@Override
-	public void onPostSuccess() {
-		//TODO create success popup
+	public void onPostSuccess(URL postUrl) {
+		AbstractionLayer.getMinecraft().displayGuiScreen(new RedditPostSuccessPopup(getParentScreen(), postUrl));
 	}
 
 	@Override
