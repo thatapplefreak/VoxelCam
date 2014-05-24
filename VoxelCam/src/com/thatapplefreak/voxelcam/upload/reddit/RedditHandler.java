@@ -2,16 +2,15 @@ package com.thatapplefreak.voxelcam.upload.reddit;
 
 import java.io.File;
 
-import com.cd.reddit.Reddit;
-import com.cd.reddit.RedditException;
-import com.cd.reddit.json.mapping.RedditJsonMessage;
+import com.thatapplefreak.voxelcam.gui.manager.PostPopup;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadFailedPopup;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
+import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadSuccessPopup;
 
 public abstract class RedditHandler {
-	
-	/**
-	 * Reddit API instance
-	 */
-	private static Reddit reddit;
 	
 	/**
 	 * user is logged into reddit
@@ -20,11 +19,33 @@ public abstract class RedditHandler {
 	
 	/**
 	 * Post image to reddit
-	 * @param PostTitle
+	 * @param postTitle
 	 * @param screenshot
 	 */
-	public static void doRedditPost(final String PostTitle, final String subreddit, final File screenshot, IRedditPostCallback callback) {
-		
+	public static void doRedditPost(final String postTitle, final String subreddit, final File screenshot, final IRedditPostCallback callback) {
+		final ImgurUpload poster = new ImgurUpload(screenshot, screenshot.getName(), "");
+		poster.start(new ImgurCallback() {
+
+			@Override
+			public void onHTTPFailure(int responseCode, String responseMessage) {
+				callback.onPostFailure();
+			}
+
+			@Override
+			public void onCompleted(ImgurResponse response) {
+
+				ImgurUploadResponse uploadResponse = (ImgurUploadResponse) poster.getResponse();
+				if (uploadResponse.isSuccessful()) {
+					try {
+						// POST to reddit
+					} catch (Exception e) {
+						callback.onPostFailure();
+					}
+				} else {
+					callback.onPostFailure();
+				}
+			}
+		});
 	}
 	
 	/**
@@ -34,16 +55,14 @@ public abstract class RedditHandler {
 	 * @return
 	 */
 	public static void login(final String username, final String password, final ILoginCallback logincallback) {
-		reddit = new Reddit(username);
 		new Thread() {
 			@Override
 			public void run() {
-				RedditJsonMessage respmessage = null;
 				try {
-					respmessage = reddit.login(username, password);
+					//LOGIN
 					logincallback.onLoginSuccess();
 					loggedIn = true;
-				} catch (RedditException e) {
+				} catch (Exception e) {
 					logincallback.onLoginFailure();
 				}			
 			}

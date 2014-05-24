@@ -103,7 +103,7 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 	}
 
 	@Override
-	public void onPostSuccess(URL postUrl) {
+	public void onPostSuccess(String postUrl) {
 		AbstractionLayer.getMinecraft().displayGuiScreen(new RedditPostSuccessPopup(getParentScreen(), postUrl));
 	}
 

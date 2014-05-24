@@ -17,7 +17,7 @@ public class RedditLoginPopup extends GuiDialogBox implements ILoginCallback, Sc
 	private boolean failed = false;
 	private boolean loggingIn = false;
 	
-	private GuiTextFieldEx usernameField, passwordField;
+	private GuiTextFieldEx usernameField,passwordField;
 
 	public RedditLoginPopup(GuiScreen parentScreen) {
 		super(parentScreen, 200, 100, I18n.format("pleaseloginto") + " Reddit"); //TODO Translate

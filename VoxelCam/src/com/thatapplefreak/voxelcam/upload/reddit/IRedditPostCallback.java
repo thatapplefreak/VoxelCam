@@ -4,7 +4,7 @@ import java.net.URL;
 
 public interface IRedditPostCallback {
 
-	void onPostSuccess(URL postUrl);
+	void onPostSuccess(String string);
 	
 	void onPostFailure();
 	
