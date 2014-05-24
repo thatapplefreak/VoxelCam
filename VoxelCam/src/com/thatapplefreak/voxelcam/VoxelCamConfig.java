@@ -48,8 +48,8 @@ public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider 
 		defaults.put(TWITTERAUTHTOKENSECRET, "needLogin");
 		defaults.put(FACEBOOKAUTHTOKEN, "needLogin");
 		defaults.put(FACEBOOKUSERID, "needLogin");
-		defaults.put(REDDITUSERNAME, "needLogin");
-		defaults.put(REDDITPASSWORD, "needLogin");
+		defaults.put(REDDITUSERNAME, "");
+		defaults.put(REDDITPASSWORD, "");
 		defaults.put(NORMALSCREENSHOTNAMINGMETHOD, "DATE");
 		defaults.put(BIGSCREENSHOTNAMINGMETHOD, "custom_DATE");
 		defaults.put(AUTO_UPLOAD, "false");

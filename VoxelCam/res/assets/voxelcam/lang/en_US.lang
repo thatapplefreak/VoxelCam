@@ -54,6 +54,12 @@ postcompletedsuccessfully=Post completed successfully
 moreinfo=More info
 keybindings=Keybindings
 developer=Developer
+login=Login
+pleaseloginto=Please login to
+loggingin= Logging in
+loginfailpleasetryagain=Login failed! Please try again
+username=Username
+password=Password
 
 welcomeline1=Thank you for downloading VoxelCam version
 welcomeline2=Open the screenshots manager while in game

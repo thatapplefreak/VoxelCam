@@ -12,6 +12,7 @@
 	<classpathentry kind="lib" path="lib/facebook4j-core-2.0.0.jar"/>
 	<classpathentry kind="lib" path="/Client/jars/libraries/com/google/code/gson/gson/2.2.4/gson-2.2.4.jar"/>
 	<classpathentry kind="lib" path="lib/twitter4j-core-3.0.6-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="lib/raw4j-1.0-SNAPSHOT.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/VoxelCommonMods"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
