@@ -4,9 +4,10 @@ import java.net.URL;
 
 import net.minecraft.client.gui.GuiScreen;
 
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
-public class RedditPostSuccessPopup extends GuiDialogBox {
+public class RedditPostSuccessPopup extends GuiDialogBox implements ScreenshotIncapable {
 	
 	private URL post;
 

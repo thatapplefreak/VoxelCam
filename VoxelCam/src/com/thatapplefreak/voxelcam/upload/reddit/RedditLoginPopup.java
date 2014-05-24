@@ -6,12 +6,13 @@ import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
 import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 
-public class RedditLoginPopup extends GuiDialogBox implements ILoginCallback {
+public class RedditLoginPopup extends GuiDialogBox implements ILoginCallback, ScreenshotIncapable {
 	
 	private boolean failed = false;
 	private boolean loggingIn = false;

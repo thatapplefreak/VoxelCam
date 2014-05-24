@@ -8,12 +8,13 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
 import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 
-public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback {
+public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback, ScreenshotIncapable {
 	
 	private static final ResourceLocation karmapony = new ResourceLocation("voxelcam", "textures/karmapony.png");
 	
