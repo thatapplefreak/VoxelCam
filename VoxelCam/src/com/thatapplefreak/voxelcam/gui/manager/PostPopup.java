@@ -20,6 +20,9 @@ import com.thatapplefreak.voxelcam.upload.imgur.ImgurHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
+import com.thatapplefreak.voxelcam.upload.reddit.RedditHandler;
+import com.thatapplefreak.voxelcam.upload.reddit.RedditLoginPopup;
+import com.thatapplefreak.voxelcam.upload.reddit.RedditPostPopup;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterLoginPopup;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterPostPopup;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
@@ -54,7 +57,6 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 			btnGoogleDrive.enabled = false;
 		}
 		btnFacebook.enabled = false;
-		btnReddit.enabled = false;
 		buttonList.add(btnImgur);
 		buttonList.add(btnDropBox);
 		buttonList.add(btnFacebook);
@@ -111,6 +113,13 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 			break;
 		case 4: // Google Drive
 			GoogleDriveHandler.doGoogleDrive(GuiScreenShotManager.getSelectedPhoto(), true);
+			break;
+		case 5:
+			if (!RedditHandler.isLoggedIn()) {
+				mc.displayGuiScreen(new RedditLoginPopup(getParentScreen()));
+			} else {
+				mc.displayGuiScreen(new RedditPostPopup(getParentScreen()));
+			}
 			break;
 		}
 	}
