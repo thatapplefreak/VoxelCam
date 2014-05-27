@@ -213,7 +213,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 						return;
 					}
 					heldKeys.add(key);
-					ScreenshotTaker.capture(minecraft.displayWidth, minecraft.displayHeight, config.getStringProperty(VoxelCamConfig.NORMALSCREENSHOTNAMINGMETHOD));
+					ScreenshotTaker.capture(minecraft.displayWidth, minecraft.displayHeight);
 				}
 			}
 		} else {

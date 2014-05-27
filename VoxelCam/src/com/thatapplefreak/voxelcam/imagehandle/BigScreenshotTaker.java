@@ -74,7 +74,7 @@ public abstract class BigScreenshotTaker {
 
 	public static void onTick() {
 		if (waiting) {
-			ScreenshotTaker.capture(VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT), VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.BIGSCREENSHOTNAMINGMETHOD));
+			ScreenshotTaker.capture(VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOWIDTH), VoxelCamCore.getConfig().getIntProperty(VoxelCamConfig.PHOTOHEIGHT));
 			fbo.end();
 			fbo.dispose();
 			returnMinecraftToNormal();
