@@ -13,6 +13,7 @@ import net.minecraft.client.resources.I18n;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
@@ -94,11 +95,11 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 		super.actionPerformed(guibutton);
 		switch (guibutton.id) {
 		case 0: // Imgur
-			ImgurHandler.doImgur(this, GuiScreenShotManager.getSelectedPhoto());
+			ImgurHandler.doImgur(this, VoxelCamIO.getSelectedPhoto());
 			this.uploading = true;
 			break;
 		case 1: // DropBox
-			DropboxHandler.doDropBox(GuiScreenShotManager.getSelectedPhoto(), true);
+			DropboxHandler.doDropBox(VoxelCamIO.getSelectedPhoto(), true);
 			mc.displayGuiScreen(getParentScreen());
 			break;
 		case 2: // Facebook
@@ -112,7 +113,7 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 			}
 			break;
 		case 4: // Google Drive
-			GoogleDriveHandler.doGoogleDrive(GuiScreenShotManager.getSelectedPhoto(), true);
+			GoogleDriveHandler.doGoogleDrive(VoxelCamIO.getSelectedPhoto(), true);
 			break;
 		case 5:
 			if (!RedditHandler.isLoggedIn()) {

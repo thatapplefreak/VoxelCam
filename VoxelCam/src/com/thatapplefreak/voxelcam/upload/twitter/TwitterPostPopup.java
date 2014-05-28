@@ -12,6 +12,7 @@ import twitter4j.auth.AccessToken;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
@@ -77,7 +78,7 @@ public class TwitterPostPopup extends GuiDialogBox {
 
 	@Override
 	public boolean validateDialog() {
-		TwitterHandler.doTwitter(this, GuiScreenShotManager.getSelectedPhoto(), textbox.getText());
+		TwitterHandler.doTwitter(this, VoxelCamIO.getSelectedPhoto(), textbox.getText());
 		uploading = true;
 		return false;
 	}

@@ -9,6 +9,7 @@ import net.minecraft.util.ResourceLocation;
 
 import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
@@ -32,7 +33,7 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 	protected void onInitDialog() {
 		super.onInitDialog();
 		btnOk.displayString = I18n.format("post");
-		titleField = new GuiTextFieldEx(fontRendererObj, dialogX + 10, dialogY + 25, 230, 20, GuiScreenShotManager.getSelectedPhoto().getName().replaceAll(".png", ""));
+		titleField = new GuiTextFieldEx(fontRendererObj, dialogX + 10, dialogY + 25, 230, 20, VoxelCamIO.getSelectedPhoto().getName().replaceAll(".png", ""));
 		subredditField = new GuiTextFieldEx(fontRendererObj, dialogX + 10, dialogY + 70, 230, 20, "minecraft");
 	}
 	
@@ -94,7 +95,7 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 	@Override
 	public void onSubmit() {
 		posting = true;
-		RedditHandler.doRedditPost(titleField.getText(), subredditField.getText(), GuiScreenShotManager.getSelectedPhoto(), this);
+		RedditHandler.doRedditPost(titleField.getText(), subredditField.getText(), VoxelCamIO.getSelectedPhoto(), this);
 	}
 
 	@Override

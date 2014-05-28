@@ -4,6 +4,7 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class DeletePopup extends GuiDialogBox implements ScreenshotIncapable {
@@ -14,7 +15,7 @@ public class DeletePopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	@Override
 	public void onSubmit() {
-		((GuiScreenShotManager) getParentScreen()).delete();
+		VoxelCamIO.delete();
 	}
 
 	@Override

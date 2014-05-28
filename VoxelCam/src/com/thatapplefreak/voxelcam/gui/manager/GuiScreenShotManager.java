@@ -23,6 +23,7 @@ import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 
 /**
  * This Gui shows the player the screenshots he/she has taken and can
@@ -32,11 +33,6 @@ import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
  * 
  */
 public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapable {
-
-	/**
-	 * List of all PNG files in the screenshot directory
-	 */
-	private static ArrayList<File> screenShotFiles;
 
 	/**
 	 * Frame for the currently displaying picture
@@ -49,11 +45,6 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	private PhotoSelector selector;
 
 	/**
-	 * Index of the currently selected photo
-	 */
-	public static int selected = 0;
-
-	/**
 	 * Button to go to previous screen
 	 */
 	private GuiButton btnBack, btnRename, btnDelete, btnPost, btnOpenFolder, btnEditPicture;
@@ -62,39 +53,19 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 
 	private static final float frameScale = 22F / 30F;
 
-	/**
-	 * This makes it so it auto selects the first pic only the first time it is
-	 * initialized
-	 */
-	private boolean firstInit = true;
-
 	public GuiScreenShotManager() {
-		setScreenShotFiles(new ArrayList<File>(Arrays.asList(VoxelCamCore.getScreenshotsDir().listFiles())));
-		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
-			if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
-				getScreenShotFiles().remove(i); // Remove all files that are not
-												// png images
-			}
-		}
-		if (getScreenShotFiles().size() == 0) {
-			getScreenShotFiles().add(null);
-		}
-
-		frame = new ScalePhotoFrame(this, (int) (width - (width * (frameScale))), 10, frameScale, getScreenShotFiles().get(selected));
+		frame = new ScalePhotoFrame(this, (int) (width - (width * (frameScale))), 10, frameScale, VoxelCamIO.getSelectedPhoto());
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public void initGui() {
-		if (firstInit) {
-			selected = 0;
-			firstInit = false;
 
-			searchBar = new SearchBar(fontRendererObj, 11, 14, 50, 13);
+		searchBar = new SearchBar(fontRendererObj, 11, 14, 50, 13);
 
-			selector = new PhotoSelector(this, 125);
-			selector.registerScrollButtons(buttonList, 7, 8);
-		}
+		selector = new PhotoSelector(this, 125);
+		selector.registerScrollButtons(buttonList, 7, 8);
+		
 
 		btnBack = new GuiButton(0, 10, height - 30, 70, 20, I18n.format("back"));
 		buttonList.add(btnBack);
@@ -136,35 +107,14 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	@Override
 	public void updateScreen() {
 		super.updateScreen();
-		// panoramaRenderer.updatePanorama();
-		setScreenShotFiles(getSortedScreenshots());
-		if (updateTickCounter % 30 == 0) { // Update every 1.5 seconds
-			for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
-				if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
-					getScreenShotFiles().remove(i); // Remove all files that are
-													// not
-													// png images
-				}
-			}
-			if (getScreenShotFiles().isEmpty()) {
-				getScreenShotFiles().add(null);
-			}
-		}
-		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
-			if (getScreenShotFiles().get(i) != null && !getScreenShotFiles().get(i).getName().toLowerCase().contains(searchBar.getText().toLowerCase())) {
-				getScreenShotFiles().remove(i);
-			}
-		}
-		if (selected > getScreenShotFiles().size()) {
-			selected = getScreenShotFiles().size() - 1;
-		}
-		if (frame.getPhoto() != getScreenShotFiles().get(selected)) {
-			if (getScreenShotFiles().get(selected) == null) {
+		VoxelCamIO.updateScreenShotFilesList();
+		if (frame.getPhoto() != VoxelCamIO.getSelectedPhoto()) {
+			if (VoxelCamIO.getSelectedPhoto() == null) {
 				frame.setPhoto(null);
-			} else if (frame.getPhoto() == null && getScreenShotFiles().get(selected) != null) {
-				frame.setPhoto(getScreenShotFiles().get(selected));
-			} else if (!frame.getPhoto().equals(getScreenShotFiles().get(selected))) {
-				frame.setPhoto(getScreenShotFiles().get(selected));
+			} else if (frame.getPhoto() == null && VoxelCamIO.getSelectedPhoto() != null) {
+				frame.setPhoto(VoxelCamIO.getSelectedPhoto());
+			} else if (!frame.getPhoto().equals(VoxelCamIO.getSelectedPhoto())) {
+				frame.setPhoto(VoxelCamIO.getSelectedPhoto());
 			}
 		}
 		frame.update((int) (btnPost.xPosition + 70 - (width * frameScale)), 13);
@@ -189,14 +139,6 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 		return new ArrayList<File>(Arrays.asList(filesInScreenshotDir));
 	}
 
-	public void selectPhotoIndex(int i) {
-		selected = i;
-	}
-
-	public boolean getSelected(int i) {
-		return i == selected;
-	}
-
 	public FontRenderer getFontRenderer(GuiScreenShotManager man) {
 		return man.fontRendererObj;
 	}
@@ -206,11 +148,11 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 		if (btn == btnBack) {
 			keyTyped('`', 1);
 		} else if (btn == btnRename) {
-			mc.displayGuiScreen(new RenamePopup(this, getScreenShotFiles().get(selected).getName()));
+			mc.displayGuiScreen(new RenamePopup(this, VoxelCamIO.getSelectedPhoto().getName()));
 		} else if (btn == btnDelete) {
 			mc.displayGuiScreen(new DeletePopup(this));
 		} else if (btn == btnEditPicture) {
-			mc.displayGuiScreen(new GuiEditScreenshot(this, getSelectedPhoto()));
+			mc.displayGuiScreen(new GuiEditScreenshot(this, VoxelCamIO.getSelectedPhoto()));
 		} else if (btn == btnOpenFolder) {
 			try {
 				Desktop.getDesktop().browse(VoxelCamCore.getScreenshotsDir().toURI());
@@ -219,20 +161,6 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			}
 		} else if (btn == btnPost) {
 			mc.displayGuiScreen(new PostPopup(this));
-		}
-	}
-
-	public void rename(String string) {
-		File newFile = new File(VoxelCamCore.getScreenshotsDir(), string + ".png");
-		getSelectedPhoto().renameTo(newFile);
-	}
-
-	public void delete() {
-		GLImageMemoryHandler.requestImageRemovalFromMem(getScreenShotFiles().get(selected));
-		getSelectedPhoto().delete(); // EXTERMINATE!
-		getScreenShotFiles().remove(selected); // remove refrence
-		if (selected > 0) {
-			selected--;
 		}
 	}
 
@@ -249,18 +177,6 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			btnPost.enabled = false;
 		}
 		btnBack.enabled = true;
-	}
-
-	public static ArrayList<File> getScreenShotFiles() {
-		return screenShotFiles;
-	}
-
-	private void setScreenShotFiles(ArrayList<File> screenShotFiles) {
-		GuiScreenShotManager.screenShotFiles = screenShotFiles;
-	}
-
-	public static File getSelectedPhoto() {
-		return getScreenShotFiles().get(selected);
 	}
 
 	@Override
@@ -285,12 +201,12 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			} else if (par1 == 'p') {
 				actionPerformed(btnPost);
 			} else if (par2 == Keyboard.KEY_UP || par2 == Keyboard.KEY_W) {
-				if (selected > 0) {
-					selected--;
+				if (VoxelCamIO.selected > 0) {
+					VoxelCamIO.selected--;
 				}
 			} else if (par2 == Keyboard.KEY_DOWN || par2 == Keyboard.KEY_S) {
-				if (selected < getScreenShotFiles().size() - 1) {
-					selected++;
+				if (VoxelCamIO.selected < VoxelCamIO.getScreenShotFiles().size() - 1) {
+					VoxelCamIO.selected++;
 				}
 			}
 		}

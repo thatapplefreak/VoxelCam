@@ -29,6 +29,7 @@ import com.thatapplefreak.voxelcam.gui.settings.GuiVoxelCamSettingsPanel;
 import com.thatapplefreak.voxelcam.imagehandle.BigScreenshotTaker;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotTaker;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thevoxelbox.common.gui.SettingsPanelManager;
 import com.thevoxelbox.common.status.StatusMessage;
 import com.thevoxelbox.common.status.StatusMessageManager;
@@ -79,6 +80,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 			screenshotsDir.mkdir(); // Make sure that the screenshots directory
 									// is there, if not, create it
 		}
+		VoxelCamIO.updateScreenShotFilesList();
 
 		// Register the Keys that VoxelCam uses
 		LiteLoader.getInput().registerKeyBinding(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER);

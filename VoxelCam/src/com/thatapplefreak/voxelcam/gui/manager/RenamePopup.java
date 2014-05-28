@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class RenamePopup extends GuiDialogBox implements ScreenshotIncapable {
@@ -27,7 +28,7 @@ public class RenamePopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	@Override
 	public void onSubmit() {
-		((GuiScreenShotManager) getParentScreen()).rename(renameBox.getText());
+		VoxelCamIO.rename(renameBox.getText());
 	}
 
 	@Override

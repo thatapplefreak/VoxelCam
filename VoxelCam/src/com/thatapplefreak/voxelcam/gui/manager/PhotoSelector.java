@@ -7,6 +7,8 @@ import net.minecraft.client.renderer.Tessellator;
 
 import org.lwjgl.opengl.GL11;
 
+import com.thatapplefreak.voxelcam.io.VoxelCamIO;
+
 
 public class PhotoSelector extends GuiTextSlot {
 	final GuiScreenShotManager parent;
@@ -24,12 +26,12 @@ public class PhotoSelector extends GuiTextSlot {
 
 	@Override
 	protected int getSize() {
-		return GuiScreenShotManager.getScreenShotFiles().size();
+		return VoxelCamIO.getScreenShotFiles().size();
 	}
 
 	@Override
 	protected boolean isSelected(int i) {
-		return parent.getSelected(i);
+		return VoxelCamIO.isSelected(i);
 	}
 
 	@Override
@@ -38,7 +40,7 @@ public class PhotoSelector extends GuiTextSlot {
 
 	@Override
 	protected void drawSlot(int i, int j, int k, int l, Tessellator tessellator) {
-		File pic = GuiScreenShotManager.getScreenShotFiles().get(i);
+		File pic = VoxelCamIO.getScreenShotFiles().get(i);
 		if (pic != null) {
 			GL11.glEnable(GL11.GL_BLEND);
 			parent.getFontRenderer(parent).drawString(parent.getFontRenderer(parent).trimStringToWidth(pic.getName().replace(".png", ""), listWidth - 10), 13, k + 2, 0xFFFFFF);
@@ -48,7 +50,7 @@ public class PhotoSelector extends GuiTextSlot {
 
 	@Override
 	protected void elementClicked(int i, boolean flag) {
-		parent.selectPhotoIndex(i);
+		VoxelCamIO.selectPhotoIndex(i);
 	}
 
 	public void setDimensionsAndPosition(int x, int y, int x2, int y2) {
