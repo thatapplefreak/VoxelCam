@@ -33,7 +33,7 @@ public abstract class VoxelCamIO {
 		return i == selected;
 	}
 
-	public static void updateScreenShotFilesList() {
+	public static void updateScreenShotFilesList(String filter) {
 		File[] filesInScreenshotDir = VoxelCamCore.getScreenshotsDir().listFiles();
 		Arrays.sort(filesInScreenshotDir, new Comparator<File>() {
 			@Override
@@ -51,6 +51,11 @@ public abstract class VoxelCamIO {
 		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
 			if (!getScreenShotFiles().get(i).getName().endsWith(".png")) {
 				getScreenShotFiles().remove(i); 
+			}
+		}
+		for (int i = getScreenShotFiles().size() - 1; i >= 0; i--) {
+			if (!getScreenShotFiles().get(i).getName().contains(filter)) {
+				getScreenShotFiles().remove(i);
 			}
 		}
 		if (getScreenShotFiles().isEmpty()) {

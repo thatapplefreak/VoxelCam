@@ -80,7 +80,7 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 			screenshotsDir.mkdir(); // Make sure that the screenshots directory
 									// is there, if not, create it
 		}
-		VoxelCamIO.updateScreenShotFilesList();
+		VoxelCamIO.updateScreenShotFilesList("");
 
 		// Register the Keys that VoxelCam uses
 		LiteLoader.getInput().registerKeyBinding(VoxelCamConfig.KEY_OPENSCREENSHOTMANAGER);

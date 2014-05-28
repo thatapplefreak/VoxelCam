@@ -107,7 +107,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	@Override
 	public void updateScreen() {
 		super.updateScreen();
-		VoxelCamIO.updateScreenShotFilesList();
+		VoxelCamIO.updateScreenShotFilesList(searchBar.getText());
 		if (frame.getPhoto() != VoxelCamIO.getSelectedPhoto()) {
 			if (VoxelCamIO.getSelectedPhoto() == null) {
 				frame.setPhoto(null);
