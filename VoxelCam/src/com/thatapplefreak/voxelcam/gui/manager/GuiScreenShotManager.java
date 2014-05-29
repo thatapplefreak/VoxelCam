@@ -170,7 +170,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 			this.mc.setIngameFocus();
 		}
 		searchBar.textboxKeyTyped(keyChar, keyCode);
-		if (!searchBar.isFocused()) {
+		if (!searchBar.isFocused() && btnDelete.enabled) {
 			if (keyChar == 'r') {
 				actionPerformed(btnRename);
 			} else if (keyChar == 'd') {
