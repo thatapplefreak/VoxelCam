@@ -3,6 +3,8 @@ package com.thatapplefreak.voxelcam.gui.manager;
 import java.io.File;
 import java.text.SimpleDateFormat;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
 
 import org.lwjgl.opengl.GL11;
@@ -43,8 +45,9 @@ public class PhotoSelector extends GuiTextSlot {
 		File pic = VoxelCamIO.getScreenShotFiles().get(i);
 		if (pic != null) {
 			GL11.glEnable(GL11.GL_BLEND);
-			parent.getFontRenderer(parent).drawString(parent.getFontRenderer(parent).trimStringToWidth(pic.getName().replace(".png", ""), listWidth - 10), 13, k + 2, 0xFFFFFF);
-			parent.getFontRenderer(parent).drawString(parent.getFontRenderer(parent).trimStringToWidth(sdf.format(pic.lastModified()), listWidth - 10), 13, k + 12, 0xCCCCCC);
+			FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
+			font.drawString(font.trimStringToWidth(pic.getName().replace(".png", ""), listWidth - 10), 13, k + 2, 0xFFFFFF);
+			font.drawString(font.trimStringToWidth(sdf.format(pic.lastModified()), listWidth - 10), 13, k + 12, 0xCCCCCC);
 		}
 	}
 

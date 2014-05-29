@@ -45,25 +45,25 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 	protected void onInitDialog() {
 		buttonList.remove(btnOk);
 		btnCancel.xPosition = dialogX + 60;
-		btnImgur = new GuiButton(0, dialogX + 15, dialogY + 40, 70, 20, "Imgur");
+		
+		buttonList.add(btnImgur = new GuiButton(0, dialogX + 15, dialogY + 40, 70, 20, "Imgur"));
+		buttonList.add(btnFacebook = new GuiButton(2, dialogX + 95, dialogY + 10, 70, 20, "Facebook"));
+		buttonList.add(btnTwitter = new GuiButton(3, dialogX + 15, dialogY + 10, 70, 20, "Twitter"));
+		buttonList.add(btnReddit = new GuiButton(5, dialogX + 95, dialogY + 40, 70, 20, "Reddit"));
+		
 		btnDropBox = new GuiButton(1, dialogX + 15, dialogY + 70, 70, 20, "Dropbox");
-		btnFacebook = new GuiButton(2, dialogX + 95, dialogY + 10, 70, 20, "Facebook");
-		btnTwitter = new GuiButton(3, dialogX + 15, dialogY + 10, 70, 20, "Twitter");
 		btnGoogleDrive = new GuiButton(4, dialogX + 95, dialogY + 70, 70, 20, "Google Drive");
-		btnReddit = new GuiButton(5, dialogX + 95, dialogY + 40, 70, 20, "Reddit");
+		buttonList.add(btnDropBox);
+		buttonList.add(btnGoogleDrive);
+		
 		if (!(new File(System.getProperty("user.home"), "/dropbox/").exists())) {
 			btnDropBox.enabled = false;
 		}
 		if (!(new File(System.getProperty("user.home"), "/Google Drive/").exists())) {
 			btnGoogleDrive.enabled = false;
 		}
+		
 		btnFacebook.enabled = false;
-		buttonList.add(btnImgur);
-		buttonList.add(btnDropBox);
-		buttonList.add(btnFacebook);
-		buttonList.add(btnTwitter);
-		buttonList.add(btnGoogleDrive);
-		buttonList.add(btnReddit);
 	}
 
 	@Override
@@ -92,36 +92,29 @@ public class PostPopup extends GuiDialogBox implements ScreenshotIncapable {
 
 	@Override
 	protected void actionPerformed(GuiButton guibutton) {
-		super.actionPerformed(guibutton);
-		switch (guibutton.id) {
-		case 0: // Imgur
+		if (guibutton.equals(btnCancel)) {
+			closeDialog();
+		} else if (guibutton.equals(btnImgur)) {
 			ImgurHandler.doImgur(this, VoxelCamIO.getSelectedPhoto());
 			this.uploading = true;
-			break;
-		case 1: // DropBox
+		} else if (guibutton.equals(btnDropBox)) {
 			DropboxHandler.doDropBox(VoxelCamIO.getSelectedPhoto(), true);
 			mc.displayGuiScreen(getParentScreen());
-			break;
-		case 2: // Facebook
-			// TODO
-			break;
-		case 3: // Twitter
+		} else if (guibutton.equals(btnTwitter)) {
 			if (VoxelCamCore.getConfig().getStringProperty(VoxelCamConfig.TWITTERAUTHTOKEN).equals("needLogin")) {
 				mc.displayGuiScreen(new TwitterLoginPopup(getParentScreen()));
 			} else {
 				mc.displayGuiScreen(new TwitterPostPopup(getParentScreen()));
 			}
-			break;
-		case 4: // Google Drive
+		} else if (guibutton.equals(btnGoogleDrive)) {
 			GoogleDriveHandler.doGoogleDrive(VoxelCamIO.getSelectedPhoto(), true);
-			break;
-		case 5:
+			mc.displayGuiScreen(getParentScreen());
+		} else if (guibutton.equals(btnReddit)) {
 			if (!RedditHandler.isLoggedIn()) {
 				mc.displayGuiScreen(new RedditLoginPopup(getParentScreen()));
 			} else {
 				mc.displayGuiScreen(new RedditPostPopup(getParentScreen()));
 			}
-			break;
 		}
 	}
 	

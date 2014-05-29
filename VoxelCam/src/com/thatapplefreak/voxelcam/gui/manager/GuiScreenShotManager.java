@@ -89,20 +89,18 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	@Override
-	public void drawScreen(int par1, int par2, float par3) {
+	public void drawScreen(int xPos, int yPos, float partialTicks) {
 		if (!mc.isSingleplayer()) {
 			drawDefaultBackground();
 		} else {
 			drawBackground(0);
 		}
 
-		super.drawScreen(par1, par2, par3);
-		frame.draw(par1, par2, par3);
-		selector.drawScreen(par1, par2, par3);
+		super.drawScreen(xPos, yPos, partialTicks);
+		frame.draw(xPos, yPos, partialTicks);
+		selector.drawScreen(xPos, yPos, partialTicks);
 		searchBar.drawTextBox();
 	}
-
-	private int updateTickCounter = 0;
 
 	@Override
 	public void updateScreen() {
@@ -122,44 +120,23 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 		searchBar.setWidth(selector.right - selector.left - 2);
 	}
 
-	private ArrayList<File> getSortedScreenshots() {
-		File[] filesInScreenshotDir = VoxelCamCore.getScreenshotsDir().listFiles();
-		Arrays.sort(filesInScreenshotDir, new Comparator<File>() {
-			@Override
-			public int compare(File f, File g) {
-				if (f.lastModified() > g.lastModified()) {
-					return -1;
-				} else if (f.lastModified() < g.lastModified()) {
-					return 1;
-				} else {
-					return 0;
-				}
-			}
-		});
-		return new ArrayList<File>(Arrays.asList(filesInScreenshotDir));
-	}
-
-	public FontRenderer getFontRenderer(GuiScreenShotManager man) {
-		return man.fontRendererObj;
-	}
-
 	@Override
 	protected void actionPerformed(GuiButton btn) {
-		if (btn == btnBack) {
+		if (btn.equals(btnBack)) {
 			keyTyped('`', 1);
-		} else if (btn == btnRename) {
+		} else if (btn.equals(btnRename)) {
 			mc.displayGuiScreen(new RenamePopup(this, VoxelCamIO.getSelectedPhoto().getName()));
-		} else if (btn == btnDelete) {
+		} else if (btn.equals(btnDelete)) {
 			mc.displayGuiScreen(new DeletePopup(this));
-		} else if (btn == btnEditPicture) {
+		} else if (btn.equals(btnEditPicture)) {
 			mc.displayGuiScreen(new GuiEditScreenshot(this, VoxelCamIO.getSelectedPhoto()));
-		} else if (btn == btnOpenFolder) {
+		} else if (btn.equals(btnOpenFolder)) {
 			try {
 				Desktop.getDesktop().browse(VoxelCamCore.getScreenshotsDir().toURI());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-		} else if (btn == btnPost) {
+		} else if (btn.equals(btnPost)) {
 			mc.displayGuiScreen(new PostPopup(this));
 		}
 	}
@@ -180,31 +157,31 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	@Override
-	protected void mouseClicked(int par1, int par2, int par3) {
-		super.mouseClicked(par1, par2, par3);
-		searchBar.mouseClicked(par1, par2, par3);
+	protected void mouseClicked(int mouseX, int mouseY, int button) {
+		super.mouseClicked(mouseX, mouseY, button);
+		searchBar.mouseClicked(mouseX, mouseY, button);
 	}
 
 	@Override
-	protected void keyTyped(char par1, int par2) {
-		if (par2 == 1) {
+	protected void keyTyped(char keyChar, int keyCode) {
+		if (keyCode == 1) {
 			GLImageMemoryHandler.requestImageFlush();
 			this.mc.displayGuiScreen((GuiScreen) null);
 			this.mc.setIngameFocus();
 		}
-		searchBar.textboxKeyTyped(par1, par2);
+		searchBar.textboxKeyTyped(keyChar, keyCode);
 		if (!searchBar.isFocused()) {
-			if (par1 == 'r') {
+			if (keyChar == 'r') {
 				actionPerformed(btnRename);
-			} else if (par1 == 'd') {
+			} else if (keyChar == 'd') {
 				actionPerformed(btnDelete);
-			} else if (par1 == 'p') {
+			} else if (keyChar == 'p') {
 				actionPerformed(btnPost);
-			} else if (par2 == Keyboard.KEY_UP || par2 == Keyboard.KEY_W) {
+			} else if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_W) {
 				if (VoxelCamIO.selected > 0) {
 					VoxelCamIO.selected--;
 				}
-			} else if (par2 == Keyboard.KEY_DOWN || par2 == Keyboard.KEY_S) {
+			} else if (keyCode == Keyboard.KEY_DOWN || keyCode == Keyboard.KEY_S) {
 				if (VoxelCamIO.selected < VoxelCamIO.getScreenShotFiles().size() - 1) {
 					VoxelCamIO.selected++;
 				}
