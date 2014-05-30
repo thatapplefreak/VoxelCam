@@ -20,7 +20,7 @@ public class RedditPostSuccessPopup extends GuiDialogBox implements ScreenshotIn
 	private GuiButton btnView, btnClipboard;
 
 	public RedditPostSuccessPopup(GuiScreen parentScreen, String postUrl) {
-		super(parentScreen, 365, 80, I18n.fomat("redditpostsuccess"));
+		super(parentScreen, 365, 80, I18n.format("redditpostsuccess"));
 		this.url = postUrl;
 	}
 	
