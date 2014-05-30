@@ -43,14 +43,14 @@ public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback
 		subredditField.setVisible(!posting);
 		if (!posting) {
 			if (failed) {
-				drawCenteredString(fontRendererObj, "Failed to post", dialogX + dialogWidth / 2, dialogY + dialogHeight - 35, 0xFF0000);
+				drawCenteredString(fontRendererObj, I18n.format("failedtopost"), dialogX + dialogWidth / 2, dialogY + dialogHeight - 35, 0xFF0000);
 			}
-			drawString(fontRendererObj, "Post title:", dialogX + 10, dialogY + 10, 0xFFFFFF);
+			drawString(fontRendererObj, I18n.format("posttitle") + ":", dialogX + 10, dialogY + 10, 0xFFFFFF);
 			titleField.drawTextBox();
-			drawString(fontRendererObj, "subreddit:", dialogX + 10,	dialogY + 55, 0xFFFFFF);
+			drawString(fontRendererObj, I18n.format("subreddit") + ":", dialogX + 10,	dialogY + 55, 0xFFFFFF);
 			subredditField.drawTextBox();
 		} else {
-			drawCenteredString(fontRendererObj, "Posting...", dialogX + dialogWidth / 2, dialogY + dialogHeight / 2 - 10, 0xFFFFFF);
+			drawCenteredString(fontRendererObj, I18n.format("posting") + "...", dialogX + dialogWidth / 2, dialogY + dialogHeight / 2 - 10, 0xFFFFFF);
 		}
 		
 		if (subredditField.getText().equals("mylittlepony")) { //EE

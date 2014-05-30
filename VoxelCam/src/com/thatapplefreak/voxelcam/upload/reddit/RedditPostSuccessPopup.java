@@ -20,7 +20,7 @@ public class RedditPostSuccessPopup extends GuiDialogBox implements ScreenshotIn
 	private GuiButton btnView, btnClipboard;
 
 	public RedditPostSuccessPopup(GuiScreen parentScreen, String postUrl) {
-		super(parentScreen, 365, 80, "Post to Reddit succeeded");
+		super(parentScreen, 365, 80, I18n.fomat("redditpostsuccess"));
 		this.url = postUrl;
 	}
 	
@@ -47,7 +47,7 @@ public class RedditPostSuccessPopup extends GuiDialogBox implements ScreenshotIn
 	
 	@Override
 	protected void drawDialog(int mouseX, int mouseY, float f) {
-		drawCenteredString(fontRendererObj, I18n.format("uploadsuccess"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
+		drawCenteredString(fontRendererObj, I18n.format("postsuccess"), dialogX + (dialogWidth / 2), dialogY + 18, 0xFFFFAA00);
 		drawCenteredString(fontRendererObj, this.url, dialogX + (dialogWidth / 2), dialogY + 32, 0xFFFFFF55);
 	}
 

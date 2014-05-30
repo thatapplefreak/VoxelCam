@@ -1,3 +1,5 @@
+//English (US)
+
 camera=Camera
 screenshot=Screenshot
 screenshots=Screenshots
@@ -42,6 +44,7 @@ undo=Undo
 open=Open
 copylink=Copy link
 uploadsuccess=Upload completed successfully
+postsuccess=Post completed successfully
 errorcode=Error code
 pleaseenterpin=Please enter the PIN you received
 post=Post
@@ -60,6 +63,11 @@ loggingin= Logging in
 loginfailpleasetryagain=Login failed! Please try again
 username=Username
 password=Password
+failedtopost=Failed to post
+posttitle=Post title
+subreddit=Subreddit
+posting=Posting
+redditpostsuccess=Post to Reddit succeeded
 
 welcomeline1=Thank you for downloading VoxelCam version
 welcomeline2=Open the screenshots manager while in game
