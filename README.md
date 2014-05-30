@@ -7,4 +7,5 @@ Dependencies:
 Liteloader: https://www.assembla.com/code/liteloader/subversion/nodes  
 VoxelCommon: https://www.assembla.com/code/voxellibs/subversion/nodes/4/VoxelCommon  
 Twitter4J: https://github.com/yusuke/twitter4j  
-Facebook4J: https://github.com/roundrop/facebook4j  
+Facebook4J: https://github.com/roundrop/facebook4j   
+jReddit: https://github.com/karan/jReddit
