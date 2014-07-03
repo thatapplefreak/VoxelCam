@@ -34,7 +34,7 @@ public abstract class DropboxHandler {
 				if (os.equals(EnumOS.WINDOWS)) {
 					new ProcessBuilder("explorer.exe", "/select,",
 							dropboxCopy.toString()).start();
-				} else if (os.equals(EnumOS.MACOS)) {
+				} else if (os.equals(EnumOS.OSX)) {
 					new ProcessBuilder("open", "-R", dropboxCopy.toString())
 							.start();
 				}

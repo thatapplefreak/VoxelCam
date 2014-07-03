@@ -31,7 +31,7 @@ public abstract class GoogleDriveHandler {
 				if (os.equals(EnumOS.WINDOWS)) {
 					new ProcessBuilder("explorer.exe", "/select,",
 							googleDriveCopy.toString()).start();
-				} else if (os.equals(EnumOS.MACOS)) {
+				} else if (os.equals(EnumOS.OSX)) {
 					new ProcessBuilder("open", "-R", googleDriveCopy.toString())
 							.start();
 				}

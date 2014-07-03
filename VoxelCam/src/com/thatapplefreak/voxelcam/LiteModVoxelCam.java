@@ -15,5 +15,4 @@ public class LiteModVoxelCam extends VoxelCommonLiteMod{
 	public String getName() {
 		return "VoxelCam";
 	}
-	
 }

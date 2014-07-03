@@ -8,9 +8,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.client.shader.Framebuffer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ScreenShotHelper;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -21,6 +23,7 @@ import com.mumfrey.liteloader.RenderListener;
 import com.mumfrey.liteloader.Tickable;
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.mumfrey.liteloader.modconfig.ConfigPanel;
+import com.mumfrey.liteloader.transformers.event.ReturnEventInfo;
 import com.mumfrey.liteloader.util.ModUtilities;
 import com.thatapplefreak.voxelcam.gui.mainmenu.FirstRunPopup;
 import com.thatapplefreak.voxelcam.gui.mainmenu.GuiMainMenuWithPhotoButton;
@@ -204,23 +207,18 @@ public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListe
 		return GuiVoxelCamSettingsPanel.class;
 	}
 	
-	public static void screenshotListener(Minecraft minecraft) {
-		int key = minecraft.gameSettings.keyBindScreenshot.getKeyCode();
-		if (isKeyDown(key)) {
-			if (!(minecraft.currentScreen instanceof ScreenshotIncapable)) {
-				if (!heldKeys.contains(key)) {
-					if (isKeyDown(Keyboard.KEY_LSHIFT) || isKeyDown(Keyboard.KEY_RSHIFT)) {
-						heldKeys.add(key);
-						BigScreenshotTaker.run();
-						return;
-					}
-					heldKeys.add(key);
-					ScreenshotTaker.capture(minecraft.displayWidth, minecraft.displayHeight);
-				}
+	public static void takeScreenshot(ReturnEventInfo<ScreenShotHelper, IChatComponent> returnEventInfo, File arg1, int arg2, int arg3, Framebuffer buffer) {
+		if (!(AbstractionLayer.getMinecraft().currentScreen instanceof ScreenshotIncapable)) {
+			if (isKeyDown(Keyboard.KEY_LSHIFT) || isKeyDown(Keyboard.KEY_RSHIFT)) {
+				BigScreenshotTaker.run();
+			} else {
+				ScreenshotTaker.capture(buffer.framebufferWidth, buffer.framebufferHeight);
 			}
-		} else {
-			heldKeys.remove(key);
 		}
+		ChatMessageBuilder cmb = new ChatMessageBuilder();
+		cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
+		cmb.append(" " + I18n.format("savingscreenshot"));
+		returnEventInfo.setReturnValue(cmb.getMessage());
 	}
 
 	@Override

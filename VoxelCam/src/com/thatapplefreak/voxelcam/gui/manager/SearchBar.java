@@ -113,7 +113,7 @@ public class SearchBar extends Gui {
 	 */
 	public void writeText(String par1Str) {
 		String var2 = "";
-		String var3 = ChatAllowedCharacters.filerAllowedCharacters(par1Str);
+		String var3 = ChatAllowedCharacters.filterAllowedCharacters(par1Str);
 		int var4 = this.cursorPosition < this.selectionEnd ? this.cursorPosition : this.selectionEnd;
 		int var5 = this.cursorPosition < this.selectionEnd ? this.selectionEnd : this.cursorPosition;
 		int var6 = this.maxStringLength - this.text.length() - (var4 - this.selectionEnd);
