@@ -19,7 +19,6 @@ import org.lwjgl.input.Mouse;
 import com.mumfrey.liteloader.Configurable;
 import com.mumfrey.liteloader.InitCompleteListener;
 import com.mumfrey.liteloader.RenderListener;
-import com.mumfrey.liteloader.Tickable;
 import com.mumfrey.liteloader.core.LiteLoader;
 import com.mumfrey.liteloader.modconfig.ConfigPanel;
 import com.mumfrey.liteloader.transformers.event.ReturnEventInfo;
@@ -43,7 +42,7 @@ import com.thevoxelbox.common.util.ChatMessageBuilder;
  * @author thatapplefreak
  * 
  */
-public class VoxelCamCore implements Tickable, InitCompleteListener, RenderListener, Configurable {
+public class VoxelCamCore implements InitCompleteListener, RenderListener, Configurable {
 
 	/**
 	 * This is the configuration file for the mod

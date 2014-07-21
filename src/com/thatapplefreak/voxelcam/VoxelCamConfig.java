@@ -4,11 +4,10 @@ import net.minecraft.client.settings.KeyBinding;
 
 import org.lwjgl.input.Keyboard;
 
-import com.thevoxelbox.common.interfaces.IVoxelPropertyProvider;
 import com.thevoxelbox.common.util.ModConfig;
 
 
-public class VoxelCamConfig extends ModConfig implements IVoxelPropertyProvider {
+public class VoxelCamConfig extends ModConfig {
 
 	// Keybinds that VoxelCam uses
 	public static final KeyBinding KEY_OPENSCREENSHOTMANAGER = new KeyBinding("ScreenShot Manager", Keyboard.KEY_H, "VoxelCam");
