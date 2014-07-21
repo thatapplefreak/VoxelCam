@@ -5,15 +5,14 @@ import java.io.File;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.EnumChatFormatting;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
-import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.ChatMessageBuilder;
 
 public abstract class AutoUploader {

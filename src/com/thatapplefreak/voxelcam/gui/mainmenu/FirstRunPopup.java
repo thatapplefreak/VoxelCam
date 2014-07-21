@@ -6,8 +6,8 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
 import com.mumfrey.liteloader.core.LiteLoader;
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 

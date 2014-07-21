@@ -1,19 +1,15 @@
 package com.thatapplefreak.voxelcam.upload.reddit;
 
-import java.net.URL;
-
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
-import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 
 public class RedditPostPopup extends GuiDialogBox implements IRedditPostCallback, ScreenshotIncapable {
 	

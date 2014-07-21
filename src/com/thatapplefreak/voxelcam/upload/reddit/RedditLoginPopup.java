@@ -10,7 +10,6 @@ import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 import com.thevoxelbox.common.util.gui.GuiTextFieldEx;
-import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 
 public class RedditLoginPopup extends GuiDialogBox implements ILoginCallback, ScreenshotIncapable {
 	

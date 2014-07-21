@@ -1,17 +1,9 @@
 package com.thatapplefreak.voxelcam.imagehandle.metadata;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
 
 import net.minecraft.client.Minecraft;
-
-import com.mumfrey.liteloader.core.LiteLoader;
 
 public abstract class MetaDataHandler {
 

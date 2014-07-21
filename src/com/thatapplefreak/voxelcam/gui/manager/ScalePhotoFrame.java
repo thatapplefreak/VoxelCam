@@ -2,7 +2,6 @@ package com.thatapplefreak.voxelcam.gui.manager;
 
 import static org.lwjgl.opengl.GL11.*;
 
-import java.awt.LinearGradientPaint;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;

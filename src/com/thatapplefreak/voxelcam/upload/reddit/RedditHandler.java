@@ -8,13 +8,10 @@ import org.json.simple.JSONObject;
 
 import com.github.jreddit.user.User;
 import com.github.jreddit.utils.restclient.HttpRestClient;
-import com.thatapplefreak.voxelcam.gui.manager.PostPopup;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadFailedPopup;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadSuccessPopup;
 
 public abstract class RedditHandler {
 	

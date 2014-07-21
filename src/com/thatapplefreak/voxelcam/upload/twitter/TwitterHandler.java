@@ -3,15 +3,6 @@ package com.thatapplefreak.voxelcam.upload.twitter;
 import java.io.File;
 
 import net.minecraft.client.resources.I18n;
-
-import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
-
 import twitter4j.Status;
 import twitter4j.StatusUpdate;
 import twitter4j.Twitter;
@@ -19,6 +10,9 @@ import twitter4j.TwitterException;
 import twitter4j.TwitterFactory;
 import twitter4j.auth.AccessToken;
 import twitter4j.auth.RequestToken;
+
+import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 
 public abstract class TwitterHandler {
 	

@@ -1,22 +1,10 @@
 package com.thatapplefreak.voxelcam.upload.twitter;
 
-import java.io.File;
-
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
-import twitter4j.Status;
-import twitter4j.TwitterException;
-import twitter4j.auth.AccessToken;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.io.VoxelCamIO;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
 public class TwitterPostPopup extends GuiDialogBox {

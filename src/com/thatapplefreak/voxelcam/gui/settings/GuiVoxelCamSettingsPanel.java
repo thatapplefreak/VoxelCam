@@ -2,9 +2,10 @@ package com.thatapplefreak.voxelcam.gui.settings;
 
 import net.minecraft.client.resources.I18n;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thevoxelbox.common.gui.GuiVoxelBoxSettingsPanel;
+import com.thevoxelbox.common.util.ModConfig;
 import com.thevoxelbox.common.util.properties.VoxelPropertyAbstractButton;
 import com.thevoxelbox.common.util.properties.VoxelPropertyCheckBox;
 import com.thevoxelbox.common.util.properties.VoxelPropertyIntField;
@@ -36,7 +37,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		heightField.setMaxFieldValue(max);
 		heightField.setMinFieldValue(min);
 		properties.add(heightField);
-		properties.add(new VoxelPropertyAbstractButton(config, null, "720p", PANEL_LEFT + 70, PANEL_TOP + 24) {
+		properties.add(new VoxelPropertyAbstractButton<ModConfig>(config, null, "720p", PANEL_LEFT + 70, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
 				VoxelCamConfig config = VoxelCamCore.getConfig();
@@ -45,7 +46,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(config, null, "1080p", PANEL_LEFT + 70, PANEL_TOP + 44) {
+		properties.add(new VoxelPropertyAbstractButton<ModConfig>(config, null, "1080p", PANEL_LEFT + 70, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
 				VoxelCamConfig config = VoxelCamCore.getConfig();
@@ -54,7 +55,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(config, null, "4K (2160p)", PANEL_LEFT + 145, PANEL_TOP + 24) {
+		properties.add(new VoxelPropertyAbstractButton<ModConfig>(config, null, "4K (2160p)", PANEL_LEFT + 145, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
 				VoxelCamConfig config = VoxelCamCore.getConfig();
@@ -63,7 +64,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 				updateFields();
 			}
 		});
-		properties.add(new VoxelPropertyAbstractButton(config, null, "IMAX", PANEL_LEFT + 145, PANEL_TOP + 44) {
+		properties.add(new VoxelPropertyAbstractButton<ModConfig>(config, null, "IMAX", PANEL_LEFT + 145, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
 				VoxelCamConfig config = VoxelCamCore.getConfig();

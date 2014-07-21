@@ -4,15 +4,10 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
-import twitter4j.TwitterException;
-import twitter4j.auth.AccessToken;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thatapplefreak.voxelcam.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler.TwitterOauthGrabber;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
-import com.thevoxelbox.common.util.gui.GuiDialogBox.DialogResult;
 
 public class TwitterPINPopup extends GuiDialogBox {
 

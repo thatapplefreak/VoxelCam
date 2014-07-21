@@ -1,26 +1,18 @@
 package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
 
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
 import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 import com.thatapplefreak.voxelcam.upload.dropbox.DropboxHandler;
 import com.thatapplefreak.voxelcam.upload.googleDrive.GoogleDriveHandler;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurCallback;
 import com.thatapplefreak.voxelcam.upload.imgur.ImgurHandler;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurResponse;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUpload;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadResponse;
 import com.thatapplefreak.voxelcam.upload.reddit.RedditHandler;
 import com.thatapplefreak.voxelcam.upload.reddit.RedditLoginPopup;
 import com.thatapplefreak.voxelcam.upload.reddit.RedditPostPopup;

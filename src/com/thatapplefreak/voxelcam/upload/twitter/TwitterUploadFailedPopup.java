@@ -1,11 +1,10 @@
 package com.thatapplefreak.voxelcam.upload.twitter;
 
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.resources.I18n;
 import twitter4j.Status;
 import twitter4j.StatusUpdate;
 import twitter4j.TwitterException;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.resources.I18n;
 
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 

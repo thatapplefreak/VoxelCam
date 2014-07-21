@@ -1,23 +1,10 @@
 package com.thatapplefreak.voxelcam.imagehandle;
 
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import javax.imageio.ImageIO;
-
 import net.minecraft.client.Minecraft;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thevoxelbox.common.gl.FBO;
-import com.thevoxelbox.common.util.PrivateFields;
 import com.thevoxelbox.common.util.PrivateMethods;
 
 /**

@@ -1,6 +1,6 @@
 package com.thatapplefreak.voxelcam.imagehandle;
 
-import static org.lwjgl.opengl.GL11.glDeleteTextures;
+import static org.lwjgl.opengl.GL11.*;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -13,9 +13,6 @@ import java.util.Set;
 import javax.imageio.ImageIO;
 
 import net.minecraft.client.renderer.texture.TextureUtil;
-
-import org.lwjgl.LWJGLException;
-import org.lwjgl.opengl.Display;
 
 
 public abstract class GLImageMemoryHandler {

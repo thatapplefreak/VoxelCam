@@ -1,16 +1,8 @@
 package com.thatapplefreak.voxelcam.gui.manager;
 
 import java.awt.Desktop;
-import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 
-import javax.imageio.ImageIO;
-
-import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
@@ -20,9 +12,7 @@ import org.lwjgl.input.Keyboard;
 import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.gui.editor.GuiEditScreenshot;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
-import com.thatapplefreak.voxelcam.imagehandle.ImageDrawer;
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
-import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 import com.thatapplefreak.voxelcam.io.VoxelCamIO;
 
 /**

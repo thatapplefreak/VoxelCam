@@ -2,14 +2,12 @@ package com.thatapplefreak.voxelcam.upload.reddit;
 
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
-import java.net.URL;
 
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 
 import com.thatapplefreak.voxelcam.imagehandle.ScreenshotIncapable;
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurDelete;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 

@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.imagehandle.GLImageMemoryHandler;
 
 public abstract class VoxelCamIO {

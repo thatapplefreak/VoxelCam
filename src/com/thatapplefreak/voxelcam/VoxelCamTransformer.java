@@ -1,22 +1,11 @@
 package com.thatapplefreak.voxelcam;
 
 import java.io.File;
-import java.lang.annotation.Annotation;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.shader.Framebuffer;
-import net.minecraft.util.ScreenShotHelper;
-
-import com.mumfrey.liteloader.ChatRenderListener;
 import com.mumfrey.liteloader.core.runtime.Obf;
-import com.mumfrey.liteloader.transformers.Callback;
-import com.mumfrey.liteloader.transformers.Obfuscated;
-import com.mumfrey.liteloader.transformers.Callback.CallbackType;
-import com.mumfrey.liteloader.transformers.CallbackInjectionTransformer;
 import com.mumfrey.liteloader.transformers.event.Event;
 import com.mumfrey.liteloader.transformers.event.EventInjectionTransformer;
 import com.mumfrey.liteloader.transformers.event.MethodInfo;
-import com.mumfrey.liteloader.transformers.event.inject.BeforeInvoke;
 import com.mumfrey.liteloader.transformers.event.inject.MethodHead;
 
 public class VoxelCamTransformer extends EventInjectionTransformer {

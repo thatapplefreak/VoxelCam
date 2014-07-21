@@ -1,14 +1,7 @@
 package com.thatapplefreak.voxelcam.upload.facebook;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thatapplefreak.voxelcam.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.upload.twitter.TwitterHandler;
-import com.thatapplefreak.voxelcam.upload.twitter.TwitterPINPopup;
-
 import facebook4j.Facebook;
-import facebook4j.FacebookException;
 import facebook4j.FacebookFactory;
-import facebook4j.auth.AccessToken;
 
 public abstract class FacebookHandler {
 

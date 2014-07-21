@@ -2,7 +2,6 @@ package com.thatapplefreak.voxelcam.upload.imgur;
 
 import java.io.File;
 
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.gui.manager.PostPopup;
 
 public abstract class ImgurHandler {

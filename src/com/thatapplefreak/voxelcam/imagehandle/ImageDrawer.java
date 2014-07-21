@@ -1,15 +1,7 @@
 package com.thatapplefreak.voxelcam.imagehandle;
 
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.imageio.ImageIO;
-
-import net.minecraft.client.renderer.Tessellator;
 import static org.lwjgl.opengl.GL11.*;
+import net.minecraft.client.renderer.Tessellator;
 
 /**
  * Utility Class that can take any File that is an image and draw it to a gui

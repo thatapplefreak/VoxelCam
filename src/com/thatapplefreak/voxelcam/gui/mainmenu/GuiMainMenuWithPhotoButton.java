@@ -1,14 +1,9 @@
 package com.thatapplefreak.voxelcam.gui.mainmenu;
 
-import org.lwjgl.opengl.GL11;
-
-import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
-import com.thevoxelbox.common.util.AbstractionLayer;
-import com.thevoxelbox.common.util.gui.AdvancedDrawGui;
-
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiMainMenu;
-import net.minecraft.util.ResourceLocation;
+
+import com.thatapplefreak.voxelcam.gui.manager.GuiScreenShotManager;
 
 public class GuiMainMenuWithPhotoButton extends GuiMainMenu {
 

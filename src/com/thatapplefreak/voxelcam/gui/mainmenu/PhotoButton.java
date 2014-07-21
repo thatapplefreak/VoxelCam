@@ -1,12 +1,12 @@
 package com.thatapplefreak.voxelcam.gui.mainmenu;
 
-import org.lwjgl.opengl.GL11;
-
-import com.thevoxelbox.common.util.AbstractionLayer;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.ResourceLocation;
+
+import org.lwjgl.opengl.GL11;
+
+import com.thevoxelbox.common.util.AbstractionLayer;
 
 public class PhotoButton extends GuiButton {
 	

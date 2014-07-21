@@ -4,10 +4,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import net.minecraft.client.Minecraft;
-
 import com.thatapplefreak.voxelcam.VoxelCamCore;
-import com.thevoxelbox.common.util.PrivateFields;
 
 public abstract class ScreenshotNamer {
 

@@ -3,11 +3,7 @@ package com.thatapplefreak.voxelcam.imagehandle;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 
 import javax.imageio.ImageIO;
 
@@ -15,19 +11,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.texture.TextureUtil;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.util.ChatStyle;
 import net.minecraft.util.EnumChatFormatting;
-import net.minecraft.util.IChatComponent;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
-import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.VoxelCamCore;
 import com.thatapplefreak.voxelcam.imagehandle.metadata.MetaDataHandler;
 import com.thatapplefreak.voxelcam.upload.AutoUploader;
-import com.thevoxelbox.common.util.AbstractionLayer;
 import com.thevoxelbox.common.util.ChatMessageBuilder;
 
 public abstract class ScreenshotTaker {

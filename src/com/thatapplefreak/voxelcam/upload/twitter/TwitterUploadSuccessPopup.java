@@ -3,12 +3,11 @@ package com.thatapplefreak.voxelcam.upload.twitter;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 
-import twitter4j.TwitterException;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
+import twitter4j.TwitterException;
 
-import com.thatapplefreak.voxelcam.upload.imgur.ImgurDelete;
 import com.thevoxelbox.common.util.BrowserOpener;
 import com.thevoxelbox.common.util.gui.GuiDialogBox;
 
