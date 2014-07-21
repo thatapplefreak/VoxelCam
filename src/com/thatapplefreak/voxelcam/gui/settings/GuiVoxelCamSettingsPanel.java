@@ -39,6 +39,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		properties.add(new VoxelPropertyAbstractButton(config, null, "720p", PANEL_LEFT + 70, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
+				VoxelCamConfig config = VoxelCamCore.getConfig();
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 1280);
 				config.setProperty(VoxelCamConfig.PHOTOHEIGHT, 720);
 				updateFields();
@@ -47,6 +48,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		properties.add(new VoxelPropertyAbstractButton(config, null, "1080p", PANEL_LEFT + 70, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
+				VoxelCamConfig config = VoxelCamCore.getConfig();
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 1920);
 				config.setProperty(VoxelCamConfig.PHOTOHEIGHT, 1080);
 				updateFields();
@@ -55,6 +57,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		properties.add(new VoxelPropertyAbstractButton(config, null, "4K (2160p)", PANEL_LEFT + 145, PANEL_TOP + 24) {
 			@Override
 			protected void onClick() {
+				VoxelCamConfig config = VoxelCamCore.getConfig();
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 3840);
 				config.setProperty(VoxelCamConfig.PHOTOHEIGHT, 2160);
 				updateFields();
@@ -63,6 +66,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		properties.add(new VoxelPropertyAbstractButton(config, null, "IMAX", PANEL_LEFT + 145, PANEL_TOP + 44) {
 			@Override
 			protected void onClick() {
+				VoxelCamConfig config = VoxelCamCore.getConfig();
 				config.setProperty(VoxelCamConfig.PHOTOWIDTH, 10000);
 				config.setProperty(VoxelCamConfig.PHOTOHEIGHT, 7000);
 				updateFields();
@@ -77,7 +81,7 @@ public class GuiVoxelCamSettingsPanel extends GuiVoxelBoxSettingsPanel {
 		properties.add(new VoxelPropertyCheckBox(config, VoxelCamConfig.AUTO_UPLOAD_GOOGLEDRIVE, I18n.format("to") + " Google Drive", PANEL_LEFT + 20, PANEL_TOP + 125));
 	}
 
-	private void updateFields() {
+	protected void updateFields() {
 		widthField.update();
 		heightField.update();
 	}

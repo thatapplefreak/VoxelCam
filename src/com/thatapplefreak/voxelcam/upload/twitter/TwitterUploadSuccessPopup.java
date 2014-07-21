@@ -15,7 +15,7 @@ import com.thevoxelbox.common.util.gui.GuiDialogBox;
 public class TwitterUploadSuccessPopup extends GuiDialogBox {
 	
 	private final String url;
-	private final long postID;
+	protected final long postID;
 	
 	private GuiButton btnView, btnClipboard;
 

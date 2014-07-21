@@ -13,7 +13,7 @@ public class TwitterUploadFailedPopup extends GuiDialogBox {
 	
 	private String errorMessage;
 	
-	private StatusUpdate failedUpdate;
+	protected StatusUpdate failedUpdate;
 	
 	private boolean retrying = false;
 

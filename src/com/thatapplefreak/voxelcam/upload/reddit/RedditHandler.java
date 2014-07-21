@@ -18,12 +18,12 @@ import com.thatapplefreak.voxelcam.upload.imgur.ImgurUploadSuccessPopup;
 
 public abstract class RedditHandler {
 	
-	private static User reddit;
+	protected static User reddit;
 	
 	/**
 	 * user is logged into reddit
 	 */
-	private static boolean loggedIn = false;
+	protected static boolean loggedIn = false;
 	
 	/**
 	 * Post image to reddit

@@ -61,8 +61,8 @@ public abstract class ScreenshotTaker {
 		save(pixelValues, width, height, screenshotName);
 	}
 	
-	private static int savepercent = 0;
-	private static boolean isWritingToFile = false;
+	protected static int savepercent = 0;
+	protected static boolean isWritingToFile = false;
 	
 	private static void save(final int[] pixelValues, final int width, final int height, final File saveTo) {
 		Thread imageSaveThread = new Thread("ImageSaver") {
@@ -119,7 +119,7 @@ public abstract class ScreenshotTaker {
 		return savepercent;
 	}
 
-	private static void upload(final File saveTo) {
+	protected static void upload(final File saveTo) {
 		if (VoxelCamCore.getConfig().getBoolProperty(VoxelCamConfig.AUTO_UPLOAD)) {
 			AutoUploader.upload(saveTo);
 		}

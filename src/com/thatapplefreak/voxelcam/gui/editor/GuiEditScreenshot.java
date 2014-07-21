@@ -22,19 +22,19 @@ public class GuiEditScreenshot extends AdvancedDrawGui {
 	/**
 	 * File refrence of the Screenshot
 	 */
-	private final File screenshotFile;
+	protected final File screenshotFile;
 	
 	/**
 	 * This is the raw data for the Screenshot before undergoing changes
 	 */
-	private BufferedImage uneditedScreenshot;
+	protected BufferedImage uneditedScreenshot;
 	
 	/**
 	 * This is the image created by adding the users edits
 	 */
-	private BufferedImage editedScreenshot;
+	protected BufferedImage editedScreenshot;
 	
-	private boolean loading = true;
+	protected boolean loading = true;
 	
 	public GuiEditScreenshot(GuiScreen parent, final File screenshot) {
 		this.parentScreen = parent;
