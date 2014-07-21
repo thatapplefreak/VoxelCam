@@ -52,12 +52,14 @@ public class RedditLoginPopup extends GuiDialogBox implements ILoginCallback, Sc
 		passwordField.drawTextBox();
 	}
 	
+	@Override
 	public void onLoginSuccess() {
 		VoxelCamCore.getConfig().setProperty(VoxelCamConfig.REDDITUSERNAME, usernameField.getText());
 		VoxelCamCore.getConfig().setProperty(VoxelCamConfig.REDDITPASSWORD, passwordField.getText());
 		AbstractionLayer.getMinecraft().displayGuiScreen(new RedditPostPopup(getParentScreen()));
 	}
 	
+	@Override
 	public void onLoginFailure() {
 		loggingIn = false;
 		failed = true;

@@ -8,10 +8,12 @@ public class LiteModVoxelCam extends VoxelCommonLiteMod{
 		super("com.thatapplefreak.voxelcam.VoxelCamCore");
 	}
 	
+	@Override
 	public String getVersion() {
 		return "1.3.1";
 	}
 	
+	@Override
 	public String getName() {
 		return "VoxelCam";
 	}
