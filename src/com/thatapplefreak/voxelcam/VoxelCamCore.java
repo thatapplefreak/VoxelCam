@@ -165,6 +165,11 @@ public class VoxelCamCore implements InitCompleteListener, RenderListener, Confi
 
 	@Override
 	public void onRender() {
+		GuiScreen currentScreen = AbstractionLayer.getMinecraft().currentScreen;
+		// If this is the users first time running the mod show a welcome screen
+		if (currentScreen != null && config.getBoolProperty(VoxelCamConfig.FIRSTRUN) && !(currentScreen instanceof FirstRunPopup)) {
+			Minecraft.getMinecraft().displayGuiScreen(new FirstRunPopup(currentScreen));
+		}
 	}
 
 	/**
@@ -181,12 +186,9 @@ public class VoxelCamCore implements InitCompleteListener, RenderListener, Confi
 				Minecraft.getMinecraft().displayGuiScreen(new GuiMainMenuWithPhotoButton());
 			}
 		}
-
-		// If this is the users first time running the mod show a welcome screen
-		if (currentScreen != null && config.getBoolProperty(VoxelCamConfig.FIRSTRUN) && !(currentScreen instanceof FirstRunPopup)) {
-			Minecraft.getMinecraft().displayGuiScreen(new FirstRunPopup(currentScreen));
-		}
 	}
+	
+	
 
 	@Override
 	public void onRenderWorld() {
