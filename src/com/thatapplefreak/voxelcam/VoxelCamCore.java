@@ -19,7 +19,9 @@ import org.lwjgl.input.Mouse;
 import com.mumfrey.liteloader.Configurable;
 import com.mumfrey.liteloader.InitCompleteListener;
 import com.mumfrey.liteloader.RenderListener;
+import com.mumfrey.liteloader.ScreenshotListener;
 import com.mumfrey.liteloader.core.LiteLoader;
+import com.mumfrey.liteloader.core.LiteLoaderEventBroker.ReturnValue;
 import com.mumfrey.liteloader.modconfig.ConfigPanel;
 import com.mumfrey.liteloader.transformers.event.ReturnEventInfo;
 import com.thatapplefreak.voxelcam.gui.mainmenu.FirstRunPopup;
@@ -42,7 +44,7 @@ import com.thevoxelbox.common.util.ChatMessageBuilder;
  * @author thatapplefreak
  * 
  */
-public class VoxelCamCore implements InitCompleteListener, RenderListener, Configurable {
+public class VoxelCamCore implements ScreenshotListener, InitCompleteListener, RenderListener, Configurable {
 
 	/**
 	 * This is the configuration file for the mod
@@ -218,6 +220,12 @@ public class VoxelCamCore implements InitCompleteListener, RenderListener, Confi
 		cmb.append("[VoxelCam]", EnumChatFormatting.DARK_RED, false);
 		cmb.append(" " + I18n.format("savingscreenshot"));
 		returnEventInfo.setReturnValue(cmb.getMessage());
+	}
+	
+	@Override
+	public boolean onSaveScreenshot(String screenshotName, int width, int height, Framebuffer fbo, ReturnValue<IChatComponent> message) {
+		// TODO move takeScreenshot() funcion into this method
+		return true;
 	}
 
 	@Override

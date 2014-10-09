@@ -1,5 +1,7 @@
 package com.thatapplefreak.voxelcam.gui.mainmenu;
 
+import java.io.IOException;
+
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiMainMenu;
 
@@ -17,7 +19,7 @@ public class GuiMainMenuWithPhotoButton extends GuiMainMenu {
 	}
 
 	@Override
-	protected void actionPerformed(GuiButton par1GuiButton) {
+	protected void actionPerformed(GuiButton par1GuiButton) throws IOException {
 		super.actionPerformed(par1GuiButton);
 		if (par1GuiButton.equals(photoBtn)) {
 			mc.displayGuiScreen(new GuiScreenShotManager());

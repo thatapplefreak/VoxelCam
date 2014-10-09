@@ -27,7 +27,7 @@ public abstract class ImageDrawer {
 	public static void drawImageToGui(int img, int x, int y, int x2, int y2) {
 		glBindTexture(GL_TEXTURE_2D, img);
 		glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-		Tessellator tessellator = Tessellator.instance;
+		Tessellator tessellator = Tessellator.getInstance();
 		tessellator.startDrawingQuads();
 		tessellator.addVertexWithUV(x, y2, 0, 0, 1);
 		tessellator.addVertexWithUV(x2, y2, 0, 1, 1);

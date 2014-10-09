@@ -104,7 +104,7 @@ public class ScalePhotoFrame extends Gui {
 	}
 
 	private void drawBackground() {
-		Tessellator t = Tessellator.instance;
+		Tessellator t = Tessellator.getInstance();
 		glEnable(GL_BLEND);
 		glDisable(GL_TEXTURE_2D);
 		glColor4f(0.0F, 0.0F, 0.0F, 0.5F);

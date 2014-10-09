@@ -24,7 +24,7 @@ public class TwitterPostPopup extends GuiDialogBox {
 	@Override
 	protected void onInitDialog() {
 		btnOk.displayString = I18n.format("post");
-		textbox = new GuiTextField(fontRendererObj, width / 2 - (200 / 2), height / 2 - (16 / 2) - 8, 200, 16);
+		textbox = new GuiTextField(0xFFFFFF, fontRendererObj, width / 2 - (200 / 2), height / 2 - (16 / 2) - 8, 200, 16);
 		textbox.setMaxStringLength(tweetLengh);
 		textbox.setFocused(true);
 	}

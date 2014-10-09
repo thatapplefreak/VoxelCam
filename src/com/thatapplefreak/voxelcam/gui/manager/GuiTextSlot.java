@@ -216,26 +216,26 @@ public abstract class GuiTextSlot {
 
 		glDisable(GL_LIGHTING);
 		glDisable(GL_FOG);
-		Tessellator var18 = Tessellator.instance;
+		Tessellator tessellator = Tessellator.getInstance();
 		// glBindTexture(GL_TEXTURE_2D,
 		// this.client.renderEngine.getTexture("/gui/background.png"));
 		glEnable(GL_BLEND);
 		glDisable(GL_TEXTURE_2D);
 		glColor4f(0.0F, 0.0F, 0.0F, 0.5F);
 		float var17 = 32.0F;
-		var18.startDrawingQuads();
+		tessellator.startDrawingQuads();
 		// var18.setColorOpaque_I(2105376);
-		var18.addVertexWithUV(this.left, this.bottom, 0.0D, this.left / var17, (this.bottom + (int) this.scrollDistance) / var17);
-		var18.addVertexWithUV(this.right, this.bottom, 0.0D, this.right / var17, (this.bottom + (int) this.scrollDistance) / var17);
-		var18.addVertexWithUV(this.right, this.top, 0.0D, this.right / var17, (this.top + (int) this.scrollDistance) / var17);
-		var18.addVertexWithUV(this.left, this.top, 0.0D, this.left / var17, (this.top + (int) this.scrollDistance) / var17);
-		var18.draw();
+		tessellator.addVertexWithUV(this.left, this.bottom, 0.0D, this.left / var17, (this.bottom + (int) this.scrollDistance) / var17);
+		tessellator.addVertexWithUV(this.right, this.bottom, 0.0D, this.right / var17, (this.bottom + (int) this.scrollDistance) / var17);
+		tessellator.addVertexWithUV(this.right, this.top, 0.0D, this.right / var17, (this.top + (int) this.scrollDistance) / var17);
+		tessellator.addVertexWithUV(this.left, this.top, 0.0D, this.left / var17, (this.top + (int) this.scrollDistance) / var17);
+		tessellator.draw();
 		glDisable(GL_BLEND);
 		glEnable(GL_TEXTURE_2D);
 		var10 = this.top + 4 - (int) this.scrollDistance;
 
 		if (this.field_27262_q) {
-			this.func_27260_a(boxRight, var10, var18);
+			this.func_27260_a(boxRight, var10, tessellator);
 		}
 
 		int var14;
@@ -250,22 +250,22 @@ public abstract class GuiTextSlot {
 					int var15 = boxRight;
 					glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 					glDisable(GL_TEXTURE_2D);
-					var18.startDrawingQuads();
-					var18.setColorOpaque_I(8421504);
-					var18.addVertexWithUV(var14, var19 + var13 + 2, 0.0D, 0.0D, 1.0D);
-					var18.addVertexWithUV(var15, var19 + var13 + 2, 0.0D, 1.0D, 1.0D);
-					var18.addVertexWithUV(var15, var19 - 2, 0.0D, 1.0D, 0.0D);
-					var18.addVertexWithUV(var14, var19 - 2, 0.0D, 0.0D, 0.0D);
-					var18.setColorOpaque_I(0);
-					var18.addVertexWithUV(var14 + 1, var19 + var13 + 1, 0.0D, 0.0D, 1.0D);
-					var18.addVertexWithUV(var15 - 1, var19 + var13 + 1, 0.0D, 1.0D, 1.0D);
-					var18.addVertexWithUV(var15 - 1, var19 - 1, 0.0D, 1.0D, 0.0D);
-					var18.addVertexWithUV(var14 + 1, var19 - 1, 0.0D, 0.0D, 0.0D);
-					var18.draw();
+					tessellator.startDrawingQuads();
+					tessellator.setColorOpaque_I(8421504);
+					tessellator.addVertexWithUV(var14, var19 + var13 + 2, 0.0D, 0.0D, 1.0D);
+					tessellator.addVertexWithUV(var15, var19 + var13 + 2, 0.0D, 1.0D, 1.0D);
+					tessellator.addVertexWithUV(var15, var19 - 2, 0.0D, 1.0D, 0.0D);
+					tessellator.addVertexWithUV(var14, var19 - 2, 0.0D, 0.0D, 0.0D);
+					tessellator.setColorOpaque_I(0);
+					tessellator.addVertexWithUV(var14 + 1, var19 + var13 + 1, 0.0D, 0.0D, 1.0D);
+					tessellator.addVertexWithUV(var15 - 1, var19 + var13 + 1, 0.0D, 1.0D, 1.0D);
+					tessellator.addVertexWithUV(var15 - 1, var19 - 1, 0.0D, 1.0D, 0.0D);
+					tessellator.addVertexWithUV(var14 + 1, var19 - 1, 0.0D, 0.0D, 0.0D);
+					tessellator.draw();
 					glEnable(GL_TEXTURE_2D);
 				}
 
-				this.drawSlot(var11, boxRight, var19, var13, var18);
+				this.drawSlot(var11, boxRight, var19, var13, tessellator);
 			}
 		}
 
@@ -278,22 +278,22 @@ public abstract class GuiTextSlot {
 		glDisable(GL_ALPHA_TEST);
 		glShadeModel(GL_SMOOTH);
 		glDisable(GL_TEXTURE_2D);
-		var18.startDrawingQuads();
-		var18.setColorRGBA_I(0, 0);
-		var18.addVertexWithUV(this.left, this.top + var20, 0.0D, 0.0D, 1.0D);
-		var18.addVertexWithUV(this.right, this.top + var20, 0.0D, 1.0D, 1.0D);
-		var18.setColorRGBA_I(0, 255);
-		var18.addVertexWithUV(this.right, this.top, 0.0D, 1.0D, 0.0D);
-		var18.addVertexWithUV(this.left, this.top, 0.0D, 0.0D, 0.0D);
-		var18.draw();
-		var18.startDrawingQuads();
-		var18.setColorRGBA_I(0, 255);
-		var18.addVertexWithUV(this.left, this.bottom, 0.0D, 0.0D, 1.0D);
-		var18.addVertexWithUV(this.right, this.bottom, 0.0D, 1.0D, 1.0D);
-		var18.setColorRGBA_I(0, 0);
-		var18.addVertexWithUV(this.right, this.bottom - var20, 0.0D, 1.0D, 0.0D);
-		var18.addVertexWithUV(this.left, this.bottom - var20, 0.0D, 0.0D, 0.0D);
-		var18.draw();
+		tessellator.startDrawingQuads();
+		tessellator.setColorRGBA_I(0, 0);
+		tessellator.addVertexWithUV(this.left, this.top + var20, 0.0D, 0.0D, 1.0D);
+		tessellator.addVertexWithUV(this.right, this.top + var20, 0.0D, 1.0D, 1.0D);
+		tessellator.setColorRGBA_I(0, 255);
+		tessellator.addVertexWithUV(this.right, this.top, 0.0D, 1.0D, 0.0D);
+		tessellator.addVertexWithUV(this.left, this.top, 0.0D, 0.0D, 0.0D);
+		tessellator.draw();
+		tessellator.startDrawingQuads();
+		tessellator.setColorRGBA_I(0, 255);
+		tessellator.addVertexWithUV(this.left, this.bottom, 0.0D, 0.0D, 1.0D);
+		tessellator.addVertexWithUV(this.right, this.bottom, 0.0D, 1.0D, 1.0D);
+		tessellator.setColorRGBA_I(0, 0);
+		tessellator.addVertexWithUV(this.right, this.bottom - var20, 0.0D, 1.0D, 0.0D);
+		tessellator.addVertexWithUV(this.left, this.bottom - var20, 0.0D, 0.0D, 0.0D);
+		tessellator.draw();
 		var19 = this.getContentHeight() - (this.bottom - this.top - 4);
 
 		if (var19 > 0) {
@@ -313,27 +313,27 @@ public abstract class GuiTextSlot {
 				var14 = this.top;
 			}
 
-			var18.startDrawingQuads();
-			var18.setColorRGBA_I(0, 255);
-			var18.addVertexWithUV(scrollBarXStart, this.bottom, 0.0D, 0.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd, this.bottom, 0.0D, 1.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd, this.top, 0.0D, 1.0D, 0.0D);
-			var18.addVertexWithUV(scrollBarXStart, this.top, 0.0D, 0.0D, 0.0D);
-			var18.draw();
-			var18.startDrawingQuads();
-			var18.setColorRGBA_I(8421504, 255);
-			var18.addVertexWithUV(scrollBarXStart, var14 + var13, 0.0D, 0.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd, var14 + var13, 0.0D, 1.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd, var14, 0.0D, 1.0D, 0.0D);
-			var18.addVertexWithUV(scrollBarXStart, var14, 0.0D, 0.0D, 0.0D);
-			var18.draw();
-			var18.startDrawingQuads();
-			var18.setColorRGBA_I(12632256, 255);
-			var18.addVertexWithUV(scrollBarXStart, var14 + var13 - 1, 0.0D, 0.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd - 1, var14 + var13 - 1, 0.0D, 1.0D, 1.0D);
-			var18.addVertexWithUV(scrollBarXEnd - 1, var14, 0.0D, 1.0D, 0.0D);
-			var18.addVertexWithUV(scrollBarXStart, var14, 0.0D, 0.0D, 0.0D);
-			var18.draw();
+			tessellator.startDrawingQuads();
+			tessellator.setColorRGBA_I(0, 255);
+			tessellator.addVertexWithUV(scrollBarXStart, this.bottom, 0.0D, 0.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd, this.bottom, 0.0D, 1.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd, this.top, 0.0D, 1.0D, 0.0D);
+			tessellator.addVertexWithUV(scrollBarXStart, this.top, 0.0D, 0.0D, 0.0D);
+			tessellator.draw();
+			tessellator.startDrawingQuads();
+			tessellator.setColorRGBA_I(8421504, 255);
+			tessellator.addVertexWithUV(scrollBarXStart, var14 + var13, 0.0D, 0.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd, var14 + var13, 0.0D, 1.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd, var14, 0.0D, 1.0D, 0.0D);
+			tessellator.addVertexWithUV(scrollBarXStart, var14, 0.0D, 0.0D, 0.0D);
+			tessellator.draw();
+			tessellator.startDrawingQuads();
+			tessellator.setColorRGBA_I(12632256, 255);
+			tessellator.addVertexWithUV(scrollBarXStart, var14 + var13 - 1, 0.0D, 0.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd - 1, var14 + var13 - 1, 0.0D, 1.0D, 1.0D);
+			tessellator.addVertexWithUV(scrollBarXEnd - 1, var14, 0.0D, 1.0D, 0.0D);
+			tessellator.addVertexWithUV(scrollBarXStart, var14, 0.0D, 0.0D, 0.0D);
+			tessellator.draw();
 		}
 
 		this.func_27257_b(mouseX, mouseY);

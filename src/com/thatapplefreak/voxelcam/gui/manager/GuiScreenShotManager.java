@@ -147,7 +147,7 @@ public class GuiScreenShotManager extends GuiScreen implements ScreenshotIncapab
 	}
 
 	@Override
-	protected void mouseClicked(int mouseX, int mouseY, int button) {
+	protected void mouseClicked(int mouseX, int mouseY, int button) throws IOException {
 		super.mouseClicked(mouseX, mouseY, button);
 		searchBar.mouseClicked(mouseX, mouseY, button);
 	}

@@ -21,7 +21,7 @@ public class TwitterPINPopup extends GuiDialogBox {
 
 	@Override
 	protected void onInitDialog() {
-		pinBox = new GuiTextField(fontRendererObj, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
+		pinBox = new GuiTextField(0xFFFFFF, fontRendererObj, width / 2 - (150 / 2), height / 2 - (16 / 2) - 8, 150, 16);
 		BrowserOpener.openURLstringInBrowser(TwitterHandler.requestToken.getAuthorizationURL());
 	}
 
