@@ -20,5 +20,13 @@
 	"voxelcam.areyousure": "Are You Sure",
 	"voxelcam.ok": "Ok",
 
-	"voxelcam.bigscreenshotunsupported": "Big screenshots are not yet supported in this version of VoxelCam"
+	"voxelcam.bigscreenshotunsupported": "Big screenshots are not yet supported in this version of VoxelCam",
+
+	"voxelcam.dropboxnoinstallerror": "Error uploading to Dropbox! Dropbox not installed!",
+	"voxelcam.googledrivenoinstallerror": "Error uploading to Google Drive! Google Drive not installed!",
+	"voxelcam.dropboxautouploadsuccess": "Auto upload to Dropbox succeeded: %s",
+	"voxelcam.googledriveautouploadsuccess": "Auto upload to Google Drive succeeded: %s",
+	"voxelcam.imgurnoclientid": "Imgur uploads need a Client ID - register one at api.imgur.com and set it in the VoxelCam config",
+	"voxelcam.imgurautouploadsuccess": "Auto upload to Imgur succeeded",
+	"voxelcam.imguruploadfail": "Upload to Imgur failed"
 }

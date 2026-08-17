@@ -23,6 +23,9 @@ public class VoxelCamConfig {
 	public boolean autoUploadDropbox = false;
 	public boolean autoUploadGoogleDrive = false;
 
+	/** Register a free anonymous app at https://api.imgur.com/oauth2/addclient and paste its Client ID here. */
+	public String imgurClientId = "";
+
 	public static VoxelCamConfig load() {
 		if (Files.exists(CONFIG_PATH)) {
 			try (var reader = Files.newBufferedReader(CONFIG_PATH, StandardCharsets.UTF_8)) {

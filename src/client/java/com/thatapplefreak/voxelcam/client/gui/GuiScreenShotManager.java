@@ -1,8 +1,8 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
-import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotTextureCache;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
+import com.thatapplefreak.voxelcam.client.upload.AutoUploader;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -10,10 +10,9 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Util;
 
-import java.awt.Desktop;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -107,17 +106,17 @@ public class GuiScreenShotManager extends Screen {
 		}).dimensions(width - 80, height - 45, 70, 20).build());
 		editButton.active = false;
 
-		openFolderButton = addDrawableChild(ButtonWidget.builder(Text.translatable("voxelcam.openscreenshotsfolder"), b -> {
-			try {
-				Desktop.getDesktop().browse(screenshotsDir.toURI());
-			} catch (IOException e) {
-				VoxelCamClient.LOGGER.warn("Failed to open screenshots folder", e);
-			}
-		}).dimensions(width - 220, height - 25, 140, 20).build());
+		openFolderButton = addDrawableChild(ButtonWidget.builder(Text.translatable("voxelcam.openscreenshotsfolder"), b ->
+				Util.getOperatingSystem().open(screenshotsDir))
+				.dimensions(width - 220, height - 25, 140, 20).build());
 
 		postButton = addDrawableChild(ButtonWidget.builder(Text.translatable("voxelcam.postto"), b -> {
+			File photo = VoxelCamIO.getSelectedPhoto();
+			if (photo != null) {
+				AutoUploader.postNow(photo);
+			}
 		}).dimensions(width - 80, height - 25, 70, 20).build());
-		postButton.active = false;
+		postButton.active = hasSelection;
 	}
 
 	@Override

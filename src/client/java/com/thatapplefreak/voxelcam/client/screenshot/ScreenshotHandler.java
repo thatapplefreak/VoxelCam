@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
+import com.thatapplefreak.voxelcam.client.upload.AutoUploader;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
@@ -64,6 +65,9 @@ public final class ScreenshotHandler {
 		try (image) {
 			image.writeTo(target);
 			ChatMessages.send("voxelcam.savedscreenshotas", target.getName());
+			if (VoxelCamClient.getConfig().autoUpload) {
+				AutoUploader.upload(target);
+			}
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			ChatMessages.send("voxelcam.uploadfailed");
