@@ -1,3 +1,16 @@
-/bin
-/build/build
-/build/.gradle
+# Gradle
+.gradle/
+build/
+!src/**/build/
+
+# Loom / run directory
+run/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+bin/
+
+# OS
+.DS_Store

@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "voxelcam",
+	"version": "${version}",
+	"name": "VoxelCam",
+	"description": "Adds features to make in-game screenshots easier to handle, including editing and uploading to image hosts.",
+	"authors": [
+		"thatapplefreak"
+	],
+	"contact": {
+		"homepage": "https://github.com/thatapplefreak/VoxelCam"
+	},
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.thatapplefreak.voxelcam.client.VoxelCamClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.21.11",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
