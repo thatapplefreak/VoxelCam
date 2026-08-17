@@ -19,21 +19,32 @@ import java.util.Map;
  */
 public final class ScreenshotTextureCache {
 
-	private static final Map<File, Identifier> LOADED = new HashMap<>();
+	/** A loaded screenshot texture and its pixel dimensions (needed to preserve aspect ratio). */
+	public record Preview(Identifier id, int width, int height) {
+	}
+
+	private static final Map<File, Preview> LOADED = new HashMap<>();
 	private static int nextId = 0;
 
 	private ScreenshotTextureCache() {
 	}
 
-	/** Returns the texture identifier for the given screenshot, loading it if necessary. Null on failure. */
-	public static Identifier get(File screenshot) {
+	/** Returns the loaded texture for the given screenshot, loading it if necessary. Null on failure. */
+	public static Preview get(File screenshot) {
 		if (screenshot == null) {
 			return null;
 		}
-		return LOADED.computeIfAbsent(screenshot, ScreenshotTextureCache::load);
+		// Failures are cached as null entries on purpose: get() runs every frame, so
+		// retrying a corrupt file would re-read it and log a warning ~60x/second.
+		if (LOADED.containsKey(screenshot)) {
+			return LOADED.get(screenshot);
+		}
+		Preview preview = load(screenshot);
+		LOADED.put(screenshot, preview);
+		return preview;
 	}
 
-	private static Identifier load(File screenshot) {
+	private static Preview load(File screenshot) {
 		// NativeImageBackedTexture takes ownership of the NativeImage and closes it in
 		// its own close(); closing it here (e.g. try-with-resources) would leave the
 		// texture holding a freed native pointer.
@@ -42,7 +53,7 @@ public final class ScreenshotTextureCache {
 			Identifier id = Identifier.of(VoxelCamClient.MOD_ID, "screenshot_" + (nextId++));
 			NativeImageBackedTexture texture = new NativeImageBackedTexture(screenshot::getName, image);
 			MinecraftClient.getInstance().getTextureManager().registerTexture(id, texture);
-			return id;
+			return new Preview(id, image.getWidth(), image.getHeight());
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.warn("Failed to load screenshot texture for {}", screenshot, e);
 			return null;
@@ -50,15 +61,15 @@ public final class ScreenshotTextureCache {
 	}
 
 	public static void release(File screenshot) {
-		Identifier id = LOADED.remove(screenshot);
-		if (id != null) {
-			MinecraftClient.getInstance().getTextureManager().destroyTexture(id);
+		Preview preview = LOADED.remove(screenshot);
+		if (preview != null) {
+			MinecraftClient.getInstance().getTextureManager().destroyTexture(preview.id());
 		}
 	}
 
 	public static void releaseAll() {
-		for (Identifier id : LOADED.values()) {
-			MinecraftClient.getInstance().getTextureManager().destroyTexture(id);
+		for (Preview preview : LOADED.values()) {
+			MinecraftClient.getInstance().getTextureManager().destroyTexture(preview.id());
 		}
 		LOADED.clear();
 	}

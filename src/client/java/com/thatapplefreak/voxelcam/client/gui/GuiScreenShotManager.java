@@ -9,7 +9,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
 
 import java.io.File;
@@ -29,6 +28,7 @@ public class GuiScreenShotManager extends Screen {
 	private static final int LIST_X = 10;
 	private static final int LIST_WIDTH = 150;
 	private static final int LIST_TOP = 44;
+	private static final int FRAME_TOP = 44;
 
 	private final File screenshotsDir;
 	private final List<ButtonWidget> rowWidgets = new ArrayList<>();
@@ -160,20 +160,38 @@ public class GuiScreenShotManager extends Screen {
 		// and its blur pass throws "Can only blur once per frame" if repeated.
 		super.render(context, mouseX, mouseY, delta);
 
+		int frameX = LIST_X + LIST_WIDTH + 30;
+		int frameY = FRAME_TOP;
+		int frameWidth = width - frameX - 10;
+		int frameHeight = height - FRAME_TOP - 55;
+		if (frameWidth <= 0 || frameHeight <= 0) {
+			return;
+		}
+		context.fill(frameX, frameY, frameX + frameWidth, frameY + frameHeight, 0x80000000);
+
 		File selected = VoxelCamIO.getSelectedPhoto();
-		if (selected == null) {
+		ScreenshotTextureCache.Preview preview = selected == null ? null : ScreenshotTextureCache.get(selected);
+		if (preview == null) {
+			context.drawCenteredTextWithShadow(textRenderer, Text.translatable("voxelcam.noscreenshots"),
+					frameX + frameWidth / 2, frameY + frameHeight / 2 - 4, 0xFFFFFFFF);
 			return;
 		}
-		Identifier texture = ScreenshotTextureCache.get(selected);
-		if (texture == null) {
-			return;
-		}
-		int previewX = LIST_X + LIST_WIDTH + 30;
-		int previewSize = Math.min(width - previewX - 10, height - 80);
-		if (previewSize > 0) {
-			context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, previewX, 24, 0F, 0F,
-					previewSize, previewSize, previewSize, previewSize);
-		}
+
+		// Letterbox: scale to fit inside the frame preserving aspect ratio, then centre.
+		// The old ScalePhotoFrame did the same; drawing at the frame size directly would
+		// squash non-matching aspect ratios (screenshots are rarely square).
+		float scale = Math.min((float) frameWidth / preview.width(), (float) frameHeight / preview.height());
+		int drawWidth = Math.max(1, Math.round(preview.width() * scale));
+		int drawHeight = Math.max(1, Math.round(preview.height() * scale));
+		int drawX = frameX + (frameWidth - drawWidth) / 2;
+		int drawY = frameY + (frameHeight - drawHeight) / 2;
+
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, preview.id(), drawX, drawY, 0F, 0F,
+				drawWidth, drawHeight, preview.width(), preview.height(), preview.width(), preview.height());
+
+		context.drawCenteredTextWithShadow(textRenderer,
+				Text.literal(selected.getName().replaceFirst("\\.png$", "")),
+				frameX + frameWidth / 2, frameY - 12, 0xFFFFFFFF);
 	}
 
 	@Override
