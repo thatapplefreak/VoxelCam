@@ -7,7 +7,9 @@ import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.util.Identifier;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,9 +34,13 @@ public final class ScreenshotTextureCache {
 	}
 
 	private static Identifier load(File screenshot) {
-		try (NativeImage image = NativeImage.read(new java.io.FileInputStream(screenshot))) {
+		// NativeImageBackedTexture takes ownership of the NativeImage and closes it in
+		// its own close(); closing it here (e.g. try-with-resources) would leave the
+		// texture holding a freed native pointer.
+		try (InputStream in = new FileInputStream(screenshot)) {
+			NativeImage image = NativeImage.read(in);
 			Identifier id = Identifier.of(VoxelCamClient.MOD_ID, "screenshot_" + (nextId++));
-			NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> screenshot.getName(), image);
+			NativeImageBackedTexture texture = new NativeImageBackedTexture(screenshot::getName, image);
 			MinecraftClient.getInstance().getTextureManager().registerTexture(id, texture);
 			return id;
 		} catch (IOException e) {

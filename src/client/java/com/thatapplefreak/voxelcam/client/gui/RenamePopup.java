@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -43,12 +42,6 @@ public class RenamePopup extends Screen {
 			VoxelCamIO.rename(screenshotsDir, newName);
 		}
 		close();
-	}
-
-	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		renderBackground(context, mouseX, mouseY, delta);
-		super.render(context, mouseX, mouseY, delta);
 	}
 
 	@Override
