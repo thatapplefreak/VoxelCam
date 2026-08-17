@@ -7,5 +7,16 @@
 	"voxelcam.savingscreenshot": "Saving Screenshot",
 	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
-	"voxelcam.uploadfailed": "Upload failed"
+	"voxelcam.uploadfailed": "Upload failed",
+
+	"voxelcam.screenshots": "Screenshots",
+	"voxelcam.search": "Search",
+	"voxelcam.back": "Back",
+	"voxelcam.rename": "Rename",
+	"voxelcam.delete": "Delete",
+	"voxelcam.edit": "Edit",
+	"voxelcam.openscreenshotsfolder": "Open Screenshots Folder",
+	"voxelcam.postto": "Post to...",
+	"voxelcam.areyousure": "Are You Sure",
+	"voxelcam.ok": "Ok"
 }
