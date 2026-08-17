@@ -18,5 +18,7 @@
 	"voxelcam.openscreenshotsfolder": "Open Screenshots Folder",
 	"voxelcam.postto": "Post to...",
 	"voxelcam.areyousure": "Are You Sure",
-	"voxelcam.ok": "Ok"
+	"voxelcam.ok": "Ok",
+
+	"voxelcam.bigscreenshotunsupported": "Big screenshots are not yet supported in this version of VoxelCam"
 }

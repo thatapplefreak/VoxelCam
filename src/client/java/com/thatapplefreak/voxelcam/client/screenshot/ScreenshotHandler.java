@@ -5,6 +5,7 @@ import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.ScreenshotRecorder;
 
 import java.io.File;
@@ -29,6 +30,18 @@ public final class ScreenshotHandler {
 	public static boolean onScreenshotKeyPressed(Framebuffer framebuffer) {
 		if (saving) {
 			ChatMessages.send("voxelcam.savingpleasewait");
+			return true;
+		}
+
+		MinecraftClient client = MinecraftClient.getInstance();
+		boolean shiftHeld = InputUtil.isKeyPressed(client.getWindow(), InputUtil.GLFW_KEY_LEFT_SHIFT)
+				|| InputUtil.isKeyPressed(client.getWindow(), InputUtil.GLFW_KEY_RIGHT_SHIFT);
+		if (shiftHeld) {
+			// Big/panorama-style oversized screenshots (the old BigScreenshotTaker) relied on
+			// reflectively resizing the actual game window and rendering into a VoxelCommon FBO.
+			// Modern MC's GPU-command-encoder render pipeline has no equivalent hook verified yet;
+			// porting this needs dedicated, visually-tested work rather than a guessed reimplementation.
+			ChatMessages.send("voxelcam.bigscreenshotunsupported");
 			return true;
 		}
 
