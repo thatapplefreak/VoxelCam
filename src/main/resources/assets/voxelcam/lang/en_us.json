@@ -2,5 +2,10 @@
 	"key.category.voxelcam.voxelcam": "VoxelCam",
 	"key.voxelcam.openscreenshotmanager": "Screenshot Manager",
 
-	"voxelcam.chat.prefix": "[VoxelCam]"
+	"voxelcam.chat.prefix": "[VoxelCam]",
+
+	"voxelcam.savingscreenshot": "Saving Screenshot",
+	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
+	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
+	"voxelcam.uploadfailed": "Upload failed"
 }
