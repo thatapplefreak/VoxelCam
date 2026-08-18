@@ -16,13 +16,30 @@ Features
   [catbox.moe](https://catbox.moe) for a link. No account or API key is needed
   for any of these.
 
-Requirements
-------------
+Installing
+----------
 
-* Minecraft 1.21.11
-* [Fabric Loader](https://fabricmc.net/) 0.19.3 or newer
-* [Fabric API](https://modrinth.com/mod/fabric-api)
-* Java 25
+VoxelCam is client-side only. Install it in your own game; servers do not need
+it, and you can use it on any server, modded or vanilla.
+
+1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.19.3 or newer
+   for Minecraft 1.21.11.
+2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11.
+3. Download `voxelcam-2.0.0.jar` from the
+   [latest release](https://github.com/thatapplefreak/VoxelCam/releases/latest).
+4. Put both jars in your `mods` folder, creating it if it does not exist:
+   * Windows — `%appdata%\.minecraft\mods`
+   * macOS — `~/Library/Application Support/minecraft/mods`
+   * Linux — `~/.minecraft/mods`
+5. Launch Minecraft using the Fabric profile.
+
+Press `H` in-game to open the screenshot manager, or use the camera button on
+the title screen.
+
+VoxelCam needs **Java 25 or newer**. If the game refuses to start and reports
+that VoxelCam requires Java 25, point your launcher at a Java 25+ installation
+(in the vanilla launcher: Installations → your Fabric profile → More Options →
+Java executable).
 
 Building
 --------
@@ -40,3 +57,24 @@ Twitter, Facebook, Reddit, Imgur, Dropbox, and Google Drive, and included an
 image editor. Those depended on credentialed APIs and a LiteLoader-era
 rendering stack; the Fabric port replaces them with keyless sharing. The old
 implementation remains in this repository's Git history.
+
+Licence
+-------
+
+VoxelCam is free software: you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License version 3, as published by the
+Free Software Foundation.
+
+VoxelCam is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See [`COPYING.LESSER`](COPYING.LESSER) and
+[`COPYING`](COPYING) for the full terms — LGPLv3 applies on top of GPLv3, so
+both texts are included.
+
+You are free to include VoxelCam in a modpack. Modifications to VoxelCam itself
+must be released under the same licence.
+
+Versions 1.x were released under a different, closed arrangement ("Copyright ©
+2013-2014 Thatapplefreak", modpack use by written permission). The LGPL applies
+to 2.0.0 onward. Some 1.x source in this repository's history was contributed by
+others and is not covered by this grant.

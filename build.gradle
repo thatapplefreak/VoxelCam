@@ -37,6 +37,12 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
 
+// LGPL requires anyone who receives the jar to receive the licence with it.
+tasks.named('jar') {
+	from(rootProject.file('COPYING')) { into 'META-INF' }
+	from(rootProject.file('COPYING.LESSER')) { into 'META-INF' }
+}
+
 processResources {
 	inputs.property 'version', project.version
 

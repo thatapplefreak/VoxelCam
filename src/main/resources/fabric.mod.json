@@ -10,6 +10,7 @@
 	"contact": {
 		"homepage": "https://github.com/thatapplefreak/VoxelCam"
 	},
+	"license": "LGPL-3.0-only",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
