@@ -2,14 +2,14 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public final class VoxelCamIO {
 
 	private static List<File> screenShotFiles = new ArrayList<>();
-	private static int selected = 0;
+	private static File selected;
 
 	private VoxelCamIO() {
 	}
@@ -18,59 +18,53 @@ public final class VoxelCamIO {
 		return screenShotFiles;
 	}
 
-	public static void selectPhotoIndex(int i) {
-		selected = i;
+	public static void selectPhoto(File file) {
+		selected = file;
 	}
 
-	public static int getSelectedIndex() {
+	public static File getSelectedPhoto() {
 		return selected;
 	}
 
-	public static boolean isSelected(int i) {
-		return i == selected;
-	}
-
+	/** Lists .png files in the directory, newest first, filtered by a case-insensitive name match. */
 	public static void updateScreenShotFilesList(File screenshotsDir, String filter) {
 		File[] filesInDir = screenshotsDir.listFiles();
+		String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
 		List<File> files = new ArrayList<>();
 		if (filesInDir != null) {
-			for (File f : filesInDir) {
-				if (f.getName().endsWith(".png") && f.getName().contains(filter)) {
-					files.add(f);
+			for (File file : filesInDir) {
+				String name = file.getName();
+				if (name.toLowerCase(Locale.ROOT).endsWith(".png")
+						&& name.toLowerCase(Locale.ROOT).contains(needle)) {
+					files.add(file);
 				}
 			}
 		}
 		files.sort(Comparator.comparingLong(File::lastModified).reversed());
 		screenShotFiles = files;
-		if (selected >= screenShotFiles.size()) {
-			selected = Math.max(0, screenShotFiles.size() - 1);
-		}
 	}
 
-	public static void rename(File screenshotsDir, String newName) {
-		File selectedPhoto = getSelectedPhoto();
-		if (selectedPhoto != null) {
-			selectedPhoto.renameTo(new File(screenshotsDir, newName + ".png"));
+	/** Renames the selected screenshot, returning the new file (or null if it failed). */
+	public static File rename(File screenshotsDir, String newName) {
+		if (selected == null) {
+			return null;
 		}
+		File target = new File(screenshotsDir, newName + ".png");
+		if (target.equals(selected) || !selected.renameTo(target)) {
+			return null;
+		}
+		ScreenshotImageCache.release(selected);
+		selected = target;
+		return target;
 	}
 
 	public static void delete() {
-		File selectedPhoto = getSelectedPhoto();
-		if (selectedPhoto == null) {
+		if (selected == null) {
 			return;
 		}
-		ScreenshotTextureCache.release(selectedPhoto);
-		selectedPhoto.delete();
+		ScreenshotImageCache.release(selected);
+		selected.delete();
 		screenShotFiles.remove(selected);
-		if (selected > 0 && selected >= screenShotFiles.size()) {
-			selected--;
-		}
-	}
-
-	public static File getSelectedPhoto() {
-		if (screenShotFiles.isEmpty() || selected < 0 || selected >= screenShotFiles.size()) {
-			return null;
-		}
-		return screenShotFiles.get(selected);
+		selected = null;
 	}
 }
