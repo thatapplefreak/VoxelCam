@@ -36,10 +36,8 @@ it, and you can use it on any server, modded or vanilla.
 Press `H` in-game to open the screenshot manager, or use the camera button on
 the title screen.
 
-VoxelCam needs **Java 25 or newer**. If the game refuses to start and reports
-that VoxelCam requires Java 25, point your launcher at a Java 25+ installation
-(in the vanilla launcher: Installations → your Fabric profile → More Options →
-Java executable).
+VoxelCam targets **Java 21**, the runtime Minecraft 1.21.11 ships with, so the
+official launcher needs no changes.
 
 Building
 --------

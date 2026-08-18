@@ -27,11 +27,17 @@ client, read the PNG, and remove the scaffolding before finishing.
 
 ## Environment gotchas
 
-**JDK 25 is mandatory** (`options.release = 25`, `fabric.mod.json` requires `java >=25`). The
-VS Code Java extension bundles JDK 21 and will run Gradle with it, failing as
-`error: release version 25 not supported` while the terminal build succeeds. `.vscode/settings.json`
-pins `java.import.gradle.java.home` to a JDK 25 to prevent this; that file is gitignored, so a fresh
-clone needs it re-added.
+**Target Java 21, not whatever JDK you happen to run Gradle with.** Minecraft 1.21.11 requires and
+bundles Java 21; Java 25 only arrives with MC 26.1+. 2.0.0 was briefly published compiled to class
+version 69 with `"java": ">=25"`, which Fabric Loader rejects on any stock install — it ran in dev
+only because Loom inherited a JDK 25 `JAVA_HOME`. `options.release` and `fabric.mod.json`'s
+`depends.java` must both stay at 21, and a release build is worth checking with
+`javap -v` (major version 65) before publishing.
+
+Newer JDKs are fine for *running* Gradle. If a build ever fails with
+`error: release version N not supported`, the JDK running Gradle is older than the target — in
+VS Code that is usually the Java extension's bundled JDK, pinned via `java.import.gradle.java.home`
+in the gitignored `.vscode/settings.json`.
 
 **`.gradle/loom-cache/minecraftMaven/` can hold more than one Minecraft version.** Reading the wrong
 one produces confidently wrong API conclusions. Always pin the jar matching `gradle.properties`
