@@ -1,0 +1,52 @@
+name: Publish release
+
+# Runs when a GitHub release is published, so the release itself stays the
+# trigger and cutting one by hand still works. Each destination is skipped
+# unless its token is configured, which lets this land before the Modrinth and
+# CurseForge projects exist.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - run: ./gradlew build --stacktrace
+
+      - name: Read mod version
+        id: mod
+        run: echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: Kir-Antipov/mc-publish@v3.3.1
+        with:
+          # Game versions, loader, and dependencies are read from
+          # fabric.mod.json, so they never drift from what the mod declares.
+          files: |
+            build/libs/!(*-@(dev|sources)).jar
+            build/libs/*-sources.jar
+          name: VoxelCam ${{ steps.mod.outputs.version }}
+          version: ${{ steps.mod.outputs.version }}
+          version-type: release
+          java: 21
+
+          modrinth-id: ${{ vars.MODRINTH_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          github-token: ${{ secrets.GITHUB_TOKEN }}
