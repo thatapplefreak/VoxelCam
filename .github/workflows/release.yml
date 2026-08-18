@@ -43,6 +43,10 @@ jobs:
           version-type: release
           java: 21
 
+          # Stated explicitly so a manual workflow_dispatch run knows which tag
+          # it is publishing; a release event would carry this on its own.
+          github-tag: v${{ steps.mod.outputs.version }}
+
           modrinth-id: ${{ vars.MODRINTH_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
