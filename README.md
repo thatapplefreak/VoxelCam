@@ -16,6 +16,14 @@ Features
   [catbox.moe](https://catbox.moe) for a link. No account or API key is needed
   for any of these.
 
+Requirements
+------------
+
+* Minecraft 1.21.11
+* [Fabric Loader](https://fabricmc.net/) 0.19.3 or newer
+* [Fabric API](https://modrinth.com/mod/fabric-api)
+* Java 21 — the runtime the Minecraft launcher already ships with
+
 Installing
 ----------
 
