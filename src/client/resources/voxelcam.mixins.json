@@ -4,6 +4,7 @@
 	"package": "com.thatapplefreak.voxelcam.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"MinecraftClientMixin",
 		"ScreenshotRecorderMixin"
 	],
 	"injectors": {

@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client;
 
+import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
 import net.fabricmc.api.ClientModInitializer;
@@ -40,6 +41,8 @@ public class VoxelCamClient implements ClientModInitializer {
 				InputUtil.Type.KEYSYM,
 				InputUtil.GLFW_KEY_H,
 				CATEGORY));
+
+		BigScreenshotCommand.register();
 
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
 

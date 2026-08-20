@@ -54,6 +54,11 @@
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
 
-	"voxelcam.bigscreenshotunsupported": "Big screenshots are not yet supported in this version of VoxelCam"
+	"voxelcam.bigshot.current": "Big screenshot size is %s. Shift+F2 to take one.",
+	"voxelcam.bigshot.set": "Big screenshot size set to %s",
+	"voxelcam.bigshot.clamped": "Clamped to this GPU's maximum texture size of %s",
+	"voxelcam.bigshot.invalid": "Don't know the size '%s'. Try WIDTHxHEIGHT, or one of: %s",
+	"voxelcam.bigshot.unavailable": "Big screenshots need a world open and no menu on screen",
+	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details"
 
 }
