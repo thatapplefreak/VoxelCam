@@ -7,6 +7,7 @@ import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.screen.ScreenTexts;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.ColorHelper;
 
 /**
  * Square camera button added to the title screen. Carries no label of its own,
@@ -40,9 +41,12 @@ public class PhotoButton extends ButtonWidget {
 		// so the button plate is this method's job, exactly as vanilla's own
 		// ButtonWidget.Text does before it draws its label.
 		drawButton(context);
+		// Tinted by the widget's own alpha, the way drawButton tints the plate. The shorter
+		// drawTexture overloads hardcode an opaque white, which left the icon fully visible
+		// through the title screen's fade-in while everything around it was still fading up.
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, TEXTURE,
 				getX() + (SIZE - ICON_WIDTH) / 2, getY() + (SIZE - ICON_HEIGHT) / 2,
 				ICON_U, ICON_V, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH, ICON_HEIGHT,
-				TEXTURE_SIZE, TEXTURE_SIZE);
+				TEXTURE_SIZE, TEXTURE_SIZE, ColorHelper.getWhite(alpha));
 	}
 }
