@@ -11,6 +11,10 @@ Features
 * A screenshot manager with search, thumbnails, and a large preview, opened
   with the `H` key in-game or from the camera button on the title screen.
 * Rename and delete screenshots without leaving the game.
+* Take screenshots far larger than your window — up to whatever your GPU
+  allows — with `Shift`+`F2`. Set the size with `/bigscreenshot` (or `/bs`),
+  which takes presets like `4k` and `imax`, a multiple of your window such as
+  `4x`, or exact dimensions like `3840x2160`.
 * Share a screenshot by saving a copy through your platform's native file
   dialog, showing it in your file manager, copying its path, or uploading it to
   [catbox.moe](https://catbox.moe) for a link. No account or API key is needed
@@ -33,7 +37,7 @@ it, and you can use it on any server, modded or vanilla.
 1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.19.3 or newer
    for Minecraft 1.21.11.
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11.
-3. Download `voxelcam-2.0.0.jar` from the
+3. Download `voxelcam-2.1.0.jar` from the
    [latest release](https://github.com/thatapplefreak/VoxelCam/releases/latest).
 4. Put both jars in your `mods` folder, creating it if it does not exist:
    * Windows — `%appdata%\.minecraft\mods`
@@ -42,7 +46,8 @@ it, and you can use it on any server, modded or vanilla.
 5. Launch Minecraft using the Fabric profile.
 
 Press `H` in-game to open the screenshot manager, or use the camera button on
-the title screen.
+the title screen. `F2` takes a screenshot as usual; hold `Shift` for an
+oversized one.
 
 VoxelCam targets **Java 21**, the runtime Minecraft 1.21.11 ships with, so the
 official launcher needs no changes.

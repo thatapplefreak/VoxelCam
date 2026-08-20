@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 VoxelCam is a **client-only Fabric mod** for Minecraft 1.21.11: an in-game screenshot browser with
-rename/delete and keyless sharing. Version 2.0.0 is a ground-up port of a LiteLoader mod; the pre-2.0
-implementation (Twitter/Reddit/Facebook/Imgur uploaders, an image editor, a settings panel, a
-"big screenshot" capture mode) lived in `src/com/` and was **deleted but preserved in git history** —
+rename/delete, keyless sharing, and oversized capture. Version 2.0.0 was a ground-up port of a
+LiteLoader mod; the pre-2.0 implementation (Twitter/Reddit/Facebook/Imgur uploaders, an image
+editor, a settings panel, a "big screenshot" capture mode) lived in `src/com/` and was **deleted but
+preserved in git history** —
 `git show 95c1b19:src/com/thatapplefreak/voxelcam/<path>` is the reference when porting anything that
 was left behind.
 
@@ -62,8 +63,39 @@ launch is expected, not a regression.
 
 **Capture** — `ScreenshotRecorderMixin` injects at `HEAD` of `saveScreenshot` and cancels vanilla's
 save, handing off to `ScreenshotHandler`, which names the file via `ScreenshotNamer` and writes it.
-Shift+F2 is reserved for the unported oversized-capture mode and currently reports
-`voxelcam.bigscreenshotunsupported`.
+
+**Oversized capture** — Shift+F2 takes a "big screenshot"; `/bigscreenshot <size>` (aliased `/bs`)
+sets how big. `BigScreenshot` is a state machine spanning two frames, driven by two
+`MinecraftClientMixin` injections into `render(Z)V`: at `HEAD` it resizes, and just before
+`Framebuffer.blitToScreen()` it reads the finished frame back. The resize is `Window.setFramebufferWidth/Height` plus
+`MinecraftClient.onResolutionChanged()` — all public on 1.21.11, so the old build's VoxelCommon
+`PrivateMethods.resizeMinecraft` reflection has no modern counterpart to port. `onResolutionChanged`
+is what GLFW's own framebuffer-size callback calls, so everything that caches a viewport is notified
+for free.
+
+Four things here are load-bearing and were each found the hard way:
+
+- **The window restore has to happen inside the readback consumer.** `copyTextureToBuffer` does its
+  `glReadPixels` immediately but finishes in a `queueFencedTask` that runs next frame, and restoring
+  calls `Framebuffer.resize` → `delete()`, which would close the texture that task is still reading.
+  The consumer runs during `executePendingTasks()` *before* the next frame's clear, so nothing is
+  lost by waiting.
+- **Clamp to `RenderSystem.getDevice().getMaxTextureSize()` yourself.** `Framebuffer.initFbo`
+  *throws* above it, and `WindowFramebuffer` does not override `resize`/`initFbo`, so its forgiving
+  `findSuitableSize` search never runs on this path.
+- **A second request mid-capture must be refused,** and the saved window size snapshotted only on
+  the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
+  one and every restore path leaves the window permanently huge.
+- **Captures are gated on `currentScreen == null && world != null`** — the modern
+  `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
+  `clearAndInit`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
+  with no explanation.
+
+`blitToScreen` still presents the oversized frame for exactly one frame, and
+`GlCommandEncoder.presentTexture` viewports to the *texture* size, so a single zoomed-corner frame is
+expected and not a bug. Sizes are session-only in `BigScreenshot`, never written to disk. PNG
+encoding runs on `Util.getIoWorkerExecutor()`, so `ScreenshotHandler.saving` clears in that task, not
+at the call site, and its chat feedback is bounced back through `client.execute`.
 
 **Manager UI** — `GuiScreenShotManager` is the hub: `ScreenshotListWidget` (rows) on the left,
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
@@ -116,7 +148,7 @@ the manager is reachable from the title screen. New user-facing feedback belongs
 
 ## Known dead ends
 
-- **No config file exists.** `VoxelCamConfig` was deleted once nothing read it; there is nothing to
-  configure and no `voxelcam.json` is written.
+- **No config file exists.** `VoxelCamConfig` was deleted once nothing read it, and the big-screenshot
+  size deliberately stayed session-only rather than bringing it back; no `voxelcam.json` is written.
 - `fabricApi { configureDataGeneration() }` in `build.gradle` is inert — no `fabric-datagen`
   entrypoint is declared and `src/main/java` has no sources, so `runDatagen` generates nothing.
