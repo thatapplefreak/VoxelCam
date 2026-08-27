@@ -23,10 +23,10 @@ Features
 Requirements
 ------------
 
-* Minecraft 1.21.11
+* Minecraft 26.2
 * [Fabric Loader](https://fabricmc.net/) 0.19.3 or newer
 * [Fabric API](https://modrinth.com/mod/fabric-api)
-* Java 21 — the runtime the Minecraft launcher already ships with
+* Java 25 — the runtime the Minecraft launcher already ships with
 
 Installing
 ----------
@@ -35,9 +35,9 @@ VoxelCam is client-side only. Install it in your own game; servers do not need
 it, and you can use it on any server, modded or vanilla.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.19.3 or newer
-   for Minecraft 1.21.11.
-2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11.
-3. Download `voxelcam-2.1.0.jar` from the
+   for Minecraft 26.2.
+2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 26.2.
+3. Download `voxelcam-2.2.0.jar` from the
    [latest release](https://github.com/thatapplefreak/VoxelCam/releases/latest).
 4. Put both jars in your `mods` folder, creating it if it does not exist:
    * Windows — `%appdata%\.minecraft\mods`
@@ -49,7 +49,7 @@ Press `H` in-game to open the screenshot manager, or use the camera button on
 the title screen. `F2` takes a screenshot as usual; hold `Shift` for an
 oversized one.
 
-VoxelCam targets **Java 21**, the runtime Minecraft 1.21.11 ships with, so the
+VoxelCam targets **Java 25**, the runtime Minecraft 26.2 ships with, so the
 official launcher needs no changes.
 
 Building
@@ -60,6 +60,11 @@ Building
 The built jar lands in `build/libs/`. `./gradlew runClient` launches a
 development client with the mod loaded.
 
+There are two test suites, and both gate the build in CI:
+
+    ./gradlew test               # unit tests, no game needed
+    ./gradlew runClientGameTest  # drives a real client
+
 History
 -------
 
@@ -68,6 +73,10 @@ Twitter, Facebook, Reddit, Imgur, Dropbox, and Google Drive, and included an
 image editor. Those depended on credentialed APIs and a LiteLoader-era
 rendering stack; the Fabric port replaces them with keyless sharing. The old
 implementation remains in this repository's Git history.
+
+2.2.0 moved from Minecraft 1.21.11 to 26.2. Nothing changed for players beyond
+the camera button joining the title screen's row of icon buttons; the work was
+following Minecraft's own move to unobfuscated code and a rewritten GUI layer.
 
 Licence
 -------

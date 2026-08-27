@@ -26,8 +26,6 @@ loom {
 }
 
 fabricApi {
-	configureDataGeneration()
-
 	// Creates the gametest source set and the runClientGameTest task. The mod id is
 	// the test mod's own, deliberately not voxelcam's.
 	configureTests {
@@ -36,6 +34,9 @@ fabricApi {
 	}
 }
 
+// Has to be its own block, after fabricApi: configureTests is what creates the
+// clientGameTest run configuration, so naming it in the loom block above would
+// try to create a second one and fail with a duplicate-name error.
 loom {
 	runs {
 		clientGameTest {

@@ -6,6 +6,9 @@ build/
 # Loom / run directory
 run/
 
+# Stray client logs, if the game is ever run with the project root as its cwd
+logs/
+
 # IDE
 .idea/
 *.iml
@@ -14,6 +17,3 @@ bin/
 
 # OS
 .DS_Store
-
-# Client game test scratch output
-/voxelcam-gametest-shots/
