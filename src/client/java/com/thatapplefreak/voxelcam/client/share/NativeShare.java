@@ -50,15 +50,28 @@ public final class NativeShare {
 			if (chosen == null) {
 				return null;
 			}
-			// The dialog does not enforce the filter's extension on every platform.
-			Path target = chosen.toLowerCase().endsWith(".png") ? Path.of(chosen) : Path.of(chosen + ".png");
 			try {
-				Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+				return copyTo(screenshot, chosen);
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
-			return target;
 		}, Util.ioPool());
+	}
+
+	/**
+	 * Everything saveCopy does once the user has picked a path. Split out from the
+	 * dialog so it can be tested: the dialog itself is a blocking native call with
+	 * no headless mode.
+	 */
+	static Path copyTo(File screenshot, String chosen) throws IOException {
+		Path target = targetPath(chosen);
+		Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+		return target;
+	}
+
+	/** The dialog does not enforce the filter's extension on every platform. */
+	static Path targetPath(String chosen) {
+		return chosen.toLowerCase().endsWith(".png") ? Path.of(chosen) : Path.of(chosen + ".png");
 	}
 
 	/**
@@ -68,11 +81,7 @@ public final class NativeShare {
 	 */
 	public static void revealInFileManager(File screenshot) {
 		File parent = screenshot.getParentFile();
-		String[] command = switch (Util.getPlatform()) {
-			case OSX -> new String[] { "open", "-R", screenshot.getAbsolutePath() };
-			case WINDOWS -> new String[] { "explorer.exe", "/select," + screenshot.getAbsolutePath() };
-			default -> null;
-		};
+		String[] command = revealCommand(Util.getPlatform(), screenshot);
 		if (command == null) {
 			Util.getPlatform().openFile(parent);
 			return;
@@ -85,6 +94,18 @@ public final class NativeShare {
 			VoxelCamClient.LOGGER.warn("Could not reveal {} in the file manager", screenshot, e);
 			Util.getPlatform().openFile(parent);
 		}
+	}
+
+	/**
+	 * The "reveal this item" command for a platform, or null where there is none and
+	 * the containing folder has to be opened instead.
+	 */
+	static String[] revealCommand(Util.OS platform, File screenshot) {
+		return switch (platform) {
+			case OSX -> new String[] { "open", "-R", screenshot.getAbsolutePath() };
+			case WINDOWS -> new String[] { "explorer.exe", "/select," + screenshot.getAbsolutePath() };
+			default -> null;
+		};
 	}
 
 	/** GLFW's clipboard carries text only, so this shares the path, not the image. */

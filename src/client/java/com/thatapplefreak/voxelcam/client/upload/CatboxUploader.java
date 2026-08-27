@@ -29,6 +29,15 @@ public final class CatboxUploader {
 	}
 
 	public static CompletableFuture<String> upload(File image) {
+		return upload(image, URI.create(UPLOAD_URL));
+	}
+
+	/**
+	 * Same upload against an arbitrary endpoint. Exists so the tests can point it at
+	 * a local stub and exercise the real request and the real response handling,
+	 * including catbox's habit of refusing with a 200.
+	 */
+	static CompletableFuture<String> upload(File image, URI endpoint) {
 		byte[] body;
 		String contentType;
 		try {
@@ -42,7 +51,7 @@ public final class CatboxUploader {
 		}
 
 		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(UPLOAD_URL))
+				.uri(endpoint)
 				.header("Content-Type", contentType)
 				.timeout(TIMEOUT)
 				.POST(HttpRequest.BodyPublishers.ofByteArray(body))
