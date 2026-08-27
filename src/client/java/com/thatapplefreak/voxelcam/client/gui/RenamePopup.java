@@ -110,6 +110,6 @@ public class RenamePopup extends Screen {
 
 	@Override
 	public void onClose() {
-		minecraft.setScreen(parent);
+		minecraft.setScreenAndShow(parent);
 	}
 }

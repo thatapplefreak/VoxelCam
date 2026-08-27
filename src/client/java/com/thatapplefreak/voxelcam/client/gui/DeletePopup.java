@@ -22,7 +22,7 @@ public final class DeletePopup {
 			if (confirmed) {
 				VoxelCamIO.delete();
 			}
-			Minecraft.getInstance().setScreen(parent);
+			Minecraft.getInstance().setScreenAndShow(parent);
 		}, Component.translatable("voxelcam.delete.title"), message,
 				Component.translatable("voxelcam.delete"), Component.translatable("gui.cancel"));
 	}

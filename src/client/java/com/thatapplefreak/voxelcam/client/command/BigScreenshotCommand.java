@@ -7,7 +7,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -40,9 +40,9 @@ public final class BigScreenshotCommand {
 	}
 
 	private static LiteralArgumentBuilder<FabricClientCommandSource> tree(String name) {
-		return ClientCommandManager.literal(name)
+		return ClientCommands.literal(name)
 				.executes(BigScreenshotCommand::report)
-				.then(ClientCommandManager.argument(ARGUMENT, StringArgumentType.word())
+				.then(ClientCommands.argument(ARGUMENT, StringArgumentType.word())
 						.suggests(SUGGESTIONS)
 						.executes(BigScreenshotCommand::set));
 	}

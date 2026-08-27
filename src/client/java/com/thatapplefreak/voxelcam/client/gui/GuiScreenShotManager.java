@@ -96,7 +96,7 @@ public class GuiScreenShotManager extends Screen {
 		renameButton = addRenderableWidget(button("voxelcam.rename", "voxelcam.tooltip.rename",
 				b -> renameSelected(), previewX, actionsY, actionWidth));
 		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
-				b -> minecraft.setScreen(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
+				b -> minecraft.setScreenAndShow(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
 		// Absorbs the rounding remainder so the row ends flush with the preview.
 		shareButton = addRenderableWidget(button("voxelcam.share", "voxelcam.tooltip.share",
 				b -> shareSelected(), postX, actionsY, previewX + previewWidth - postX));
@@ -158,13 +158,13 @@ public class GuiScreenShotManager extends Screen {
 
 	private void renameSelected() {
 		if (selected != null) {
-			minecraft.setScreen(new RenamePopup(this, screenshotsDir, selected));
+			minecraft.setScreenAndShow(new RenamePopup(this, screenshotsDir, selected));
 		}
 	}
 
 	private void shareSelected() {
 		if (selected != null) {
-			minecraft.setScreen(new SharePopup(this, selected));
+			minecraft.setScreenAndShow(new SharePopup(this, selected));
 		}
 	}
 
@@ -174,7 +174,7 @@ public class GuiScreenShotManager extends Screen {
 		if (!searchBar.isFocused() && selected != null) {
 			switch (input.input()) {
 				case GLFW.GLFW_KEY_DELETE, GLFW.GLFW_KEY_BACKSPACE -> {
-					minecraft.setScreen(DeletePopup.create(this));
+					minecraft.setScreenAndShow(DeletePopup.create(this));
 					return true;
 				}
 				case GLFW.GLFW_KEY_F2 -> {
@@ -266,6 +266,6 @@ public class GuiScreenShotManager extends Screen {
 	public void onClose() {
 		ScreenshotImageCache.releaseAll();
 		ScreenshotMetadata.forgetAll();
-		minecraft.setScreen(null);
+		minecraft.setScreenAndShow(null);
 	}
 }

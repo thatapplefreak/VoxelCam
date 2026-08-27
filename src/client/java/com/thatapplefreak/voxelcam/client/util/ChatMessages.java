@@ -18,7 +18,7 @@ public final class ChatMessages {
 				.append(Component.literal(" ")).append(body);
 		Minecraft client = Minecraft.getInstance();
 		if (client.player != null) {
-			client.player.displayClientMessage(message, false);
+			client.player.sendSystemMessage(message);
 		}
 	}
 

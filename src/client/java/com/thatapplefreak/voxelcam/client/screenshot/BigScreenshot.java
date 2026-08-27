@@ -12,7 +12,7 @@ import net.minecraft.client.Screenshot;
  *
  * <p>The old mod resized the real game window through a VoxelCommon reflection helper. On
  * 1.21.11 that is plain public API — {@link Window#setWidth(int)} plus
- * {@link Minecraft#resizeDisplay()}, the same call GLFW's framebuffer-size
+ * {@link Minecraft#framebufferSizeChanged()}, the same call GLFW's framebuffer-size
  * callback makes — so everything that caches a viewport size is notified by construction.
  *
  * <p>The capture spans two frames:
@@ -182,6 +182,6 @@ public final class BigScreenshot {
 		Window window = client.getWindow();
 		window.setWidth(width);
 		window.setHeight(height);
-		client.resizeDisplay();
+		client.framebufferSizeChanged();
 	}
 }

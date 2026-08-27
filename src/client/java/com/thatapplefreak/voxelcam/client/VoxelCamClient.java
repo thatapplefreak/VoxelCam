@@ -6,7 +6,7 @@ import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
@@ -36,7 +36,7 @@ public class VoxelCamClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		openScreenshotManagerKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+		openScreenshotManagerKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.voxelcam.openscreenshotmanager",
 				InputConstants.Type.KEYSYM,
 				InputConstants.KEY_H,
@@ -65,7 +65,7 @@ public class VoxelCamClient implements ClientModInitializer {
 		int columnLeft = width / 2 - 101;
 		int columnRight = width / 2 + 101;
 		int rowY = Integer.MIN_VALUE;
-		for (AbstractWidget widget : Screens.getButtons(screen)) {
+		for (AbstractWidget widget : Screens.getWidgets(screen)) {
 			// Full-width menu entries only, so the row is found from vanilla's own
 			// layout rather than from an icon button some other mod injected.
 			if (widget.getWidth() >= 90 && widget.getX() >= columnLeft
@@ -83,7 +83,7 @@ public class VoxelCamClient implements ClientModInitializer {
 		// icons, so the camera lands clear of them instead of on top.
 		int rowLeft = Integer.MAX_VALUE;
 		int rowRight = Integer.MIN_VALUE;
-		for (AbstractWidget widget : Screens.getButtons(screen)) {
+		for (AbstractWidget widget : Screens.getWidgets(screen)) {
 			if (widget.getY() < rowY + PhotoButton.SIZE && widget.getY() + widget.getHeight() > rowY) {
 				rowLeft = Math.min(rowLeft, widget.getX());
 				rowRight = Math.max(rowRight, widget.getX() + widget.getWidth());
@@ -100,8 +100,8 @@ public class VoxelCamClient implements ClientModInitializer {
 			// tuck it onto the left end instead of letting it hang off screen.
 			x = rowLeft - GAP - PhotoButton.SIZE;
 		}
-		Screens.getButtons(screen).add(new PhotoButton(x, rowY,
-			b -> client.setScreen(new GuiScreenShotManager(screenshotsDir(client)))));
+		Screens.getWidgets(screen).add(new PhotoButton(x, rowY,
+			b -> client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)))));
 	}
 
 	private static File screenshotsDir(Minecraft client) {
@@ -111,7 +111,7 @@ public class VoxelCamClient implements ClientModInitializer {
 	private static void onEndTick(Minecraft client) {
 		while (openScreenshotManagerKey.consumeClick()) {
 			if (client.screen == null) {
-				client.setScreen(new GuiScreenShotManager(screenshotsDir(client)));
+				client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
 			}
 		}
 	}
