@@ -9,19 +9,104 @@ on:
 permissions:
   contents: read
 
+env:
+  # Minecraft 26.1 onward requires and bundles Java 25. Building on the target
+  # runtime keeps CI honest about what players actually have.
+  JAVA_VERSION: 25
+  # Class file major version for Java 25, asserted against the built jar below.
+  EXPECTED_CLASS_VERSION: 69
+
 jobs:
-  build:
+  # Both test jobs gate the build: no jar is produced unless they pass.
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      # Java 21 is what Minecraft 1.21.11 runs on. Building on a newer JDK would
-      # still compile (options.release pins the bytecode), but building on the
-      # target runtime keeps CI honest about what players actually have.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 21
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - run: ./gradlew test --stacktrace
+
+      # A suite that runs zero tests passes, so the count is checked rather than
+      # trusting the exit code alone — the test source set extends `main`, which
+      # holds only resources, and a classpath regression there is silent.
+      - name: Assert tests actually ran
+        if: always()
+        run: |
+          shopt -s nullglob
+          results=(build/test-results/test/TEST-*.xml)
+          if [ ${#results[@]} -eq 0 ]; then
+            echo "::error::No test result files — the test task ran nothing"
+            exit 1
+          fi
+          total=$(grep -ho 'tests="[0-9]*"' "${results[@]}" | grep -oE '[0-9]+' | awk '{n += $1} END {print n + 0}')
+          echo "ran $total tests across ${#results[@]} classes"
+          if [ "$total" -lt 1 ]; then
+            echo "::error::Test task reported $total tests"
+            exit 1
+          fi
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: build/reports/tests/test
+          retention-days: 7
+
+  client-game-tests:
+    name: Client game tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # The tests drive a real client, so the runner needs a virtual framebuffer
+      # and a software GL driver. Loom turns XVFB on by itself on Linux when CI
+      # is set, but it does not install it.
+      - name: Install a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+
+      - run: ./gradlew runClientGameTest --stacktrace
+
+      # The failure screenshots are usually the fastest way to see what went
+      # wrong on a machine nobody can look at.
+      - name: Upload game test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-game-test-output
+          path: |
+            build/run/clientGameTest/screenshots
+            build/run/clientGameTest/logs
+          retention-days: 7
+          if-no-files-found: ignore
+
+  build:
+    name: Build jar
+    needs: [unit-tests, client-game-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -29,14 +114,14 @@ jobs:
 
       # Guards the mistake that shipped in the first 2.0.0: a jar compiled to a
       # class version no stock Minecraft install can load.
-      - name: Verify bytecode targets Java 21
+      - name: Verify bytecode targets Java ${{ env.JAVA_VERSION }}
         run: |
           jar=$(ls build/libs/*.jar | grep -v -- '-sources.jar' | head -1)
           unzip -o -q "$jar" 'com/thatapplefreak/voxelcam/client/VoxelCamClient.class' -d /tmp/verify
           major=$(javap -v /tmp/verify/com/thatapplefreak/voxelcam/client/VoxelCamClient.class | grep -oE 'major version: [0-9]+' | grep -oE '[0-9]+')
           echo "class file major version: $major"
-          if [ "$major" != "65" ]; then
-            echo "::error::Expected major version 65 (Java 21), got $major"
+          if [ "$major" != "${EXPECTED_CLASS_VERSION}" ]; then
+            echo "::error::Expected major version ${EXPECTED_CLASS_VERSION} (Java ${JAVA_VERSION}), got $major"
             exit 1
           fi
 

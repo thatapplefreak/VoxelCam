@@ -36,6 +36,19 @@ fabricApi {
 	}
 }
 
+loom {
+	runs {
+		clientGameTest {
+			// CI runners are slow enough that the game test network synchronizer can
+			// time out; upstream's advice is to turn it off there. Left on locally,
+			// where it is what keeps the tests deterministic.
+			if (System.getenv("CI") != null) {
+				vmArg "-Dfabric.client.gametest.disableNetworkSynchronizer=true"
+			}
+		}
+	}
+}
+
 // splitEnvironmentSourceSets() leaves `test` extending `main`, which holds only
 // resources — without this the tests cannot see a single class they are testing.
 sourceSets {

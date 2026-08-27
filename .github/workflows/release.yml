@@ -14,16 +14,28 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
 
       - uses: gradle/actions/setup-gradle@v6
+
+      # Publishing untested code is worse than a slow release, so the suites gate
+      # this too. `build` would run the unit tests on its own, but as its own step
+      # a failure here reads as "tests failed" rather than "build failed".
+      - run: ./gradlew test --stacktrace
+
+      - name: Install a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+
+      - run: ./gradlew runClientGameTest --stacktrace
 
       - run: ./gradlew build --stacktrace
 
@@ -41,7 +53,7 @@ jobs:
           name: VoxelCam ${{ steps.mod.outputs.version }}
           version: ${{ steps.mod.outputs.version }}
           version-type: release
-          java: 21
+          java: 25
 
           # Stated explicitly so a manual workflow_dispatch run knows which tag
           # it is publishing; a release event would carry this on its own.
