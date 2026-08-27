@@ -90,12 +90,38 @@ setters look "removed" when they are only non-public.
 
 ## Source layout
 
-Loom `splitEnvironmentSourceSets()` is on, but **all code lives in `src/client/java`**; `src/main`
-holds resources only (`fabric.mod.json`, lang, textures). `compileJava` is `NO-SOURCE` and
-`build/classes/java/main` never exists — the "Class path entries reference missing files" warning at
-launch is expected, not a regression.
+Four source sets, none of which is where a newcomer first looks:
 
-`src/client/resources/voxelcam.mixins.json` registers the single mixin.
+```
+src/main/resources/     fabric.mod.json, lang, textures   <- no java at all
+src/client/java/        every line of the mod
+src/client/resources/   voxelcam.mixins.json
+src/test/java/          JUnit, no game
+src/gametest/java/      client game tests
+src/gametest/resources/ fabric.mod.json for the test mod (id voxelcam-gametest)
+```
+
+**`src/main/java` does not exist, and that is not an oversight.** Loom's
+`splitEnvironmentSourceSets()` is on, which splits code into a common `main` and a client-only
+`client`. VoxelCam is client-only (`"environment": "client"`), so everything lands in `client` and
+`main` is left holding resources — `fabric.mod.json` and the assets have to live there because
+`main` is the primary resource root that ends up at the jar root. `voxelcam.mixins.json` sits in
+`client/resources` instead, next to the two mixins it registers.
+
+Three consequences worth recognising rather than re-diagnosing:
+
+- `compileJava` is `NO-SOURCE` and `build/classes/java/main` never exists, so the
+  "Class path entries reference missing files" warning at launch is expected, not a regression.
+- The `test` source set extends `main`, so it sees no code until `build.gradle` puts the client
+  output on its classpath explicitly.
+- Mod code is imported as `com.thatapplefreak.voxelcam.client.*` even though nothing is under a
+  `common` package, because the whole mod is the client half.
+
+**The split is kept deliberately.** For a client-only mod it buys nothing at runtime, and collapsing
+everything into `src/main/java` would remove both the launch warning and the test classpath wiring.
+It stays because it is the layout Fabric's own 26.2 example mod ships, so it is what anyone who has
+seen another Fabric mod expects — and rearranging every file changes nothing a player can observe.
+Worth revisiting some time that is not immediately before a release.
 
 ## Architecture
 
@@ -211,7 +237,12 @@ the manager is reachable from the title screen. New user-facing feedback belongs
 - **No config file exists.** `VoxelCamConfig` was deleted once nothing read it, and the big-screenshot
   size deliberately stayed session-only rather than bringing it back; no `voxelcam.json` is written.
   The version pins in `gradle.properties` are build-time only and are not runtime config.
-- `configureDataGeneration()` in `build.gradle`'s `fabricApi` block is inert — no `fabric-datagen`
-  entrypoint is declared and `src/main/java` has no sources, so `runDatagen` generates nothing.
-  **Only that one call is inert.** `configureTests` in the same block is load-bearing: it creates
-  the `gametest` source set and the `runClientGameTest` task, so do not remove the block wholesale.
+- **There is no data generation.** `configureDataGeneration()` was removed in 2.2.0: no
+  `fabric-datagen` entrypoint was ever declared and `src/main/java` has no sources, so its
+  `runDatagen` task only ever generated nothing. The mod ships hand-written assets. Do not add the
+  call back expecting it to do something on its own.
+- **`fabricApi { configureTests { ... } }` is load-bearing** — it creates the `gametest` source set
+  and the `runClientGameTest` task, so the block that survived is not the same kind of decoration
+  the datagen call was. The `clientGameTest` run config must be tuned in a *separate* `loom` block
+  placed after it; naming it in the `loom` block above instead fails with a duplicate-name error,
+  because `configureTests` is what creates that run config.
