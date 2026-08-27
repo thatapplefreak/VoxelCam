@@ -13,6 +13,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.resources.Identifier;
@@ -20,6 +21,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class VoxelCamClient implements ClientModInitializer {
 
@@ -56,52 +62,87 @@ public class VoxelCamClient implements ClientModInitializer {
 	}
 
 	/**
-	 * Puts the camera button on the title screen's bottom button row, past its
-	 * right end. The LiteLoader build hardcoded width/2 + 104, but modern vanilla
-	 * puts its own accessibility button in exactly that slot, so the row is
-	 * measured at runtime and the camera goes after whatever is already there.
+	 * Puts the camera button in the title screen's row of square icon buttons, next
+	 * to vanilla's friends, language, and accessibility icons.
+	 *
+	 * The row is found and re-laid-out at runtime rather than hardcoded. Vanilla
+	 * centres it on the screen, so appending a fourth button without moving the other
+	 * three would leave the whole group visibly off-centre; instead the existing icons
+	 * shift left by half a slot and the camera takes the new right-hand end, which is
+	 * what vanilla's own layout would produce for four buttons.
 	 */
 	private static void addTitleScreenButton(Minecraft client, Screen screen, int width, int height) {
-		int columnLeft = width / 2 - 101;
-		int columnRight = width / 2 + 101;
+		Button.OnPress open = b -> client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
+
+		List<AbstractWidget> iconRow = findIconRow(screen);
+		if (!iconRow.isEmpty()) {
+			// Derived from the row itself, so a resource pack or mod using a different
+			// pitch stays consistent instead of having the camera jammed against a neighbour.
+			int slot = iconRow.size() > 1
+					? iconRow.get(1).getX() - iconRow.get(0).getX()
+					: PhotoButton.SIZE + GAP;
+			int count = iconRow.size() + 1;
+			int rowWidth = count * PhotoButton.SIZE + (count - 1) * (slot - PhotoButton.SIZE);
+			int left = width / 2 - rowWidth / 2;
+			int rowY = iconRow.get(0).getY();
+
+			for (int i = 0; i < iconRow.size(); i++) {
+				iconRow.get(i).setX(left + i * slot);
+			}
+			Screens.getWidgets(screen).add(
+					new PhotoButton(left + iconRow.size() * slot, rowY, open));
+			return;
+		}
+
+		// Unrecognised layout (a menu-replacing mod, say): fall back to sitting past the
+		// right end of the bottom full-width row, where the button used to live.
+		Screens.getWidgets(screen).add(new PhotoButton(fallbackX(screen, width), fallbackY(screen, height), open));
+	}
+
+	/**
+	 * The contiguous run of square, icon-sized buttons vanilla centres above the
+	 * Options/Quit row, ordered left to right. Empty if nothing matches.
+	 */
+	private static List<AbstractWidget> findIconRow(Screen screen) {
+		Map<Integer, List<AbstractWidget>> rows = new HashMap<>();
+		for (AbstractWidget widget : Screens.getWidgets(screen)) {
+			// Square and icon-sized: enough to tell vanilla's icon buttons from the
+			// full-width menu entries without naming their classes, which are private.
+			if (widget.getWidth() == PhotoButton.SIZE && widget.getHeight() == PhotoButton.SIZE) {
+				rows.computeIfAbsent(widget.getY(), y -> new ArrayList<>()).add(widget);
+			}
+		}
+		// Lowest such row, so a mod adding its own icons higher up does not capture the camera.
+		List<AbstractWidget> best = rows.entrySet().stream()
+				.max(Map.Entry.comparingByKey())
+				.map(Map.Entry::getValue)
+				.orElseGet(ArrayList::new);
+		best.sort(Comparator.comparingInt(AbstractWidget::getX));
+		return best;
+	}
+
+	private static int fallbackY(Screen screen, int height) {
 		int rowY = Integer.MIN_VALUE;
 		for (AbstractWidget widget : Screens.getWidgets(screen)) {
-			// Full-width menu entries only, so the row is found from vanilla's own
-			// layout rather than from an icon button some other mod injected.
-			if (widget.getWidth() >= 90 && widget.getX() >= columnLeft
-				&& widget.getX() + widget.getWidth() <= columnRight) {
+			if (widget.getWidth() >= 90) {
 				rowY = Math.max(rowY, widget.getY());
 			}
 		}
-		if (rowY == Integer.MIN_VALUE) {
-			// Unrecognised layout (a menu-replacing mod, say): fall back to where the
-			// bottom row sits in vanilla.
-			rowY = height / 4 + 132;
-		}
+		return rowY == Integer.MIN_VALUE ? height / 4 + 132 : rowY;
+	}
 
-		// Everything sharing that row, including vanilla's language and accessibility
-		// icons, so the camera lands clear of them instead of on top.
-		int rowLeft = Integer.MAX_VALUE;
+	private static int fallbackX(Screen screen, int width) {
 		int rowRight = Integer.MIN_VALUE;
 		for (AbstractWidget widget : Screens.getWidgets(screen)) {
-			if (widget.getY() < rowY + PhotoButton.SIZE && widget.getY() + widget.getHeight() > rowY) {
-				rowLeft = Math.min(rowLeft, widget.getX());
-				rowRight = Math.max(rowRight, widget.getX() + widget.getWidth());
-			}
+			rowRight = Math.max(rowRight, widget.getX() + widget.getWidth());
 		}
 		if (rowRight == Integer.MIN_VALUE) {
-			rowLeft = width / 2 - 100;
-			rowRight = width / 2 + 100;
+			return width / 2 + 100 + GAP;
 		}
-
 		int x = rowRight + GAP;
-		if (x + PhotoButton.SIZE > width - GAP) {
-			// No room on the right (narrow window, or a mod already extended the row):
-			// tuck it onto the left end instead of letting it hang off screen.
-			x = rowLeft - GAP - PhotoButton.SIZE;
-		}
-		Screens.getWidgets(screen).add(new PhotoButton(x, rowY,
-			b -> client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)))));
+		// No room on the right (narrow window, or a mod already extended the row):
+		// tuck it onto the left end instead of letting it hang off screen.
+		return x + PhotoButton.SIZE > width - GAP ? Math.max(GAP, width / 2 - 100 - GAP - PhotoButton.SIZE) : x;
 	}
 
 	private static File screenshotsDir(Minecraft client) {
