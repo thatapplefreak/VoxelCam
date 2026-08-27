@@ -110,7 +110,7 @@ public class VoxelCamClient implements ClientModInitializer {
 
 	private static void onEndTick(Minecraft client) {
 		while (openScreenshotManagerKey.consumeClick()) {
-			if (client.screen == null) {
+			if (client.gui.screen() == null) {
 				client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
 			}
 		}

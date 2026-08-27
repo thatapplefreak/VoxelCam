@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -77,7 +77,7 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 		}
 
 		@Override
-		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float delta) {
+		public void extractContent(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean hovered, float delta) {
 			int x = getContentX();
 			int y = getContentY();
 			int rowWidth = getContentWidth();
@@ -104,13 +104,13 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 			var textRenderer = Minecraft.getInstance().font;
 
 			String name = textRenderer.plainSubstrByWidth(ScreenshotMetadata.displayName(file), textWidth);
-			context.drawString(textRenderer, Component.literal(name), textX, y + 6, 0xFFFFFFFF);
+			context.text(textRenderer, Component.literal(name), textX, y + 6, 0xFFFFFFFF);
 
 			ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(file);
 			String subtitle = size == null
 					? ScreenshotMetadata.fileSize(file)
 					: size.width() + "×" + size.height() + "  ·  " + ScreenshotMetadata.fileSize(file);
-			context.drawString(textRenderer,
+			context.text(textRenderer,
 					Component.literal(textRenderer.plainSubstrByWidth(subtitle, textWidth)).withStyle(ChatFormatting.GRAY),
 					textX, y + 18, 0xFFA0A0A0);
 		}

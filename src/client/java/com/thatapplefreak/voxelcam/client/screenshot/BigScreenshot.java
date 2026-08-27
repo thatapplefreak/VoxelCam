@@ -84,7 +84,7 @@ public final class BigScreenshot {
 		// Resizing runs Screen.resize, which the manager turns into a full clearAndInit at an
 		// absurd scaled width; and with no world ChatMessages is silent, so a multi-second
 		// freeze would come with no explanation at all. This is the old ScreenshotIncapable.
-		if (client.level == null || client.screen != null) {
+		if (client.level == null || client.gui.screen() != null) {
 			ChatMessages.send("voxelcam.bigshot.unavailable");
 			return;
 		}
@@ -118,7 +118,7 @@ public final class BigScreenshot {
 
 		Minecraft client = Minecraft.getInstance();
 		try {
-			Screenshot.takeScreenshot(client.getMainRenderTarget(), BigScreenshot::onImageReady);
+			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), BigScreenshot::onImageReady);
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
@@ -182,6 +182,10 @@ public final class BigScreenshot {
 		Window window = client.getWindow();
 		window.setWidth(width);
 		window.setHeight(height);
+		// On 26.x framebufferSizeChanged only recalculates the GUI scale; resizing the main
+		// render target is GameRenderer's job and nothing in Minecraft does it for us, so the
+		// two have to be driven separately or the frame keeps rendering at the old size.
+		client.gameRenderer.resize(width, height);
 		client.framebufferSizeChanged();
 	}
 }

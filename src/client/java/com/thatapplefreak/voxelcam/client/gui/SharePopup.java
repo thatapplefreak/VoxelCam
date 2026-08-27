@@ -6,7 +6,7 @@ import com.thatapplefreak.voxelcam.client.upload.CatboxUploader;
 import java.io.File;
 import java.nio.file.Path;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
@@ -132,16 +132,16 @@ public class SharePopup extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-		super.render(context, mouseX, mouseY, delta);
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		super.extractRenderState(context, mouseX, mouseY, delta);
 		int titleY = height / 2 - (BUTTON_HEIGHT + GAP) * 2 - 30;
-		context.drawCenteredString(font, title, width / 2, titleY, 0xFFFFFFFF);
-		context.drawCenteredString(font,
+		context.centeredText(font, title, width / 2, titleY, 0xFFFFFFFF);
+		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(screenshot.getName(), BUTTON_WIDTH)).withStyle(ChatFormatting.GRAY),
 				width / 2, titleY + 12, 0xFFA0A0A0);
 
 		if (status != null) {
-			context.drawCenteredString(font,
+			context.centeredText(font,
 					status.copy().withStyle(statusIsError ? ChatFormatting.RED : ChatFormatting.GREEN),
 					width / 2, height / 2 + (BUTTON_HEIGHT + GAP) * 3 + 8, statusIsError ? 0xFFFF5555 : 0xFF55FF55);
 		}

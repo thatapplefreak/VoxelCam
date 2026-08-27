@@ -1,7 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -36,13 +36,13 @@ public class PhotoButton extends Button {
 	}
 
 	@Override
-	protected void renderContents(GuiGraphics context, int mouseX, int mouseY, float delta) {
-		// renderWidget() calls straight through to here without painting anything,
-		// so the button plate is this method's job, exactly as vanilla's own
-		// ButtonWidget.Text does before it draws its label.
-		renderDefaultSprite(context);
-		// Tinted by the widget's own alpha, the way drawButton tints the plate. The shorter
-		// drawTexture overloads hardcode an opaque white, which left the icon fully visible
+	protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		// extractWidgetRenderState() is final and calls straight through to here
+		// without painting anything, so the button plate is this method's job,
+		// exactly as vanilla's own Button does before it draws its label.
+		extractDefaultSprite(context);
+		// Tinted by the widget's own alpha, the way the default sprite is tinted. The shorter
+		// blit overloads hardcode an opaque white, which left the icon fully visible
 		// through the title screen's fade-in while everything around it was still fading up.
 		context.blit(RenderPipelines.GUI_TEXTURED, TEXTURE,
 				getX() + (SIZE - ICON_WIDTH) / 2, getY() + (SIZE - ICON_HEIGHT) / 2,

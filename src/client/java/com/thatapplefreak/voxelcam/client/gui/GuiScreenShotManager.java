@@ -3,7 +3,7 @@ package com.thatapplefreak.voxelcam.client.gui;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -189,33 +189,34 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 		// Textures decoded on the loader threads can only be uploaded here, on the
-		// render thread.
+		// render thread. Extraction still runs on it, even though what it records
+		// is submitted to the GPU later.
 		ScreenshotImageCache.uploadPending();
 
-		// Do NOT call renderBackground() here: Screen.renderWithTooltip already does,
-		// and its blur pass throws "Can only blur once per frame" if repeated.
-		super.render(context, mouseX, mouseY, delta);
+		// Do NOT call extractBackground() here: extractRenderStateWithTooltipAndSubtitles
+		// already does, and its blur pass throws "Can only blur once per frame" if repeated.
+		super.extractRenderState(context, mouseX, mouseY, delta);
 
-		context.drawCenteredString(font, title, width / 2, 14, 0xFFFFFFFF);
+		context.centeredText(font, title, width / 2, 14, 0xFFFFFFFF);
 
 		int count = VoxelCamIO.getScreenShotFiles().size();
 		Component countText = Component.translatable(count == 1 ? "voxelcam.count.one" : "voxelcam.count.many", count);
-		context.drawString(font, countText.copy().withStyle(ChatFormatting.GRAY),
+		context.text(font, countText.copy().withStyle(ChatFormatting.GRAY),
 				width - MARGIN - font.width(countText), 31, 0xFFA0A0A0);
 
-		renderPreview(context);
+		extractPreview(context);
 	}
 
-	private void renderPreview(GuiGraphics context) {
+	private void extractPreview(GuiGraphicsExtractor context) {
 		if (previewWidth <= 0 || previewHeight <= 0) {
 			return;
 		}
 		context.fill(previewX, previewY, previewX + previewWidth, previewY + previewHeight, 0x66000000);
 
 		if (selected == null) {
-			context.drawCenteredString(font, Component.translatable("voxelcam.noscreenshots"),
+			context.centeredText(font, Component.translatable("voxelcam.noscreenshots"),
 					previewX + previewWidth / 2, previewY + previewHeight / 2 - 4, 0xFF808080);
 			return;
 		}
@@ -225,7 +226,7 @@ public class GuiScreenShotManager extends Screen {
 			Component status = ScreenshotImageCache.hasFailed(selected, false)
 					? Component.translatable("voxelcam.loadfailed")
 					: Component.translatable("voxelcam.loading");
-			context.drawCenteredString(font, status,
+			context.centeredText(font, status,
 					previewX + previewWidth / 2, previewY + previewHeight / 2 - 4, 0xFF808080);
 		} else {
 			// Letterbox: scale to fit, preserving aspect ratio, then centre.
@@ -246,7 +247,7 @@ public class GuiScreenShotManager extends Screen {
 			details.append("  ·  ").append(size.width()).append('×').append(size.height());
 		}
 		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
-		context.drawCenteredString(font,
+		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
 	}

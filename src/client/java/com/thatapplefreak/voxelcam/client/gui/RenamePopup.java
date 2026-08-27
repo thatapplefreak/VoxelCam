@@ -5,7 +5,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -96,14 +96,14 @@ public class RenamePopup extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-		super.render(context, mouseX, mouseY, delta);
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		super.extractRenderState(context, mouseX, mouseY, delta);
 		int fieldY = height / 2 - 10;
-		context.drawCenteredString(font, title, width / 2, fieldY - 28, 0xFFFFFFFF);
+		context.centeredText(font, title, width / 2, fieldY - 28, 0xFFFFFFFF);
 
 		String error = validationError();
 		if (error != null) {
-			context.drawCenteredString(font,
+			context.centeredText(font,
 					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);
 		}
 	}

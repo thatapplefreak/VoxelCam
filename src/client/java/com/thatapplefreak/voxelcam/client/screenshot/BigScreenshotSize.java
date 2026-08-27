@@ -105,7 +105,7 @@ public final class BigScreenshotSize {
 		int wanted = multiple > 0 ? window.getWidth() * multiple : width;
 		int wantedHeight = multiple > 0 ? window.getHeight() * multiple : height;
 
-		int max = RenderSystem.getDevice().getMaxTextureSize();
+		int max = RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize();
 		// Both axes shrink by the same factor. Clamping them independently would turn a 16:9
 		// request into a square whenever only one axis overflowed, re-framing the shot — the
 		// exact thing asking for a multiple of the window is meant to avoid.
