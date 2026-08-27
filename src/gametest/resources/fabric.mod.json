@@ -1,0 +1,17 @@
+{
+	"schemaVersion": 1,
+	"id": "voxelcam-gametest",
+	"version": "1.0.0",
+	"name": "VoxelCam Game Tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.thatapplefreak.voxelcam.gametest.TitleScreenButtonTest",
+			"com.thatapplefreak.voxelcam.gametest.ScreenshotManagerTest",
+			"com.thatapplefreak.voxelcam.gametest.CaptureTest"
+		]
+	},
+	"depends": {
+		"voxelcam": "*"
+	}
+}
