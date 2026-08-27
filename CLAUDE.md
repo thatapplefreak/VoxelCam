@@ -194,5 +194,8 @@ the manager is reachable from the title screen. New user-facing feedback belongs
 
 - **No config file exists.** `VoxelCamConfig` was deleted once nothing read it, and the big-screenshot
   size deliberately stayed session-only rather than bringing it back; no `voxelcam.json` is written.
-- `fabricApi { configureDataGeneration() }` in `build.gradle` is inert — no `fabric-datagen`
+  The version pins in `gradle.properties` are build-time only and are not runtime config.
+- `configureDataGeneration()` in `build.gradle`'s `fabricApi` block is inert — no `fabric-datagen`
   entrypoint is declared and `src/main/java` has no sources, so `runDatagen` generates nothing.
+  **Only that one call is inert.** `configureTests` in the same block is load-bearing: it creates
+  the `gametest` source set and the `runClientGameTest` task, so do not remove the block wholesale.
