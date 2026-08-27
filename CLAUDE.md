@@ -21,8 +21,8 @@ was left behind.
 ```
 
 **Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
-logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` and other
-plain enums load fine outside the game; `./gradlew runClientGameTest` launches a real client and runs
+logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` was checked
+and does load outside the game; `./gradlew runClientGameTest` launches a real client and runs
 the Fabric client game tests in `src/gametest/java`, which cover the title-screen placement, the
 manager's render path, and both capture paths (including an in-world oversized capture asserted at
 exactly 2x the window). A game test failure fails the Gradle build.
@@ -43,9 +43,14 @@ class wraps something untestable, the pattern has been to extract a package-priv
 (`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`) rather than
 mock the world.
 
-**Still untested, and not by oversight:** the native Save-As dialog (a blocking native call with no
-headless mode) and `copyPath`/`copyText` (GLFW clipboard, needs a live window). Those are manual
-checks before a release.
+`SharePopupTest` presses only "Copy file path". The other three targets each escape a test: the save
+dialog blocks on a native window, revealing spawns the platform file manager, and the link button
+would upload to the real catbox.
+
+**Still untested, and not by oversight:** the native Save-As dialog itself, `revealInFileManager`'s
+process launch, and the upload-result branch of `SharePopup` (which would need an injectable
+endpoint the popup does not have). Those are manual checks before a release. `copyPath` *is*
+covered, end to end through the real GLFW clipboard, in `SharePopupTest`.
 
 Anything a test cannot express still means running `runClient` and looking at the result. The usual
 pattern for that is to temporarily add a tick counter in `VoxelCamClient` that calls

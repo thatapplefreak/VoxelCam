@@ -8,7 +8,8 @@
 		"fabric-client-gametest": [
 			"com.thatapplefreak.voxelcam.gametest.TitleScreenButtonTest",
 			"com.thatapplefreak.voxelcam.gametest.ScreenshotManagerTest",
-			"com.thatapplefreak.voxelcam.gametest.CaptureTest"
+			"com.thatapplefreak.voxelcam.gametest.CaptureTest",
+			"com.thatapplefreak.voxelcam.gametest.SharePopupTest"
 		]
 	},
 	"depends": {
