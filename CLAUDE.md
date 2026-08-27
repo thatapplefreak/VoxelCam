@@ -21,7 +21,8 @@ was left behind.
 ```
 
 **Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
-classes that touch no Minecraft type; `./gradlew runClientGameTest` launches a real client and runs
+logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` and other
+plain enums load fine outside the game; `./gradlew runClientGameTest` launches a real client and runs
 the Fabric client game tests in `src/gametest/java`, which cover the title-screen placement, the
 manager's render path, and both capture paths (including an in-world oversized capture asserted at
 exactly 2x the window). A game test failure fails the Gradle build.
@@ -35,6 +36,16 @@ bundled fabric-api modules carry. `fabricApi { configureTests { ... } }` is what
 resources — `build.gradle` adds the client output to its classpath explicitly. Without that the
 tests compile against nothing and the task silently stays `NO-SOURCE`, so check reported test
 counts rather than the exit code.
+
+`CatboxUploaderTest` stubs catbox with a `com.sun.net.httpserver` server on loopback rather than
+touching the network, which is also the only way to reproduce its refusal-as-HTTP-200. Where a
+class wraps something untestable, the pattern has been to extract a package-private seam beside it
+(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`) rather than
+mock the world.
+
+**Still untested, and not by oversight:** the native Save-As dialog (a blocking native call with no
+headless mode) and `copyPath`/`copyText` (GLFW clipboard, needs a live window). Those are manual
+checks before a release.
 
 Anything a test cannot express still means running `runClient` and looking at the result. The usual
 pattern for that is to temporarily add a tick counter in `VoxelCamClient` that calls
