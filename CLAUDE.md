@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-VoxelCam is a **client-only Fabric mod** for Minecraft 1.21.11: an in-game screenshot browser with
+VoxelCam is a **client-only Fabric mod** for Minecraft 26.2: an in-game screenshot browser with
 rename/delete, keyless sharing, and oversized capture. Version 2.0.0 was a ground-up port of a
 LiteLoader mod; the pre-2.0 implementation (Twitter/Reddit/Facebook/Imgur uploaders, an image
 editor, a settings panel, a "big screenshot" capture mode) lived in `src/com/` and was **deleted but
@@ -20,35 +20,57 @@ was left behind.
 ./gradlew vscode         # regenerate .vscode/launch.json (Loom-owned; hand edits are lost)
 ```
 
-**There is no test suite** — `test` and `check` are `NO-SOURCE`. Verification means running
-`runClient` and looking at the result. A common pattern for UI work is to temporarily add a tick
-counter in `VoxelCamClient` that calls `client.setScreen(...)` and then
-`ScreenshotRecorder.takeScreenshot(client.getFramebuffer(), img -> img.writeTo(file))`, run the
-client, read the PNG, and remove the scaffolding before finishing.
+**Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
+classes that touch no Minecraft type; `./gradlew runClientGameTest` launches a real client and runs
+the Fabric client game tests in `src/gametest/java`, which cover the title-screen placement, the
+manager's render path, and both capture paths (including an in-world oversized capture asserted at
+exactly 2x the window). A game test failure fails the Gradle build.
+
+The client game test API is **not bundled in fabric-api** and is pinned separately in
+`gradle.properties` as `client_gametest_version`; its `+515ac5339e` build suffix is the one 26.2's
+bundled fabric-api modules carry. `fabricApi { configureTests { ... } }` is what creates the
+`gametest` source set and the `runClientGameTest` task.
+
+`splitEnvironmentSourceSets()` leaves the `test` source set extending `main`, which holds only
+resources — `build.gradle` adds the client output to its classpath explicitly. Without that the
+tests compile against nothing and the task silently stays `NO-SOURCE`, so check reported test
+counts rather than the exit code.
+
+Anything a test cannot express still means running `runClient` and looking at the result. The usual
+pattern for that is to temporarily add a tick counter in `VoxelCamClient` that calls
+`client.setScreenAndShow(...)` and then
+`Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), img -> img.writeToFile(file))`,
+run the client, read the PNG, and remove the scaffolding before finishing. Prefer adding a game
+test instead where one can express the check.
 
 ## Environment gotchas
 
-**Target Java 21, not whatever JDK you happen to run Gradle with.** Minecraft 1.21.11 requires and
-bundles Java 21; Java 25 only arrives with MC 26.1+. 2.0.0 was briefly published compiled to class
-version 69 with `"java": ">=25"`, which Fabric Loader rejects on any stock install — it ran in dev
-only because Loom inherited a JDK 25 `JAVA_HOME`. `options.release` and `fabric.mod.json`'s
-`depends.java` must both stay at 21, and a release build is worth checking with
-`javap -v` (major version 65) before publishing.
+**Target Java 25.** Minecraft 26.1 onward requires and bundles Java 25, so `options.release` and
+`fabric.mod.json`'s `depends.java` both sit at 25 and a release jar should be class version 69.
+This was the opposite before 2.2.0, when the target was 1.21.11 and Java 21 — publishing a jar
+compiled for the wrong one is rejected by Fabric Loader on a stock install while still running fine
+in dev, because Loom inherits whatever `JAVA_HOME` it was given. Worth a `javap -v` check before
+publishing either way.
 
 Newer JDKs are fine for *running* Gradle. If a build ever fails with
 `error: release version N not supported`, the JDK running Gradle is older than the target — in
 VS Code that is usually the Java extension's bundled JDK, pinned via `java.import.gradle.java.home`
 in the gitignored `.vscode/settings.json`.
 
-**`.gradle/loom-cache/minecraftMaven/` can hold more than one Minecraft version.** Reading the wrong
-one produces confidently wrong API conclusions. Always pin the jar matching `gradle.properties`
-before `javap`:
+**Minecraft is unobfuscated from 26.1 onward, so there are no mappings and `javap` is the reference.**
+Yarn is gone — its last release ever was `1.21.11+build.6` — and there is no `mappings` line in
+`build.gradle` at all. The vanilla client jar is the source of truth for any API question:
 
 ```bash
-# match the minecraft_version from gradle.properties, not just "*.jar"
-CP=$(find .gradle/loom-cache/minecraftMaven -path "*/1.21.11-net.fabricmc.yarn*" -name "*.jar" ! -name "*sources*" | tr '\n' ':')
-javap -classpath "$CP" net.minecraft.client.gui.widget.ButtonWidget
+# the client jar for the version in gradle.properties
+URL=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([v['url'] for v in d['versions'] if v['id']=='26.2'][0])")
+curl -s "$(curl -s "$URL" | python3 -c "import json,sys;print(json.load(sys.stdin)['downloads']['client']['url'])")" -o mc.jar
+javap -p -classpath mc.jar net.minecraft.client.gui.components.Button
 ```
+
+`javap` without `-p` hides private members, which is how the frame method and the window size
+setters look "removed" when they are only non-public.
 
 ## Source layout
 
@@ -61,17 +83,26 @@ launch is expected, not a regression.
 
 ## Architecture
 
-**Capture** — `ScreenshotRecorderMixin` injects at `HEAD` of `saveScreenshot` and cancels vanilla's
+**Capture** — `ScreenshotRecorderMixin` injects at `HEAD` of `Screenshot.grab` and cancels vanilla's
 save, handing off to `ScreenshotHandler`, which names the file via `ScreenshotNamer` and writes it.
 
 **Oversized capture** — Shift+F2 takes a "big screenshot"; `/bigscreenshot <size>` (aliased `/bs`)
 sets how big. `BigScreenshot` is a state machine spanning two frames, driven by two
-`MinecraftClientMixin` injections into `render(Z)V`: at `HEAD` it resizes, and just before
-`Framebuffer.blitToScreen()` it reads the finished frame back. The resize is `Window.setFramebufferWidth/Height` plus
-`MinecraftClient.onResolutionChanged()` — all public on 1.21.11, so the old build's VoxelCommon
-`PrivateMethods.resizeMinecraft` reflection has no modern counterpart to port. `onResolutionChanged`
-is what GLFW's own framebuffer-size callback calls, so everything that caches a viewport is notified
-for free.
+`MinecraftClientMixin` injections into `renderFrame(Z)V`: at `HEAD` it resizes, and just before
+`GpuSurface.blitFromTexture(...)` it reads the finished frame back.
+
+26.2 split the old single frame method: `runTick` keeps the game tick, `renderFrame` runs from
+acquiring the surface through presenting it, and both injections belong in the latter. The present
+is no longer `RenderTarget.blitToScreen` — that method is gone — but a blit of the main render
+target's texture onto the window's swapchain surface.
+
+The resize is `Window.setWidth/setHeight` (which write `framebufferWidth/Height`, so they are the
+framebuffer setters despite the names) followed by **both** `GameRenderer.resize` and
+`Minecraft.framebufferSizeChanged()`. On 26.x `framebufferSizeChanged` only recalculates the GUI
+scale; nothing in `Minecraft` resizes the main render target for you, so omitting
+`GameRenderer.resize` leaves the frame rendering at the old size. `framebufferSizeChanged` is the
+`WindowEventHandler` entry point GLFW's own callback uses; `resizeGui` is a narrower GUI-only path
+and is **not** a substitute.
 
 Four things here are load-bearing and were each found the hard way:
 
@@ -80,9 +111,9 @@ Four things here are load-bearing and were each found the hard way:
   calls `Framebuffer.resize` → `delete()`, which would close the texture that task is still reading.
   The consumer runs during `executePendingTasks()` *before* the next frame's clear, so nothing is
   lost by waiting.
-- **Clamp to `RenderSystem.getDevice().getMaxTextureSize()` yourself.** `Framebuffer.initFbo`
-  *throws* above it, and `WindowFramebuffer` does not override `resize`/`initFbo`, so its forgiving
-  `findSuitableSize` search never runs on this path.
+- **Clamp to `RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize()` yourself.**
+  `RenderTarget.createBuffers` (was `initFbo`) *throws* above it, and the window's target does not
+  override `resize`, so its forgiving size search never runs on this path.
 - **A second request mid-capture must be refused,** and the saved window size snapshotted only on
   the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
   one and every restore path leaves the window permanently huge.
@@ -91,8 +122,7 @@ Four things here are load-bearing and were each found the hard way:
   `clearAndInit`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
   with no explanation.
 
-`blitToScreen` still presents the oversized frame for exactly one frame, and
-`GlCommandEncoder.presentTexture` viewports to the *texture* size, so a single zoomed-corner frame is
+The oversized frame is still presented for exactly one frame, so a single zoomed-corner frame is
 expected and not a bug. Sizes are session-only in `BigScreenshot`, never written to disk. PNG
 encoding runs on `Util.getIoWorkerExecutor()`, so `ScreenshotHandler.saving` clears in that task, not
 at the call site, and its chat feedback is bounced back through `client.execute`.
@@ -105,9 +135,10 @@ Two invariants that are easy to break:
 
 - **`ScreenshotImageCache` decodes off-thread but GPU uploads must happen on the render thread.**
   `GuiScreenShotManager.render()` calls `ScreenshotImageCache.uploadPending()` first for that reason.
-  Its `render()` must **not** call `renderBackground()` — `Screen.renderWithTooltip` already does, and
-  the blur pass throws "Can only blur once per frame" if repeated.
-- **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreen(parent)`.** The
+  Its `extractRenderState()` must **not** call `extractBackground()` —
+  `Screen.extractRenderStateWithTooltipAndSubtitles` already does, and the blur pass throws
+  "Can only blur once per frame" if repeated.
+- **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
   manager overrides `refreshWidgetPositions()` to `clearAndInit()` so it rebuilds — that is what picks
   up files renamed or deleted while a popup was open, not just resize handling.
 
@@ -120,20 +151,33 @@ response is validated by checking for a `https://` prefix). `MultipartBody` exis
 `java.net.http` ships no multipart publisher.
 
 **Title-screen button** — `VoxelCamClient` registers `ScreenEvents.AFTER_INIT` and appends a
-`PhotoButton` via `Screens.getButtons(screen).add(...)`. It **measures the bottom button row at
-runtime** rather than hardcoding a position: modern vanilla puts its accessibility button exactly
-where the LiteLoader build placed the camera (`width/2 + 104`).
+`PhotoButton` via `Screens.getWidgets(screen).add(...)`. It goes in vanilla's row of square icon
+buttons (friends, language, accessibility), found **by shape at runtime** — square and
+`PhotoButton.SIZE` — because those vanilla button classes are not public.
+
+Vanilla centres that row, so the whole row is re-laid-out rather than appended to: the existing
+icons shift left by half a slot and the camera takes the new right-hand end. Appending without
+moving them leaves the group off-centre by half a slot, which looks fine in isolation and wrong
+under the menu above it. `TitleScreenButtonTest` guards exactly that. The slot pitch is read from
+the row's own spacing, and there is a fallback to the old position past the bottom full-width row
+for menu-replacing mods.
 
 ## Version-specific API traps
 
 These cost real debugging time and are not guessable from the class names:
 
-- **`PressableWidget.renderWidget` is `final` and calls only `drawIcon` + `setCursor`.** It does not
-  paint the button plate. A custom button must call `drawButton(context)` itself inside `drawIcon`,
-  the way `ButtonWidget$Text` does.
-- **`ButtonWidget` has a nested class named `Text`.** An inherited member type shadows a single-type
-  import, so inside any `ButtonWidget` subclass `Text.translatable(...)` fails to resolve — write
-  `net.minecraft.text.Text` in full.
+- **The GUI is retained-mode from 26.x on: widgets no longer draw, they extract render state.**
+  `Screen.render` is `extractRenderState(GuiGraphicsExtractor, ...)`, `Button.renderContents` is
+  `extractContents`, list entries implement `extractContent`, and the drawing calls are `text`,
+  `centeredText`, `blit`, `fill`. Extraction still runs on the render thread, which is why
+  `ScreenshotImageCache.uploadPending()` is still safe there.
+- **`AbstractButton.extractWidgetRenderState` is `final` and does not paint the button plate.**
+  A custom button must call `extractDefaultSprite(context)` itself inside `extractContents`, the
+  way vanilla's own `Button` does before drawing its label.
+- **The current screen is `Minecraft.gui.screen()`.** There is no `screen` field on `Minecraft`
+  any more, and no getter that returns one.
+- **`Minecraft` has no `getMainRenderTarget()`.** It is `Minecraft.gameRenderer.mainRenderTarget()`;
+  `Minecraft.windowSurface()` is the swapchain, which is a different thing.
 
 ## Conventions
 
