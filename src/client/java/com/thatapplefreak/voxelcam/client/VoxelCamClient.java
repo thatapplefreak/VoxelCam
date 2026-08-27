@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
@@ -8,14 +9,13 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.client.util.ScreenshotRecorder;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,20 +26,20 @@ public class VoxelCamClient implements ClientModInitializer {
 	public static final String MOD_ID = "voxelcam";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	private static final KeyBinding.Category CATEGORY =
-			KeyBinding.Category.create(Identifier.of(MOD_ID, "voxelcam"));
+	private static final KeyMapping.Category CATEGORY =
+			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "voxelcam"));
 
 	/** Spacing between the camera button and the row it sits beside. */
 	private static final int GAP = 4;
 
-	private static KeyBinding openScreenshotManagerKey;
+	private static KeyMapping openScreenshotManagerKey;
 
 	@Override
 	public void onInitializeClient() {
-		openScreenshotManagerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+		openScreenshotManagerKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 				"key.voxelcam.openscreenshotmanager",
-				InputUtil.Type.KEYSYM,
-				InputUtil.GLFW_KEY_H,
+				InputConstants.Type.KEYSYM,
+				InputConstants.KEY_H,
 				CATEGORY));
 
 		BigScreenshotCommand.register();
@@ -61,11 +61,11 @@ public class VoxelCamClient implements ClientModInitializer {
 	 * puts its own accessibility button in exactly that slot, so the row is
 	 * measured at runtime and the camera goes after whatever is already there.
 	 */
-	private static void addTitleScreenButton(MinecraftClient client, Screen screen, int width, int height) {
+	private static void addTitleScreenButton(Minecraft client, Screen screen, int width, int height) {
 		int columnLeft = width / 2 - 101;
 		int columnRight = width / 2 + 101;
 		int rowY = Integer.MIN_VALUE;
-		for (ClickableWidget widget : Screens.getButtons(screen)) {
+		for (AbstractWidget widget : Screens.getButtons(screen)) {
 			// Full-width menu entries only, so the row is found from vanilla's own
 			// layout rather than from an icon button some other mod injected.
 			if (widget.getWidth() >= 90 && widget.getX() >= columnLeft
@@ -83,7 +83,7 @@ public class VoxelCamClient implements ClientModInitializer {
 		// icons, so the camera lands clear of them instead of on top.
 		int rowLeft = Integer.MAX_VALUE;
 		int rowRight = Integer.MIN_VALUE;
-		for (ClickableWidget widget : Screens.getButtons(screen)) {
+		for (AbstractWidget widget : Screens.getButtons(screen)) {
 			if (widget.getY() < rowY + PhotoButton.SIZE && widget.getY() + widget.getHeight() > rowY) {
 				rowLeft = Math.min(rowLeft, widget.getX());
 				rowRight = Math.max(rowRight, widget.getX() + widget.getWidth());
@@ -104,13 +104,13 @@ public class VoxelCamClient implements ClientModInitializer {
 			b -> client.setScreen(new GuiScreenShotManager(screenshotsDir(client)))));
 	}
 
-	private static File screenshotsDir(MinecraftClient client) {
-		return new File(client.runDirectory, ScreenshotRecorder.SCREENSHOTS_DIRECTORY);
+	private static File screenshotsDir(Minecraft client) {
+		return new File(client.gameDirectory, Screenshot.SCREENSHOT_DIR);
 	}
 
-	private static void onEndTick(MinecraftClient client) {
-		while (openScreenshotManagerKey.wasPressed()) {
-			if (client.currentScreen == null) {
+	private static void onEndTick(Minecraft client) {
+		while (openScreenshotManagerKey.consumeClick()) {
+			if (client.screen == null) {
 				client.setScreen(new GuiScreenShotManager(screenshotsDir(client)));
 			}
 		}

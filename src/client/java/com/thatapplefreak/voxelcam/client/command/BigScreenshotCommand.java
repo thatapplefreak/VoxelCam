@@ -10,8 +10,8 @@ import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
 
 /**
  * {@code /bigscreenshot} (or {@code /bs}) sets the size an oversized capture will use; the
@@ -23,7 +23,7 @@ public final class BigScreenshotCommand {
 	private static final String ARGUMENT = "size";
 
 	private static final SuggestionProvider<FabricClientCommandSource> SUGGESTIONS =
-			(context, builder) -> CommandSource.suggestMatching(BigScreenshotSize.tokens(), builder);
+			(context, builder) -> SharedSuggestionProvider.suggest(BigScreenshotSize.tokens(), builder);
 
 	private BigScreenshotCommand() {
 	}
@@ -51,7 +51,7 @@ public final class BigScreenshotCommand {
 		FabricClientCommandSource source = context.getSource();
 		BigScreenshotSize size = BigScreenshot.getSize();
 		BigScreenshotSize.Resolved resolved = size.resolve(source.getClient().getWindow());
-		source.sendFeedback(Text.translatable("voxelcam.bigshot.current", describe(size, resolved)));
+		source.sendFeedback(Component.translatable("voxelcam.bigshot.current", describe(size, resolved)));
 		return 1;
 	}
 
@@ -67,16 +67,16 @@ public final class BigScreenshotCommand {
 
 		BigScreenshotSize size = BigScreenshotSize.parse(token);
 		if (size == null) {
-			source.sendError(Text.translatable("voxelcam.bigshot.invalid", token,
+			source.sendError(Component.translatable("voxelcam.bigshot.invalid", token,
 					String.join(", ", BigScreenshotSize.tokens())));
 			return 0;
 		}
 
 		BigScreenshot.setSize(size);
 		BigScreenshotSize.Resolved resolved = size.resolve(source.getClient().getWindow());
-		source.sendFeedback(Text.translatable("voxelcam.bigshot.set", describe(size, resolved)));
+		source.sendFeedback(Component.translatable("voxelcam.bigshot.set", describe(size, resolved)));
 		if (resolved.clamped()) {
-			source.sendFeedback(Text.translatable("voxelcam.bigshot.clamped", resolved.maxTextureSize()));
+			source.sendFeedback(Component.translatable("voxelcam.bigshot.clamped", resolved.maxTextureSize()));
 		}
 		return 1;
 	}

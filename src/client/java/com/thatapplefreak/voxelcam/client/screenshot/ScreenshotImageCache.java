@@ -1,11 +1,7 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -17,6 +13,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 
 /**
  * Loads screenshot images off the render thread and uploads them as textures.
@@ -115,10 +114,10 @@ public final class ScreenshotImageCache {
 				continue;
 			}
 			NativeImage image = decoded.image();
-			Identifier id = Identifier.of(VoxelCamClient.MOD_ID, "screenshot_" + (nextId++));
+			Identifier id = Identifier.fromNamespaceAndPath(VoxelCamClient.MOD_ID, "screenshot_" + (nextId++));
 			// NativeImageBackedTexture takes ownership and closes the image itself.
-			MinecraftClient.getInstance().getTextureManager()
-					.registerTexture(id, new NativeImageBackedTexture(decoded.key().file()::getName, image));
+			Minecraft.getInstance().getTextureManager()
+					.register(id, new DynamicTexture(decoded.key().file()::getName, image));
 			LOADED.put(decoded.key(), new Loaded(id, image.getWidth(), image.getHeight()));
 		}
 	}
@@ -129,7 +128,7 @@ public final class ScreenshotImageCache {
 			Key key = new Key(file, thumbnail);
 			Loaded loaded = LOADED.remove(key);
 			if (loaded != null) {
-				MinecraftClient.getInstance().getTextureManager().destroyTexture(loaded.id());
+				Minecraft.getInstance().getTextureManager().release(loaded.id());
 			}
 			FAILED.remove(key);
 		}
@@ -137,7 +136,7 @@ public final class ScreenshotImageCache {
 
 	public static void releaseAll() {
 		for (Loaded loaded : LOADED.values()) {
-			MinecraftClient.getInstance().getTextureManager().destroyTexture(loaded.id());
+			Minecraft.getInstance().getTextureManager().release(loaded.id());
 		}
 		LOADED.clear();
 		FAILED.clear();

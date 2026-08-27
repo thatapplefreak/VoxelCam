@@ -1,16 +1,16 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 
 public class RenamePopup extends Screen {
 
@@ -20,11 +20,11 @@ public class RenamePopup extends Screen {
 	private final File screenshotsDir;
 	private final String originalName;
 
-	private TextFieldWidget nameField;
-	private ButtonWidget confirmButton;
+	private EditBox nameField;
+	private Button confirmButton;
 
 	public RenamePopup(GuiScreenShotManager parent, File screenshotsDir, File currentFile) {
-		super(Text.translatable("voxelcam.rename"));
+		super(Component.translatable("voxelcam.rename"));
 		this.parent = parent;
 		this.screenshotsDir = screenshotsDir;
 		this.originalName = currentFile.getName().replaceFirst("(?i)\\.png$", "");
@@ -35,18 +35,18 @@ public class RenamePopup extends Screen {
 		int fieldX = width / 2 - FIELD_WIDTH / 2;
 		int fieldY = height / 2 - 10;
 
-		nameField = new TextFieldWidget(textRenderer, fieldX, fieldY, FIELD_WIDTH, 20, Text.translatable("voxelcam.rename"));
+		nameField = new EditBox(font, fieldX, fieldY, FIELD_WIDTH, 20, Component.translatable("voxelcam.rename"));
 		nameField.setMaxLength(128);
-		nameField.setText(originalName);
-		nameField.setChangedListener(text -> updateConfirmState());
-		addDrawableChild(nameField);
+		nameField.setValue(originalName);
+		nameField.setResponder(text -> updateConfirmState());
+		addRenderableWidget(nameField);
 		setInitialFocus(nameField);
 
 		int buttonWidth = (FIELD_WIDTH - 6) / 2;
-		confirmButton = addDrawableChild(ButtonWidget.builder(Text.translatable("voxelcam.ok"), b -> confirm())
-				.dimensions(fieldX, fieldY + 28, buttonWidth, 20).build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.cancel"), b -> close())
-				.dimensions(fieldX + buttonWidth + 6, fieldY + 28, buttonWidth, 20).build());
+		confirmButton = addRenderableWidget(Button.builder(Component.translatable("voxelcam.ok"), b -> confirm())
+				.bounds(fieldX, fieldY + 28, buttonWidth, 20).build());
+		addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
+				.bounds(fieldX + buttonWidth + 6, fieldY + 28, buttonWidth, 20).build());
 
 		updateConfirmState();
 	}
@@ -57,7 +57,7 @@ public class RenamePopup extends Screen {
 	}
 
 	private String validationError() {
-		String name = nameField.getText().trim();
+		String name = nameField.getValue().trim();
 		if (name.isEmpty()) {
 			return null; // Nothing typed yet: just disabled, no scolding.
 		}
@@ -74,7 +74,7 @@ public class RenamePopup extends Screen {
 	}
 
 	private boolean canConfirm() {
-		String name = nameField.getText().trim();
+		String name = nameField.getValue().trim();
 		return !name.isEmpty() && !name.equals(originalName) && validationError() == null;
 	}
 
@@ -82,13 +82,13 @@ public class RenamePopup extends Screen {
 		if (!canConfirm()) {
 			return;
 		}
-		VoxelCamIO.rename(screenshotsDir, nameField.getText().trim());
-		close();
+		VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim());
+		onClose();
 	}
 
 	@Override
-	public boolean keyPressed(KeyInput input) {
-		if (input.getKeycode() == GLFW.GLFW_KEY_ENTER || input.getKeycode() == GLFW.GLFW_KEY_KP_ENTER) {
+	public boolean keyPressed(KeyEvent input) {
+		if (input.input() == GLFW.GLFW_KEY_ENTER || input.input() == GLFW.GLFW_KEY_KP_ENTER) {
 			confirm();
 			return true;
 		}
@@ -96,20 +96,20 @@ public class RenamePopup extends Screen {
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 		int fieldY = height / 2 - 10;
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, fieldY - 28, 0xFFFFFFFF);
+		context.drawCenteredString(font, title, width / 2, fieldY - 28, 0xFFFFFFFF);
 
 		String error = validationError();
 		if (error != null) {
-			context.drawCenteredTextWithShadow(textRenderer,
-					Text.translatable(error).formatted(Formatting.RED), width / 2, fieldY - 14, 0xFFFF5555);
+			context.drawCenteredString(font,
+					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);
 		}
 	}
 
 	@Override
-	public void close() {
-		client.setScreen(parent);
+	public void onClose() {
+		minecraft.setScreen(parent);
 	}
 }

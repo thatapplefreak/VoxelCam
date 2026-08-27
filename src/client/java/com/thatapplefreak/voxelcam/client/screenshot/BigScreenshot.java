@@ -1,18 +1,18 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.platform.Window;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.util.ScreenshotRecorder;
-import net.minecraft.client.util.Window;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 
 /**
  * Oversized ("big") screenshots, the successor to the LiteLoader build's BigScreenshotTaker.
  *
  * <p>The old mod resized the real game window through a VoxelCommon reflection helper. On
- * 1.21.11 that is plain public API — {@link Window#setFramebufferWidth(int)} plus
- * {@link MinecraftClient#onResolutionChanged()}, the same call GLFW's framebuffer-size
+ * 1.21.11 that is plain public API — {@link Window#setWidth(int)} plus
+ * {@link Minecraft#resizeDisplay()}, the same call GLFW's framebuffer-size
  * callback makes — so everything that caches a viewport size is notified by construction.
  *
  * <p>The capture spans two frames:
@@ -80,11 +80,11 @@ public final class BigScreenshot {
 			return;
 		}
 
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		// Resizing runs Screen.resize, which the manager turns into a full clearAndInit at an
 		// absurd scaled width; and with no world ChatMessages is silent, so a multi-second
 		// freeze would come with no explanation at all. This is the old ScreenshotIncapable.
-		if (client.world == null || client.currentScreen != null) {
+		if (client.level == null || client.screen != null) {
 			ChatMessages.send("voxelcam.bigshot.unavailable");
 			return;
 		}
@@ -116,9 +116,9 @@ public final class BigScreenshot {
 		state = State.AWAITING_READBACK;
 		framesInState = 0;
 
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		try {
-			ScreenshotRecorder.takeScreenshot(client.getFramebuffer(), BigScreenshot::onImageReady);
+			Screenshot.takeScreenshot(client.getMainRenderTarget(), BigScreenshot::onImageReady);
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
@@ -127,14 +127,14 @@ public final class BigScreenshot {
 	}
 
 	private static void beginCapture() {
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		Window window = client.getWindow();
 
 		// Snapshotted only on this transition. A second request mid-capture is refused in
 		// request(), because overwriting these with the oversized values would make every
 		// restore path "restore" the window to the big size permanently.
-		savedWidth = window.getFramebufferWidth();
-		savedHeight = window.getFramebufferHeight();
+		savedWidth = window.getWidth();
+		savedHeight = window.getHeight();
 
 		state = State.CAPTURING;
 		framesInState = 0;
@@ -164,10 +164,10 @@ public final class BigScreenshot {
 		if (savedWidth <= 0 || savedHeight <= 0) {
 			return;
 		}
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		try {
 			Window window = client.getWindow();
-			if (window.getFramebufferWidth() != savedWidth || window.getFramebufferHeight() != savedHeight) {
+			if (window.getWidth() != savedWidth || window.getHeight() != savedHeight) {
 				applySize(client, savedWidth, savedHeight);
 			}
 		} catch (Throwable t) {
@@ -178,10 +178,10 @@ public final class BigScreenshot {
 		}
 	}
 
-	private static void applySize(MinecraftClient client, int width, int height) {
+	private static void applySize(Minecraft client, int width, int height) {
 		Window window = client.getWindow();
-		window.setFramebufferWidth(width);
-		window.setFramebufferHeight(height);
-		client.onResolutionChanged();
+		window.setWidth(width);
+		window.setHeight(height);
+		client.resizeDisplay();
 	}
 }

@@ -1,12 +1,12 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.client.util.ScreenshotRecorder;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 import net.minecraft.util.Util;
 
 import java.io.File;
@@ -24,15 +24,15 @@ public final class ScreenshotHandler {
 	}
 
 	/** @return true if VoxelCam handled the screenshot and vanilla's save should be cancelled. */
-	public static boolean onScreenshotKeyPressed(Framebuffer framebuffer) {
+	public static boolean onScreenshotKeyPressed(RenderTarget framebuffer) {
 		if (saving || BigScreenshot.isBusy()) {
 			ChatMessages.send("voxelcam.savingpleasewait");
 			return true;
 		}
 
-		MinecraftClient client = MinecraftClient.getInstance();
-		boolean shiftHeld = InputUtil.isKeyPressed(client.getWindow(), InputUtil.GLFW_KEY_LEFT_SHIFT)
-				|| InputUtil.isKeyPressed(client.getWindow(), InputUtil.GLFW_KEY_RIGHT_SHIFT);
+		Minecraft client = Minecraft.getInstance();
+		boolean shiftHeld = InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_LSHIFT)
+				|| InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_RSHIFT);
 		if (shiftHeld) {
 			BigScreenshot.request();
 			// Always cancel vanilla, refusals included: letting it through would write a file
@@ -44,10 +44,10 @@ public final class ScreenshotHandler {
 		return true;
 	}
 
-	private static void capture(Framebuffer framebuffer) {
+	private static void capture(RenderTarget framebuffer) {
 		saving = true;
 		try {
-			ScreenshotRecorder.takeScreenshot(framebuffer, ScreenshotHandler::saveCapturedImage);
+			Screenshot.takeScreenshot(framebuffer, ScreenshotHandler::saveCapturedImage);
 		} catch (Throwable t) {
 			saving = false;
 			VoxelCamClient.LOGGER.error("Failed to read back a screenshot", t);
@@ -62,7 +62,7 @@ public final class ScreenshotHandler {
 	 */
 	static void saveCapturedImage(NativeImage image) {
 		saving = true;
-		File screenshotsDir = new File(MinecraftClient.getInstance().runDirectory, ScreenshotRecorder.SCREENSHOTS_DIRECTORY);
+		File screenshotsDir = new File(Minecraft.getInstance().gameDirectory, Screenshot.SCREENSHOT_DIR);
 		if (!screenshotsDir.exists()) {
 			screenshotsDir.mkdirs();
 		}
@@ -70,13 +70,13 @@ public final class ScreenshotHandler {
 
 		// This runs on the render thread, where encoding an oversized PNG would stall the game
 		// for seconds. The saving flag stays up until the write is actually finished.
-		Util.getIoWorkerExecutor().execute(() -> write(image, target));
+		Util.ioPool().execute(() -> write(image, target));
 	}
 
 	private static void write(NativeImage image, File target) {
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		try (image) {
-			image.writeTo(target);
+			image.writeToFile(target);
 			client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);

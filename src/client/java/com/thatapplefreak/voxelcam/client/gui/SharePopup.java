@@ -3,15 +3,14 @@ package com.thatapplefreak.voxelcam.client.gui;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.share.NativeShare;
 import com.thatapplefreak.voxelcam.client.upload.CatboxUploader;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
 import java.io.File;
 import java.nio.file.Path;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 /**
  * Share targets for one screenshot. Replaces the old "Post to..." dialog, which
@@ -31,14 +30,14 @@ public class SharePopup extends Screen {
 	private final GuiScreenShotManager parent;
 	private final File screenshot;
 
-	private ButtonWidget saveButton;
-	private ButtonWidget linkButton;
+	private Button saveButton;
+	private Button linkButton;
 
-	private Text status = null;
+	private Component status = null;
 	private boolean statusIsError = false;
 
 	public SharePopup(GuiScreenShotManager parent, File screenshot) {
-		super(Text.translatable("voxelcam.share"));
+		super(Component.translatable("voxelcam.share"));
 		this.parent = parent;
 		this.screenshot = screenshot;
 	}
@@ -56,15 +55,15 @@ public class SharePopup extends Screen {
 		y += BUTTON_HEIGHT + GAP;
 		linkButton = addButton("voxelcam.share.link", "voxelcam.tooltip.link", x, y, this::uploadToCatbox);
 		y += BUTTON_HEIGHT + GAP * 2;
-		addDrawableChild(ButtonWidget.builder(Text.translatable("voxelcam.done"), b -> close())
-				.dimensions(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
+		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
+				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
 	}
 
-	private ButtonWidget addButton(String labelKey, String tooltipKey, int x, int y, Runnable action) {
-		ButtonWidget widget = ButtonWidget.builder(Text.translatable(labelKey), b -> action.run())
-				.dimensions(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build();
-		widget.setTooltip(Tooltip.of(Text.translatable(tooltipKey)));
-		return addDrawableChild(widget);
+	private Button addButton(String labelKey, String tooltipKey, int x, int y, Runnable action) {
+		Button widget = Button.builder(Component.translatable(labelKey), b -> action.run())
+				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build();
+		widget.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
+		return addRenderableWidget(widget);
 	}
 
 	private void saveCopy() {
@@ -73,9 +72,9 @@ public class SharePopup extends Screen {
 		saveButton.active = false;
 		setStatus("voxelcam.share.choosing", false);
 		NativeShare.saveCopy(screenshot,
-						Text.translatable("voxelcam.share.savecopy.title").getString(),
-						Text.translatable("voxelcam.share.png").getString())
-				.whenComplete((saved, error) -> client.execute(() -> {
+						Component.translatable("voxelcam.share.savecopy.title").getString(),
+						Component.translatable("voxelcam.share.png").getString())
+				.whenComplete((saved, error) -> minecraft.execute(() -> {
 					saveButton.active = true;
 					if (error != null) {
 						VoxelCamClient.LOGGER.warn("Saving a copy of {} failed", screenshot, error);
@@ -84,7 +83,7 @@ public class SharePopup extends Screen {
 						// Cancelled: clear the "choose a location" prompt, say nothing.
 						status = null;
 					} else {
-						setStatus(Text.translatable("voxelcam.share.saved", fileName(saved)), false);
+						setStatus(Component.translatable("voxelcam.share.saved", fileName(saved)), false);
 					}
 				}));
 	}
@@ -106,7 +105,7 @@ public class SharePopup extends Screen {
 	private void uploadToCatbox() {
 		linkButton.active = false;
 		setStatus("voxelcam.share.uploading.link", false);
-		CatboxUploader.upload(screenshot).whenComplete((link, error) -> client.execute(() -> {
+		CatboxUploader.upload(screenshot).whenComplete((link, error) -> minecraft.execute(() -> {
 			linkButton.active = true;
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
@@ -124,32 +123,32 @@ public class SharePopup extends Screen {
 	}
 
 	private void setStatus(String translationKey, boolean isError) {
-		setStatus(Text.translatable(translationKey), isError);
+		setStatus(Component.translatable(translationKey), isError);
 	}
 
-	private void setStatus(Text text, boolean isError) {
+	private void setStatus(Component text, boolean isError) {
 		status = text;
 		statusIsError = isError;
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 		int titleY = height / 2 - (BUTTON_HEIGHT + GAP) * 2 - 30;
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, titleY, 0xFFFFFFFF);
-		context.drawCenteredTextWithShadow(textRenderer,
-				Text.literal(textRenderer.trimToWidth(screenshot.getName(), BUTTON_WIDTH)).formatted(Formatting.GRAY),
+		context.drawCenteredString(font, title, width / 2, titleY, 0xFFFFFFFF);
+		context.drawCenteredString(font,
+				Component.literal(font.plainSubstrByWidth(screenshot.getName(), BUTTON_WIDTH)).withStyle(ChatFormatting.GRAY),
 				width / 2, titleY + 12, 0xFFA0A0A0);
 
 		if (status != null) {
-			context.drawCenteredTextWithShadow(textRenderer,
-					status.copy().formatted(statusIsError ? Formatting.RED : Formatting.GREEN),
+			context.drawCenteredString(font,
+					status.copy().withStyle(statusIsError ? ChatFormatting.RED : ChatFormatting.GREEN),
 					width / 2, height / 2 + (BUTTON_HEIGHT + GAP) * 3 + 8, statusIsError ? 0xFFFF5555 : 0xFF55FF55);
 		}
 	}
 
 	@Override
-	public void close() {
-		client.setScreen(parent);
+	public void onClose() {
+		minecraft.setScreen(parent);
 	}
 }

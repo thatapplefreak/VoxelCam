@@ -1,23 +1,22 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.AlwaysSelectedEntryListWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
 import java.io.File;
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
 
 /**
  * Scrolling screenshot list. Extends the vanilla entry list so scrollbar,
  * mouse wheel, and keyboard navigation come for free rather than being
  * hand-rolled with paging buttons.
  */
-public class ScreenshotListWidget extends AlwaysSelectedEntryListWidget<ScreenshotListWidget.ScreenshotEntry> {
+public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidget.ScreenshotEntry> {
 
 	public static final int ROW_HEIGHT = 32;
 	private static final int THUMBNAIL_WIDTH = 44;
@@ -25,7 +24,7 @@ public class ScreenshotListWidget extends AlwaysSelectedEntryListWidget<Screensh
 
 	private final Consumer<File> onSelected;
 
-	public ScreenshotListWidget(MinecraftClient client, int width, int height, int y, Consumer<File> onSelected) {
+	public ScreenshotListWidget(Minecraft client, int width, int height, int y, Consumer<File> onSelected) {
 		super(client, width, height, y, ROW_HEIGHT);
 		this.onSelected = onSelected;
 	}
@@ -56,7 +55,7 @@ public class ScreenshotListWidget extends AlwaysSelectedEntryListWidget<Screensh
 		return getWidth() - 12;
 	}
 
-	public class ScreenshotEntry extends AlwaysSelectedEntryListWidget.Entry<ScreenshotEntry> {
+	public class ScreenshotEntry extends ObjectSelectionList.Entry<ScreenshotEntry> {
 
 		private final File file;
 		private final String displayName;
@@ -67,25 +66,25 @@ public class ScreenshotListWidget extends AlwaysSelectedEntryListWidget<Screensh
 		}
 
 		@Override
-		public Text getNarration() {
-			return Text.literal(displayName);
+		public Component getNarration() {
+			return Component.literal(displayName);
 		}
 
 		@Override
-		public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
 			ScreenshotListWidget.this.setSelected(this);
 			return true;
 		}
 
 		@Override
-		public void render(DrawContext context, int mouseX, int mouseY, boolean hovered, float delta) {
+		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float delta) {
 			int x = getContentX();
 			int y = getContentY();
 			int rowWidth = getContentWidth();
 
-			int thumbHeight = ROW_HEIGHT - PADDING * 2;
-			int thumbX = x + PADDING;
-			int thumbY = y + PADDING;
+			int thumbHeight = ROW_HEIGHT - CONTENT_PADDING * 2;
+			int thumbX = x + CONTENT_PADDING;
+			int thumbY = y + CONTENT_PADDING;
 
 			ScreenshotImageCache.Loaded thumb = ScreenshotImageCache.get(file, true);
 			// Dark plate behind every thumbnail so loading, failed, and letterboxed
@@ -95,24 +94,24 @@ public class ScreenshotListWidget extends AlwaysSelectedEntryListWidget<Screensh
 				float scale = Math.min((float) THUMBNAIL_WIDTH / thumb.width(), (float) thumbHeight / thumb.height());
 				int drawWidth = Math.max(1, Math.round(thumb.width() * scale));
 				int drawHeight = Math.max(1, Math.round(thumb.height() * scale));
-				context.drawTexture(RenderPipelines.GUI_TEXTURED, thumb.id(),
+				context.blit(RenderPipelines.GUI_TEXTURED, thumb.id(),
 						thumbX + (THUMBNAIL_WIDTH - drawWidth) / 2, thumbY + (thumbHeight - drawHeight) / 2,
 						0F, 0F, drawWidth, drawHeight, thumb.width(), thumb.height(), thumb.width(), thumb.height());
 			}
 
 			int textX = thumbX + THUMBNAIL_WIDTH + 6;
-			int textWidth = Math.max(0, x + rowWidth - textX - PADDING);
-			var textRenderer = MinecraftClient.getInstance().textRenderer;
+			int textWidth = Math.max(0, x + rowWidth - textX - CONTENT_PADDING);
+			var textRenderer = Minecraft.getInstance().font;
 
-			String name = textRenderer.trimToWidth(ScreenshotMetadata.displayName(file), textWidth);
-			context.drawTextWithShadow(textRenderer, Text.literal(name), textX, y + 6, 0xFFFFFFFF);
+			String name = textRenderer.plainSubstrByWidth(ScreenshotMetadata.displayName(file), textWidth);
+			context.drawString(textRenderer, Component.literal(name), textX, y + 6, 0xFFFFFFFF);
 
 			ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(file);
 			String subtitle = size == null
 					? ScreenshotMetadata.fileSize(file)
 					: size.width() + "×" + size.height() + "  ·  " + ScreenshotMetadata.fileSize(file);
-			context.drawTextWithShadow(textRenderer,
-					Text.literal(textRenderer.trimToWidth(subtitle, textWidth)).formatted(Formatting.GRAY),
+			context.drawString(textRenderer,
+					Component.literal(textRenderer.plainSubstrByWidth(subtitle, textWidth)).withStyle(ChatFormatting.GRAY),
 					textX, y + 18, 0xFFA0A0A0);
 		}
 	}

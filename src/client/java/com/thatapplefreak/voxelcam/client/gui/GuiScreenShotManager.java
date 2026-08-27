@@ -2,15 +2,15 @@ package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import org.lwjgl.glfw.GLFW;
 
@@ -35,10 +35,10 @@ public class GuiScreenShotManager extends Screen {
 	private final File screenshotsDir;
 
 	private ScreenshotListWidget list;
-	private TextFieldWidget searchBar;
-	private ButtonWidget renameButton;
-	private ButtonWidget deleteButton;
-	private ButtonWidget shareButton;
+	private EditBox searchBar;
+	private Button renameButton;
+	private Button deleteButton;
+	private Button shareButton;
 
 	private String searchText = "";
 	private File selected;
@@ -49,7 +49,7 @@ public class GuiScreenShotManager extends Screen {
 	private int previewHeight;
 
 	public GuiScreenShotManager(File screenshotsDir) {
-		super(Text.translatable("voxelcam.screenshots"));
+		super(Component.translatable("voxelcam.screenshots"));
 		this.screenshotsDir = screenshotsDir;
 	}
 
@@ -69,15 +69,15 @@ public class GuiScreenShotManager extends Screen {
 		int actionsY = height - MARGIN - BUTTON_HEIGHT;
 		int listBottom = actionsY - GAP;
 
-		searchBar = new TextFieldWidget(textRenderer, MARGIN, 26, listWidth, 18, Text.translatable("voxelcam.search"));
-		searchBar.setPlaceholder(Text.translatable("voxelcam.search").formatted(Formatting.DARK_GRAY));
-		searchBar.setText(searchText);
-		searchBar.setChangedListener(this::onSearchChanged);
-		addDrawableChild(searchBar);
+		searchBar = new EditBox(font, MARGIN, 26, listWidth, 18, Component.translatable("voxelcam.search"));
+		searchBar.setHint(Component.translatable("voxelcam.search").withStyle(ChatFormatting.DARK_GRAY));
+		searchBar.setValue(searchText);
+		searchBar.setResponder(this::onSearchChanged);
+		addRenderableWidget(searchBar);
 
-		list = new ScreenshotListWidget(client, listWidth, listBottom - CONTENT_TOP, CONTENT_TOP, this::onSelected);
+		list = new ScreenshotListWidget(minecraft, listWidth, listBottom - CONTENT_TOP, CONTENT_TOP, this::onSelected);
 		list.setX(MARGIN);
-		addDrawableChild(list);
+		addRenderableWidget(list);
 
 		previewX = MARGIN + listWidth + GAP * 2;
 		previewY = CONTENT_TOP;
@@ -93,18 +93,18 @@ public class GuiScreenShotManager extends Screen {
 		int deleteX = previewX + actionWidth + GAP;
 		int postX = previewX + (actionWidth + GAP) * 2;
 
-		renameButton = addDrawableChild(button("voxelcam.rename", "voxelcam.tooltip.rename",
+		renameButton = addRenderableWidget(button("voxelcam.rename", "voxelcam.tooltip.rename",
 				b -> renameSelected(), previewX, actionsY, actionWidth));
-		deleteButton = addDrawableChild(button("voxelcam.delete", "voxelcam.tooltip.delete",
-				b -> client.setScreen(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
+		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
+				b -> minecraft.setScreen(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
 		// Absorbs the rounding remainder so the row ends flush with the preview.
-		shareButton = addDrawableChild(button("voxelcam.share", "voxelcam.tooltip.share",
+		shareButton = addRenderableWidget(button("voxelcam.share", "voxelcam.tooltip.share",
 				b -> shareSelected(), postX, actionsY, previewX + previewWidth - postX));
 
 		int leftWidth = Math.round((listWidth - GAP) / 2F);
-		addDrawableChild(button("voxelcam.openscreenshotsfolder.short", "voxelcam.tooltip.openfolder",
-				b -> Util.getOperatingSystem().open(screenshotsDir), MARGIN, actionsY, leftWidth));
-		addDrawableChild(button("voxelcam.done", null, b -> close(),
+		addRenderableWidget(button("voxelcam.openscreenshotsfolder.short", "voxelcam.tooltip.openfolder",
+				b -> Util.getPlatform().openFile(screenshotsDir), MARGIN, actionsY, leftWidth));
+		addRenderableWidget(button("voxelcam.done", null, b -> onClose(),
 				MARGIN + leftWidth + GAP, actionsY, listWidth - leftWidth - GAP));
 
 		// Populated only once the action buttons exist, since selecting an entry
@@ -113,12 +113,12 @@ public class GuiScreenShotManager extends Screen {
 		updateButtonStates();
 	}
 
-	private ButtonWidget button(String labelKey, String tooltipKey, ButtonWidget.PressAction action,
+	private Button button(String labelKey, String tooltipKey, Button.OnPress action,
 			int x, int y, int buttonWidth) {
-		ButtonWidget widget = ButtonWidget.builder(Text.translatable(labelKey), action)
-				.dimensions(x, y, buttonWidth, BUTTON_HEIGHT).build();
+		Button widget = Button.builder(Component.translatable(labelKey), action)
+				.bounds(x, y, buttonWidth, BUTTON_HEIGHT).build();
 		if (tooltipKey != null) {
-			widget.setTooltip(Tooltip.of(Text.translatable(tooltipKey)));
+			widget.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
 		}
 		return widget;
 	}
@@ -158,23 +158,23 @@ public class GuiScreenShotManager extends Screen {
 
 	private void renameSelected() {
 		if (selected != null) {
-			client.setScreen(new RenamePopup(this, screenshotsDir, selected));
+			minecraft.setScreen(new RenamePopup(this, screenshotsDir, selected));
 		}
 	}
 
 	private void shareSelected() {
 		if (selected != null) {
-			client.setScreen(new SharePopup(this, selected));
+			minecraft.setScreen(new SharePopup(this, selected));
 		}
 	}
 
 	@Override
-	public boolean keyPressed(KeyInput input) {
+	public boolean keyPressed(KeyEvent input) {
 		// Shortcuts only make sense when not typing a search query.
 		if (!searchBar.isFocused() && selected != null) {
-			switch (input.getKeycode()) {
+			switch (input.input()) {
 				case GLFW.GLFW_KEY_DELETE, GLFW.GLFW_KEY_BACKSPACE -> {
-					client.setScreen(DeletePopup.create(this));
+					minecraft.setScreen(DeletePopup.create(this));
 					return true;
 				}
 				case GLFW.GLFW_KEY_F2 -> {
@@ -189,7 +189,7 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		// Textures decoded on the loader threads can only be uploaded here, on the
 		// render thread.
 		ScreenshotImageCache.uploadPending();
@@ -198,41 +198,41 @@ public class GuiScreenShotManager extends Screen {
 		// and its blur pass throws "Can only blur once per frame" if repeated.
 		super.render(context, mouseX, mouseY, delta);
 
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 14, 0xFFFFFFFF);
+		context.drawCenteredString(font, title, width / 2, 14, 0xFFFFFFFF);
 
 		int count = VoxelCamIO.getScreenShotFiles().size();
-		Text countText = Text.translatable(count == 1 ? "voxelcam.count.one" : "voxelcam.count.many", count);
-		context.drawTextWithShadow(textRenderer, countText.copy().formatted(Formatting.GRAY),
-				width - MARGIN - textRenderer.getWidth(countText), 31, 0xFFA0A0A0);
+		Component countText = Component.translatable(count == 1 ? "voxelcam.count.one" : "voxelcam.count.many", count);
+		context.drawString(font, countText.copy().withStyle(ChatFormatting.GRAY),
+				width - MARGIN - font.width(countText), 31, 0xFFA0A0A0);
 
 		renderPreview(context);
 	}
 
-	private void renderPreview(DrawContext context) {
+	private void renderPreview(GuiGraphics context) {
 		if (previewWidth <= 0 || previewHeight <= 0) {
 			return;
 		}
 		context.fill(previewX, previewY, previewX + previewWidth, previewY + previewHeight, 0x66000000);
 
 		if (selected == null) {
-			context.drawCenteredTextWithShadow(textRenderer, Text.translatable("voxelcam.noscreenshots"),
+			context.drawCenteredString(font, Component.translatable("voxelcam.noscreenshots"),
 					previewX + previewWidth / 2, previewY + previewHeight / 2 - 4, 0xFF808080);
 			return;
 		}
 
 		ScreenshotImageCache.Loaded image = ScreenshotImageCache.get(selected, false);
 		if (image == null) {
-			Text status = ScreenshotImageCache.hasFailed(selected, false)
-					? Text.translatable("voxelcam.loadfailed")
-					: Text.translatable("voxelcam.loading");
-			context.drawCenteredTextWithShadow(textRenderer, status,
+			Component status = ScreenshotImageCache.hasFailed(selected, false)
+					? Component.translatable("voxelcam.loadfailed")
+					: Component.translatable("voxelcam.loading");
+			context.drawCenteredString(font, status,
 					previewX + previewWidth / 2, previewY + previewHeight / 2 - 4, 0xFF808080);
 		} else {
 			// Letterbox: scale to fit, preserving aspect ratio, then centre.
 			float scale = Math.min((float) previewWidth / image.width(), (float) previewHeight / image.height());
 			int drawWidth = Math.max(1, Math.round(image.width() * scale));
 			int drawHeight = Math.max(1, Math.round(image.height() * scale));
-			context.drawTexture(RenderPipelines.GUI_TEXTURED, image.id(),
+			context.blit(RenderPipelines.GUI_TEXTURED, image.id(),
 					previewX + (previewWidth - drawWidth) / 2, previewY + (previewHeight - drawHeight) / 2,
 					0F, 0F, drawWidth, drawHeight, image.width(), image.height(), image.width(), image.height());
 		}
@@ -246,8 +246,8 @@ public class GuiScreenShotManager extends Screen {
 			details.append("  ·  ").append(size.width()).append('×').append(size.height());
 		}
 		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
-		context.drawCenteredTextWithShadow(textRenderer,
-				Text.literal(textRenderer.trimToWidth(details.toString(), previewWidth)).formatted(Formatting.GRAY),
+		context.drawCenteredString(font,
+				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
 	}
 
@@ -258,14 +258,14 @@ public class GuiScreenShotManager extends Screen {
 	 * deleted while the popup was open.
 	 */
 	@Override
-	protected void refreshWidgetPositions() {
-		clearAndInit();
+	protected void repositionElements() {
+		rebuildWidgets();
 	}
 
 	@Override
-	public void close() {
+	public void onClose() {
 		ScreenshotImageCache.releaseAll();
 		ScreenshotMetadata.forgetAll();
-		client.setScreen(null);
+		minecraft.setScreen(null);
 	}
 }

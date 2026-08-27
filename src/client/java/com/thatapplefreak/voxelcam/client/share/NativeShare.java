@@ -1,7 +1,7 @@
 package com.thatapplefreak.voxelcam.client.share;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.Util;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -58,7 +58,7 @@ public final class NativeShare {
 				throw new UncheckedIOException(e);
 			}
 			return target;
-		}, Util.getIoWorkerExecutor());
+		}, Util.ioPool());
 	}
 
 	/**
@@ -68,13 +68,13 @@ public final class NativeShare {
 	 */
 	public static void revealInFileManager(File screenshot) {
 		File parent = screenshot.getParentFile();
-		String[] command = switch (Util.getOperatingSystem()) {
+		String[] command = switch (Util.getPlatform()) {
 			case OSX -> new String[] { "open", "-R", screenshot.getAbsolutePath() };
 			case WINDOWS -> new String[] { "explorer.exe", "/select," + screenshot.getAbsolutePath() };
 			default -> null;
 		};
 		if (command == null) {
-			Util.getOperatingSystem().open(parent);
+			Util.getPlatform().openFile(parent);
 			return;
 		}
 		try {
@@ -83,16 +83,16 @@ public final class NativeShare {
 			// Explorer and open are not guaranteed present (stripped installs, WSL);
 			// showing the folder is still better than doing nothing.
 			VoxelCamClient.LOGGER.warn("Could not reveal {} in the file manager", screenshot, e);
-			Util.getOperatingSystem().open(parent);
+			Util.getPlatform().openFile(parent);
 		}
 	}
 
 	/** GLFW's clipboard carries text only, so this shares the path, not the image. */
 	public static void copyPath(File screenshot) {
-		MinecraftClient.getInstance().keyboard.setClipboard(screenshot.getAbsolutePath());
+		Minecraft.getInstance().keyboardHandler.setClipboard(screenshot.getAbsolutePath());
 	}
 
 	public static void copyText(String text) {
-		MinecraftClient.getInstance().keyboard.setClipboard(text);
+		Minecraft.getInstance().keyboardHandler.setClipboard(text);
 	}
 }

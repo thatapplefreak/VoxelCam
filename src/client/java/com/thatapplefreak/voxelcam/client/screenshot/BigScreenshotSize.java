@@ -1,8 +1,7 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.util.Window;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -103,8 +102,8 @@ public final class BigScreenshotSize {
 	 * override {@code resize}, so its forgiving size search never runs on this path.
 	 */
 	public Resolved resolve(Window window) {
-		int wanted = multiple > 0 ? window.getFramebufferWidth() * multiple : width;
-		int wantedHeight = multiple > 0 ? window.getFramebufferHeight() * multiple : height;
+		int wanted = multiple > 0 ? window.getWidth() * multiple : width;
+		int wantedHeight = multiple > 0 ? window.getHeight() * multiple : height;
 
 		int max = RenderSystem.getDevice().getMaxTextureSize();
 		// Both axes shrink by the same factor. Clamping them independently would turn a 16:9
