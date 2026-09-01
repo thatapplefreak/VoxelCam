@@ -1,10 +1,12 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.File;
 import java.io.IOException;
@@ -179,6 +181,32 @@ class ScreenshotMetadataTest {
 		PngTextChunk.embed(file, Map.of("voxelcam:dimension", "minecraft:overworld", "some:other:tag", "x"));
 
 		assertNull(ScreenshotMetadata.captureContext(file));
+	}
+
+	@Test
+	void isStarredIsFalseForAFreshScreenshot() throws IOException {
+		assertFalse(ScreenshotMetadata.isStarred(png("shot.png", 100, 100)));
+		assertFalse(ScreenshotMetadata.isStarred(null));
+	}
+
+	@Test
+	void isStarredReflectsAnEmbeddedFlag() throws IOException {
+		File file = png("shot.png", 100, 100);
+		Favorite.setStarred(file, true);
+
+		assertTrue(ScreenshotMetadata.isStarred(file));
+	}
+
+	/** A toggle rewrites the file in place; the stale cached value must not stick around. */
+	@Test
+	void forgetDropsTheCachedStarredFlagSoAToggleIsPickedUpImmediately() throws IOException {
+		File file = png("shot.png", 100, 100);
+		assertFalse(ScreenshotMetadata.isStarred(file));
+
+		Favorite.setStarred(file, true);
+		ScreenshotMetadata.forget(file);
+
+		assertTrue(ScreenshotMetadata.isStarred(file));
 	}
 
 	/** Nothing here should depend on the platform default charset. */

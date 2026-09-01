@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import java.io.File;
 import java.util.List;
@@ -10,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 /**
  * Scrolling screenshot list. Extends the vanilla entry list so scrollbar,
@@ -21,6 +23,10 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 	public static final int ROW_HEIGHT = 32;
 	private static final int THUMBNAIL_WIDTH = 44;
 	private static final int PADDING = 4;
+	private static final Identifier STAR_TEXTURE = Identifier.fromNamespaceAndPath(VoxelCamClient.MOD_ID, "textures/star.png");
+	private static final int BADGE_SIZE = 10;
+	private static final int BADGE_TEXTURE_SIZE = 16;
+	private static final int BADGE_GOLD = 0xFFFFD700;
 
 	private final Consumer<File> onSelected;
 
@@ -97,6 +103,14 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 				context.blit(RenderPipelines.GUI_TEXTURED, thumb.id(),
 						thumbX + (THUMBNAIL_WIDTH - drawWidth) / 2, thumbY + (thumbHeight - drawHeight) / 2,
 						0F, 0F, drawWidth, drawHeight, thumb.width(), thumb.height(), thumb.width(), thumb.height());
+			}
+			// Badge only appears when starred — an empty corner already reads as "not
+			// starred" without a dim placeholder cluttering every other row.
+			if (ScreenshotMetadata.isStarred(file)) {
+				context.blit(RenderPipelines.GUI_TEXTURED, STAR_TEXTURE,
+						thumbX + THUMBNAIL_WIDTH - BADGE_SIZE - 1, thumbY + 1,
+						0F, 0F, BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_SIZE, BADGE_SIZE,
+						BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_GOLD);
 			}
 
 			int textX = thumbX + THUMBNAIL_WIDTH + 6;

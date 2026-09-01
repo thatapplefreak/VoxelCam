@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.CRC32;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,6 +41,52 @@ class VoxelCamIOTest {
 		Files.writeString(file.toPath(), "x");
 		assertTrue(file.setLastModified(modifiedAt));
 		return file;
+	}
+
+	/** A minimal but real PNG, needed wherever a test exercises the favorite flag's splice. */
+	private File realPng(String name) throws IOException {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.writeBytes(new byte[] { (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' });
+		out.writeBytes(chunk("IHDR", ihdrData(64, 32)));
+		out.writeBytes(chunk("IDAT", new byte[0]));
+		out.writeBytes(chunk("IEND", new byte[0]));
+
+		File file = dir.resolve(name).toFile();
+		Files.write(file.toPath(), out.toByteArray());
+		return file;
+	}
+
+	private static byte[] ihdrData(int width, int height) {
+		byte[] data = new byte[13];
+		writeInt(data, 0, width);
+		writeInt(data, 4, height);
+		data[8] = 8;
+		data[9] = 2;
+		return data;
+	}
+
+	private static byte[] chunk(String type, byte[] data) {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		writeInt4(out, data.length);
+		byte[] typeBytes = type.getBytes(StandardCharsets.US_ASCII);
+		out.writeBytes(typeBytes);
+		out.writeBytes(data);
+		CRC32 crc = new CRC32();
+		crc.update(typeBytes);
+		crc.update(data);
+		writeInt4(out, (int) crc.getValue());
+		return out.toByteArray();
+	}
+
+	private static void writeInt(byte[] target, int at, int value) {
+		target[at] = (byte) (value >>> 24);
+		target[at + 1] = (byte) (value >>> 16);
+		target[at + 2] = (byte) (value >>> 8);
+		target[at + 3] = (byte) value;
+	}
+
+	private static void writeInt4(ByteArrayOutputStream out, int value) {
+		out.writeBytes(new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value });
 	}
 
 	@Test
@@ -152,6 +201,29 @@ class VoxelCamIOTest {
 		VoxelCamIO.delete();
 
 		assertTrue(keep.exists());
+	}
+
+	@Test
+	void isSelectedFavoriteIsFalseWithNothingSelected() {
+		assertFalse(VoxelCamIO.isSelectedFavorite());
+	}
+
+	@Test
+	void toggleSelectedFavoriteFlipsTheFlag() throws IOException {
+		File file = realPng("shot.png");
+		VoxelCamIO.selectPhoto(file);
+		assertFalse(VoxelCamIO.isSelectedFavorite());
+
+		VoxelCamIO.toggleSelectedFavorite();
+		assertTrue(VoxelCamIO.isSelectedFavorite());
+
+		VoxelCamIO.toggleSelectedFavorite();
+		assertFalse(VoxelCamIO.isSelectedFavorite());
+	}
+
+	@Test
+	void toggleSelectedFavoriteWithNothingSelectedIsHarmless() {
+		VoxelCamIO.toggleSelectedFavorite();
 	}
 
 	private static List<String> names() {
