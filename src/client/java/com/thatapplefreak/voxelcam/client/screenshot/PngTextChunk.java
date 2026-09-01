@@ -94,7 +94,12 @@ public final class PngTextChunk {
 				return out.toByteArray();
 			}
 			int chunkEnd = (int) dataEnd + 4;
-			if (!("iTXt".equals(type) && keys.contains(keyword(png, dataStart, (int) dataEnd)))) {
+			// keyword() can return null for a malformed chunk; keys is sometimes an
+			// immutable Map.of(...).keySet() (Favorite.setStarred), whose contains(null)
+			// throws NPE instead of returning false, so the null case must short-circuit
+			// before reaching it rather than being passed through.
+			String keyword = "iTXt".equals(type) ? keyword(png, dataStart, (int) dataEnd) : null;
+			if (keyword == null || !keys.contains(keyword)) {
 				out.write(png, pos, chunkEnd - pos);
 			}
 			pos = chunkEnd;

@@ -25,7 +25,6 @@ public final class ScreenshotMetadata {
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
-	private static final DateTimeFormatter FULL = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm");
 
 	private ScreenshotMetadata() {
 	}

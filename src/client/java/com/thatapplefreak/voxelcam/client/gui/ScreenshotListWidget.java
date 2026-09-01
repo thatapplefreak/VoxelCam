@@ -22,7 +22,6 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 
 	public static final int ROW_HEIGHT = 32;
 	private static final int THUMBNAIL_WIDTH = 44;
-	private static final int PADDING = 4;
 	private static final Identifier STAR_TEXTURE = Identifier.fromNamespaceAndPath(VoxelCamClient.MOD_ID, "textures/star.png");
 	private static final int BADGE_SIZE = 10;
 	private static final int BADGE_TEXTURE_SIZE = 16;

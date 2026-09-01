@@ -44,7 +44,6 @@ public class GuiScreenShotManager extends Screen {
 	private ScreenshotListWidget list;
 	private EditBox searchBar;
 	private Button sortButton;
-	private StarToggleButton favoritesFilterButton;
 	private StarToggleButton favoriteButton;
 	private Button renameButton;
 	private Button deleteButton;
@@ -90,7 +89,7 @@ public class GuiScreenShotManager extends Screen {
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
 
-		favoritesFilterButton = addRenderableWidget(new StarToggleButton(MARGIN + searchWidth + GAP, 26,
+		addRenderableWidget(new StarToggleButton(MARGIN + searchWidth + GAP, 26,
 				FILTER_BUTTON_SIZE, () -> favoritesOnly, b -> toggleFavoritesOnly(),
 				Component.translatable("voxelcam.tooltip.favoritesonly")));
 

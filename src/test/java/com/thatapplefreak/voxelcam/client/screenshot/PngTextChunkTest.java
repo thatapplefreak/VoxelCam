@@ -163,6 +163,33 @@ class PngTextChunkTest {
 		assertEquals(1, countOccurrences(second, "voxelcam:dimension"));
 	}
 
+	/**
+	 * A chunk without a null byte anywhere in its data has no keyword strip() can read, and
+	 * {@code entries.keySet()} is sometimes an immutable {@code Map.of(...)} set — whose
+	 * {@code contains(null)} throws NPE rather than returning false. The malformed chunk
+	 * must be kept rather than crashing the embed.
+	 */
+	@Test
+	void reEmbeddingOverAMalformedForeignChunkDoesNotThrow() {
+		byte[] malformed = chunk("iTXt", "nonullbyteshere".getBytes(StandardCharsets.US_ASCII));
+		byte[] png = minimalPng();
+		// Splice the malformed chunk in right after IHDR, same place embed() itself inserts.
+		byte[] withMalformed = insertAfterIhdr(png, malformed);
+
+		byte[] result = PngTextChunk.embed(withMalformed, Map.of("voxelcam:starred", "true"));
+
+		assertEquals(Map.of("voxelcam:starred", "true"), PngTextChunk.read(result));
+	}
+
+	private static byte[] insertAfterIhdr(byte[] png, byte[] toInsert) {
+		int ihdrEnd = 8 + 25; // signature + IHDR chunk (4 len + 4 type + 13 data + 4 crc)
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.write(png, 0, ihdrEnd);
+		out.writeBytes(toInsert);
+		out.write(png, ihdrEnd, png.length - ihdrEnd);
+		return out.toByteArray();
+	}
+
 	private static int countOccurrences(byte[] png, String needle) {
 		byte[] pattern = needle.getBytes(StandardCharsets.UTF_8);
 		int count = 0;
