@@ -27,6 +27,7 @@
 	"voxelcam.share": "Trade…",
 	"voxelcam.ok": "Aye aye",
 	"voxelcam.noscreenshots": "No maps in th' chest yet",
+	"voxelcam.nofavorites": "No maps marked with an X",
 	"voxelcam.loading": "Haulin' it up…",
 	"voxelcam.loadfailed": "Couldn't haul up this map",
 	"voxelcam.count.one": "%s map",
@@ -56,6 +57,8 @@
 	"voxelcam.tooltip.copypath": "Copy this map's full route t' yer parchment",
 	"voxelcam.tooltip.openfolder": "Open th' map chest on yer computer",
 	"voxelcam.tooltip.sort": "Change th' sortin' order",
+	"voxelcam.tooltip.favorite": "Mark this map with an X",
+	"voxelcam.tooltip.favoritesonly": "Show only th' maps marked with an X",
 	"voxelcam.tooltip.openmanager": "Open th' VoxelCam map chest",
 
 	"voxelcam.delete.title": "Scuttle th' map?",

@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.File;
@@ -21,6 +22,7 @@ public final class ScreenshotMetadata {
 
 	private static final Map<File, Dimensions> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
+	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
 	private static final DateTimeFormatter FULL = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm");
@@ -70,9 +72,32 @@ public final class ScreenshotMetadata {
 		return context;
 	}
 
+	/**
+	 * Cached the same way {@link #dimensions(File)} is, since this is now checked for every
+	 * visible row's thumbnail badge rather than just the selected file.
+	 */
+	public static boolean isStarred(File file) {
+		if (file == null) {
+			return false;
+		}
+		Boolean cached = STARRED.get(file);
+		if (cached != null) {
+			return cached;
+		}
+		boolean starred = Favorite.isStarred(file);
+		STARRED.put(file, starred);
+		return starred;
+	}
+
 	public static void forgetAll() {
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
+		STARRED.clear();
+	}
+
+	/** Drops one file's cached starred flag after {@code Favorite.setStarred} rewrites it. */
+	public static void forget(File file) {
+		STARRED.remove(file);
 	}
 
 	/**

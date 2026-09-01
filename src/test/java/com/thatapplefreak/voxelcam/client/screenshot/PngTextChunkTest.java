@@ -138,6 +138,46 @@ class PngTextChunkTest {
 		assertTrue(java.util.Arrays.equals(original, PngTextChunk.embed(original, Map.of())));
 	}
 
+	/**
+	 * A toggled flag gets re-embedded into the same file repeatedly. Without stripping the
+	 * old chunk first, the new value would be shadowed forever by the original one.
+	 */
+	@Test
+	void reEmbeddingTheSameKeyOverwritesRatherThanShadowing() {
+		byte[] once = PngTextChunk.embed(minimalPng(), Map.of("voxelcam:starred", "true"));
+		byte[] twice = PngTextChunk.embed(once, Map.of("voxelcam:starred", "false"));
+
+		assertEquals(Map.of("voxelcam:starred", "false"), PngTextChunk.read(twice));
+	}
+
+	@Test
+	void reEmbeddingOneKeyLeavesUnrelatedKeysIntactAndUnduplicated() {
+		byte[] first = PngTextChunk.embed(minimalPng(),
+				Map.of("voxelcam:dimension", "minecraft:overworld", "voxelcam:starred", "false"));
+		byte[] second = PngTextChunk.embed(first, Map.of("voxelcam:starred", "true"));
+
+		assertEquals(Map.of("voxelcam:dimension", "minecraft:overworld", "voxelcam:starred", "true"),
+				PngTextChunk.read(second));
+		// Exactly one chunk per keyword: not shadowed, and not duplicated either.
+		assertEquals(1, countOccurrences(second, "voxelcam:starred"));
+		assertEquals(1, countOccurrences(second, "voxelcam:dimension"));
+	}
+
+	private static int countOccurrences(byte[] png, String needle) {
+		byte[] pattern = needle.getBytes(StandardCharsets.UTF_8);
+		int count = 0;
+		outer:
+		for (int i = 0; i + pattern.length <= png.length; i++) {
+			for (int j = 0; j < pattern.length; j++) {
+				if (png[i + j] != pattern[j]) {
+					continue outer;
+				}
+			}
+			count++;
+		}
+		return count;
+	}
+
 	@Test
 	void fileBasedEmbedAndReadRoundTripThroughDisk() throws IOException {
 		var file = dir.resolve("shot.png").toFile();

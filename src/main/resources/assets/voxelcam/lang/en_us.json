@@ -27,6 +27,7 @@
 	"voxelcam.share": "Share…",
 	"voxelcam.ok": "Ok",
 	"voxelcam.noscreenshots": "No screenshots yet",
+	"voxelcam.nofavorites": "No starred screenshots",
 	"voxelcam.loading": "Loading…",
 	"voxelcam.loadfailed": "Could not load this image",
 	"voxelcam.count.one": "%s screenshot",
@@ -56,6 +57,8 @@
 	"voxelcam.tooltip.copypath": "Copy this screenshot's full path to the clipboard",
 	"voxelcam.tooltip.openfolder": "Open the screenshots folder on your computer",
 	"voxelcam.tooltip.sort": "Change sort order",
+	"voxelcam.tooltip.favorite": "Star this screenshot",
+	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
 
 	"voxelcam.delete.title": "Delete screenshot?",

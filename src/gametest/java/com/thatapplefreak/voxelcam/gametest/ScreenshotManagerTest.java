@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.client.gui.ScreenshotMetadata;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
@@ -44,6 +45,7 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 		context.takeScreenshot("manager-with-screenshots");
 
 		assertSelectionSurvivesRename(context, dir);
+		assertFavoriteTogglePersistsAndRenders(context, dir);
 
 		context.setScreen(TitleScreen::new);
 		context.waitForScreen(TitleScreen.class);
@@ -73,6 +75,43 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 			if (!renamed.renameTo(original)) {
 				throw new AssertionError("could not restore the fixture name");
 			}
+			VoxelCamIO.selectPhoto(null);
+		});
+	}
+
+	/**
+	 * None of the fixtures start out starred, so nothing above ever exercises the row's
+	 * star badge or the toggle button's gold tint — both only paint anything once a file
+	 * actually reads as starred.
+	 */
+	private static void assertFavoriteTogglePersistsAndRenders(ClientGameTestContext context, File dir) {
+		context.runOnClient(client -> {
+			File file = new File(dir, "gametest-a.png");
+			VoxelCamIO.selectPhoto(file);
+			if (VoxelCamIO.isSelectedFavorite()) {
+				throw new AssertionError("fixture should not start out favorited");
+			}
+
+			VoxelCamIO.toggleSelectedFavorite();
+			if (!VoxelCamIO.isSelectedFavorite()) {
+				throw new AssertionError("toggling did not star the file");
+			}
+			// Mirrors what the manager's own toggle button does after a real click, so the
+			// list row picks up the change on its very next render rather than a stale miss.
+			ScreenshotMetadata.forget(file);
+		});
+
+		// Renders the star badge on the row and the gold-tinted favorite button.
+		context.waitTicks(5);
+		context.takeScreenshot("manager-with-favorite");
+
+		context.runOnClient(client -> {
+			File file = new File(dir, "gametest-a.png");
+			VoxelCamIO.toggleSelectedFavorite();
+			if (VoxelCamIO.isSelectedFavorite()) {
+				throw new AssertionError("toggling back off did not clear the flag");
+			}
+			ScreenshotMetadata.forget(file);
 			VoxelCamIO.selectPhoto(null);
 		});
 	}

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.CRC32;
 
 /**
@@ -58,15 +59,54 @@ public final class PngTextChunk {
 
 	/** Package-private seam: pure bytes in, bytes out, no file I/O to stub in a test. */
 	static byte[] embed(byte[] png, Map<String, String> entries) {
-		int insertAt = ihdrEnd(png);
+		// A key already present (e.g. re-embedding a toggled flag) must be replaced, not
+		// shadowed: new chunks are always inserted right after IHDR, ahead of anything
+		// already there, and read() keeps the LAST value it sees for a keyword as it walks
+		// front to back — so without stripping, the physically later (older) chunk would
+		// keep winning over every new value written after it, forever.
+		byte[] stripped = strip(png, entries.keySet());
+		int insertAt = ihdrEnd(stripped);
 
-		ByteArrayOutputStream out = new ByteArrayOutputStream(png.length + 64 * entries.size());
-		out.write(png, 0, insertAt);
+		ByteArrayOutputStream out = new ByteArrayOutputStream(stripped.length + 64 * entries.size());
+		out.write(stripped, 0, insertAt);
 		for (Map.Entry<String, String> entry : entries.entrySet()) {
 			out.writeBytes(iTXtChunk(entry.getKey(), entry.getValue()));
 		}
-		out.write(png, insertAt, png.length - insertAt);
+		out.write(stripped, insertAt, stripped.length - insertAt);
 		return out.toByteArray();
+	}
+
+	/** Removes any existing {@code iTXt} chunks whose keyword is about to be re-embedded. */
+	private static byte[] strip(byte[] png, Set<String> keys) {
+		if (keys.isEmpty()) {
+			return png;
+		}
+		ByteArrayOutputStream out = new ByteArrayOutputStream(png.length);
+		out.write(png, 0, SIGNATURE.length);
+		int pos = SIGNATURE.length;
+		while (pos + 12 <= png.length) {
+			int length = readInt(png, pos);
+			String type = new String(png, pos + 4, 4, StandardCharsets.US_ASCII);
+			int dataStart = pos + 8;
+			long dataEnd = (long) dataStart + length;
+			if (dataEnd + 4 > png.length) {
+				out.write(png, pos, png.length - pos);
+				return out.toByteArray();
+			}
+			int chunkEnd = (int) dataEnd + 4;
+			if (!("iTXt".equals(type) && keys.contains(keyword(png, dataStart, (int) dataEnd)))) {
+				out.write(png, pos, chunkEnd - pos);
+			}
+			pos = chunkEnd;
+		}
+		return out.toByteArray();
+	}
+
+	/** @return the chunk's keyword, or null if it has none within its own data bounds — a
+	 * foreign or malformed {@code iTXt} chunk like that is kept by {@link #strip}, not dropped. */
+	private static String keyword(byte[] png, int dataStart, int dataEnd) {
+		int keywordEnd = indexOf(png, dataStart, dataEnd, (byte) 0);
+		return keywordEnd < 0 ? null : new String(png, dataStart, keywordEnd - dataStart, StandardCharsets.US_ASCII);
 	}
 
 	/** Package-private seam, mirrored with {@link #embed(byte[], Map)}. */

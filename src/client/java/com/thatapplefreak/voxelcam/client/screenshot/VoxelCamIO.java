@@ -1,6 +1,8 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -55,6 +57,26 @@ public final class VoxelCamIO {
 		ScreenshotImageCache.release(selected);
 		selected = target;
 		return target;
+	}
+
+	public static boolean isSelectedFavorite() {
+		return selected != null && Favorite.isStarred(selected);
+	}
+
+	/**
+	 * The screenshot itself is unaffected either way; losing a star toggle to a rare I/O
+	 * failure is logged rather than surfaced, the same call {@code ScreenshotHandler} makes
+	 * for a failed capture-context embed.
+	 */
+	public static void toggleSelectedFavorite() {
+		if (selected == null) {
+			return;
+		}
+		try {
+			Favorite.setStarred(selected, !Favorite.isStarred(selected));
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to toggle the favorite flag on {}", selected, e);
+		}
 	}
 
 	public static void delete() {
