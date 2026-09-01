@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /** Cheap, cached file facts shown alongside screenshots. */
 public final class ScreenshotMetadata {
@@ -21,7 +22,7 @@ public final class ScreenshotMetadata {
 	}
 
 	private static final Map<File, Dimensions> DIMENSIONS = new HashMap<>();
-	private static final Map<File, CaptureContext> CONTEXTS = new HashMap<>();
+	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
 	private static final DateTimeFormatter FULL = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm");
@@ -54,22 +55,22 @@ public final class ScreenshotMetadata {
 
 	/**
 	 * Reads back the tags {@code CaptureContext.toTags()} writes at capture time, cached the
-	 * same way {@link #dimensions(File)} is. Files captured before this feature shipped, or by
-	 * vanilla F2, or by another mod sharing the folder, simply have no tags — this returns
-	 * null for those rather than a half-built context.
+	 * same way {@link #dimensions(File)} is — including the negative case, since unlike
+	 * dimensions() this reads the whole file. Files captured before this feature shipped, or
+	 * by vanilla F2, or by another mod sharing the folder, simply have no tags — this returns
+	 * null for those rather than a half-built context, and caches that so the preview pane
+	 * doesn't re-read the whole file every frame it stays selected.
 	 */
 	public static CaptureContext captureContext(File file) {
 		if (file == null) {
 			return null;
 		}
-		CaptureContext cached = CONTEXTS.get(file);
+		Optional<CaptureContext> cached = CONTEXTS.get(file);
 		if (cached != null) {
-			return cached;
+			return cached.orElse(null);
 		}
 		CaptureContext context = CaptureContext.fromTags(PngTextChunk.read(file));
-		if (context != null) {
-			CONTEXTS.put(file, context);
-		}
+		CONTEXTS.put(file, Optional.ofNullable(context));
 		return context;
 	}
 
