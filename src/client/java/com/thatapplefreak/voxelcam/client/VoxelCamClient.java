@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.resources.Identifier;
@@ -53,8 +54,8 @@ public class VoxelCamClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
 
 		ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-			if (screen instanceof TitleScreen) {
-				addTitleScreenButton(client, screen, scaledWidth, scaledHeight);
+			if (screen instanceof TitleScreen || screen instanceof PauseScreen) {
+				addIconRowButton(client, screen, scaledWidth, scaledHeight);
 			}
 		});
 
@@ -62,16 +63,17 @@ public class VoxelCamClient implements ClientModInitializer {
 	}
 
 	/**
-	 * Puts the camera button in the title screen's row of square icon buttons, next
-	 * to vanilla's friends, language, and accessibility icons.
+	 * Puts the camera button in the screen's row of square icon buttons — the title
+	 * screen's friends/language/accessibility row, or the pause menu's bug-report/chat
+	 * report/player report row.
 	 *
 	 * The row is found and re-laid-out at runtime rather than hardcoded. Vanilla
-	 * centres it on the screen, so appending a fourth button without moving the other
-	 * three would leave the whole group visibly off-centre; instead the existing icons
-	 * shift left by half a slot and the camera takes the new right-hand end, which is
-	 * what vanilla's own layout would produce for four buttons.
+	 * centres it on the screen, so appending a button without moving the others would
+	 * leave the whole group visibly off-centre; instead the existing icons shift left
+	 * by half a slot and the camera takes the new right-hand end, which is what
+	 * vanilla's own layout would produce for one more button.
 	 */
-	private static void addTitleScreenButton(Minecraft client, Screen screen, int width, int height) {
+	private static void addIconRowButton(Minecraft client, Screen screen, int width, int height) {
 		Button.OnPress open = b -> client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
 
 		List<AbstractWidget> iconRow = findIconRow(screen);
