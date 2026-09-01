@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
@@ -247,6 +248,10 @@ public class GuiScreenShotManager extends Screen {
 			details.append("  ·  ").append(size.width()).append('×').append(size.height());
 		}
 		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
+		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
+		if (captureContext != null) {
+			details.append("  ·  ").append(captureContext.describeLocation());
+		}
 		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);

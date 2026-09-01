@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,6 +155,30 @@ class ScreenshotMetadataTest {
 
 		String label = ScreenshotMetadata.relativeTime(file);
 		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}"), label);
+	}
+
+	@Test
+	void readsCaptureContextEmbeddedByPngTextChunk() throws IOException {
+		File file = png("shot.png", 640, 480);
+		CaptureContext embedded = new CaptureContext("minecraft:the_nether", 12, 70, -45, "New World");
+		PngTextChunk.embed(file, embedded.toTags());
+
+		assertEquals(embedded, ScreenshotMetadata.captureContext(file));
+	}
+
+	/** Every screenshot taken before this feature shipped has no tags at all. */
+	@Test
+	void captureContextIsNullWhenThereAreNoTags() throws IOException {
+		assertNull(ScreenshotMetadata.captureContext(png("untagged.png", 100, 100)));
+		assertNull(ScreenshotMetadata.captureContext(null));
+	}
+
+	@Test
+	void captureContextSurvivesACorruptOrUnrelatedTag() throws IOException {
+		File file = png("partial.png", 100, 100);
+		PngTextChunk.embed(file, Map.of("voxelcam:dimension", "minecraft:overworld", "some:other:tag", "x"));
+
+		assertNull(ScreenshotMetadata.captureContext(file));
 	}
 
 	/** Nothing here should depend on the platform default charset. */

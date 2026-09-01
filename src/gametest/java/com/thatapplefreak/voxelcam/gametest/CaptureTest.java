@@ -2,6 +2,8 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,6 +48,7 @@ public class CaptureTest implements FabricClientGameTest {
 
 	private static void assertOrdinaryCaptureWritesAFile(ClientGameTestContext context, File dir) {
 		Set<String> before = listing(dir);
+		Location expected = playerLocation(context);
 
 		context.runOnClient(client ->
 				Screenshot.grab(client.gameDirectory, client.gameRenderer.mainRenderTarget(), message -> { }));
@@ -58,6 +61,35 @@ public class CaptureTest implements FabricClientGameTest {
 		if (!size.equals(window)) {
 			throw new AssertionError("ordinary capture should match the window " + window + ", was " + size);
 		}
+
+		assertCaptureContextMatches(written, expected);
+	}
+
+	/**
+	 * The context is read on the render thread inside {@code ScreenshotHandler.saveCapturedImage},
+	 * before the frame is handed to the IO worker for encoding, so it should match wherever the
+	 * player actually was at capture time.
+	 */
+	private static void assertCaptureContextMatches(File written, Location expected) {
+		CaptureContext embedded = CaptureContext.fromTags(PngTextChunk.read(written));
+		if (embedded == null) {
+			throw new AssertionError("capture should have embedded a capture context, had none");
+		}
+		if (!embedded.dimension().equals(expected.dimension())
+				|| embedded.x() != expected.x() || embedded.y() != expected.y() || embedded.z() != expected.z()) {
+			throw new AssertionError("embedded capture context should be " + expected + ", was " + embedded);
+		}
+	}
+
+	private static Location playerLocation(ClientGameTestContext context) {
+		return context.computeOnClient(client -> {
+			var pos = client.player.blockPosition();
+			return new Location(client.player.level().dimension().identifier().toString(),
+					pos.getX(), pos.getY(), pos.getZ());
+		});
+	}
+
+	private record Location(String dimension, int x, int y, int z) {
 	}
 
 	/**
@@ -68,6 +100,7 @@ public class CaptureTest implements FabricClientGameTest {
 	private static void assertOversizedCaptureMatchesTheRequest(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
+		Location expectedLocation = playerLocation(context);
 
 		context.runOnClient(client -> {
 			BigScreenshot.setSize(BigScreenshotSize.parse("2x"));
@@ -85,6 +118,8 @@ public class CaptureTest implements FabricClientGameTest {
 			throw new AssertionError("2x capture of a " + window + " window should be "
 					+ expected + ", was " + size);
 		}
+
+		assertCaptureContextMatches(written, expectedLocation);
 	}
 
 	/**

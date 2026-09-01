@@ -67,22 +67,40 @@ public final class ScreenshotHandler {
 			screenshotsDir.mkdirs();
 		}
 		File target = ScreenshotNamer.getScreenshotName(screenshotsDir);
+		// Read while still on the render thread: by the time write() runs on the IO pool,
+		// the player may have moved on to a different frame's state entirely.
+		CaptureContext context = CaptureContext.capture();
 
 		// This runs on the render thread, where encoding an oversized PNG would stall the game
 		// for seconds. The saving flag stays up until the write is actually finished.
-		Util.ioPool().execute(() -> write(image, target));
+		Util.ioPool().execute(() -> write(image, target, context));
 	}
 
-	private static void write(NativeImage image, File target) {
+	private static void write(NativeImage image, File target, CaptureContext context) {
 		Minecraft client = Minecraft.getInstance();
 		try (image) {
 			image.writeToFile(target);
+			if (context != null) {
+				embedContext(target, context);
+			}
 			client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			client.execute(() -> ChatMessages.send("voxelcam.savefailed"));
 		} finally {
 			saving = false;
+		}
+	}
+
+	/**
+	 * The screenshot itself is already saved and good at this point; losing the tag is a
+	 * shame, not a failure worth surfacing to the player the way a failed save is.
+	 */
+	private static void embedContext(File target, CaptureContext context) {
+		try {
+			PngTextChunk.embed(target, context.toTags());
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to embed capture context into {}", target, e);
 		}
 	}
 }
