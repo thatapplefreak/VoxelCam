@@ -11,6 +11,8 @@ import net.minecraft.util.Util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Replaces VoxelCommon/LiteLoader's ScreenshotListener callback. Invoked from
@@ -80,9 +82,7 @@ public final class ScreenshotHandler {
 		Minecraft client = Minecraft.getInstance();
 		try (image) {
 			image.writeToFile(target);
-			if (context != null) {
-				embedContext(target, context);
-			}
+			embedMetadata(target, context);
 			client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
@@ -93,14 +93,25 @@ public final class ScreenshotHandler {
 	}
 
 	/**
-	 * The screenshot itself is already saved and good at this point; losing the tag is a
-	 * shame, not a failure worth surfacing to the player the way a failed save is.
+	 * The screenshot itself is already saved and good at this point; losing a tag is a
+	 * shame, not a failure worth surfacing to the player the way a failed save is. Mod
+	 * provenance is captured here rather than on the render thread with the capture
+	 * context: the mod list is fixed for the session and the shader pack reads fresh
+	 * either way, so neither needs a snapshot before the frame moves on.
 	 */
-	private static void embedContext(File target, CaptureContext context) {
+	private static void embedMetadata(File target, CaptureContext context) {
+		Map<String, String> tags = new LinkedHashMap<>();
+		if (context != null) {
+			tags.putAll(context.toTags());
+		}
+		tags.putAll(ModProvenance.capture().toTags());
+		if (tags.isEmpty()) {
+			return;
+		}
 		try {
-			PngTextChunk.embed(target, context.toTags());
+			PngTextChunk.embed(target, tags);
 		} catch (IOException e) {
-			VoxelCamClient.LOGGER.error("Failed to embed capture context into {}", target, e);
+			VoxelCamClient.LOGGER.error("Failed to embed metadata into {}", target, e);
 		}
 	}
 }
