@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -63,6 +64,25 @@ public class CaptureTest implements FabricClientGameTest {
 		}
 
 		assertCaptureContextMatches(written, expected);
+		assertModProvenanceExcludesInfrastructure(written);
+	}
+
+	/**
+	 * The only mods loaded in this environment are Fabric API's own split, the loader's
+	 * built-ins, and VoxelCam's own two ids — every one of them infrastructure the curation
+	 * in {@code ModProvenance} is supposed to filter out, so the tag should end up absent
+	 * entirely rather than leaking any of them through.
+	 */
+	private static void assertModProvenanceExcludesInfrastructure(File written) {
+		Map<String, String> tags = PngTextChunk.read(written);
+		if (tags.containsKey("voxelcam:mods")) {
+			throw new AssertionError("mod tag should be empty in a fabric-api-only install, was "
+					+ tags.get("voxelcam:mods"));
+		}
+		if (tags.containsKey("voxelcam:shaderpack")) {
+			throw new AssertionError("shaderpack tag should be absent without Iris loaded, was "
+					+ tags.get("voxelcam:shaderpack"));
+		}
 	}
 
 	/**
