@@ -29,6 +29,7 @@ class VoxelCamIOTest {
 	@BeforeEach
 	void reset() {
 		VoxelCamIO.selectPhoto(null);
+		SortMode.setCurrent(SortMode.DATE_NEWEST);
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 	}
 
@@ -69,6 +70,19 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 
 		assertEquals(List.of("newest.png", "middle.png", "old.png"), names());
+	}
+
+	/** {@link SortMode#current()} is what updateScreenShotFilesList actually sorts by. */
+	@Test
+	void listRespectsTheCurrentSortMode() throws IOException {
+		shot("banana.png", 1_000L);
+		shot("apple.png", 2_000L);
+		shot("cherry.png", 1_500L);
+		SortMode.setCurrent(SortMode.NAME_A_TO_Z);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(List.of("apple.png", "banana.png", "cherry.png"), names());
 	}
 
 	@Test

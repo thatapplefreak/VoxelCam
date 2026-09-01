@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
+import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -28,6 +29,8 @@ public class GuiScreenShotManager extends Screen {
 	private static final int GAP = 6;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int CONTENT_TOP = 52;
+	/** Wide enough for the longest label ("Dims ↓") at the default GUI scale. */
+	private static final int SORT_BUTTON_WIDTH = 54;
 	/** Preview : list width ratio. */
 	private static final float GOLDEN_RATIO = 1.618034F;
 	/** Below this a row cannot fit its thumbnail and a usable slice of the name. */
@@ -37,6 +40,7 @@ public class GuiScreenShotManager extends Screen {
 
 	private ScreenshotListWidget list;
 	private EditBox searchBar;
+	private Button sortButton;
 	private Button renameButton;
 	private Button deleteButton;
 	private Button shareButton;
@@ -70,11 +74,17 @@ public class GuiScreenShotManager extends Screen {
 		int actionsY = height - MARGIN - BUTTON_HEIGHT;
 		int listBottom = actionsY - GAP;
 
-		searchBar = new EditBox(font, MARGIN, 26, listWidth, 18, Component.translatable("voxelcam.search"));
+		int searchWidth = listWidth - SORT_BUTTON_WIDTH - GAP;
+		searchBar = new EditBox(font, MARGIN, 26, searchWidth, 18, Component.translatable("voxelcam.search"));
 		searchBar.setHint(Component.translatable("voxelcam.search").withStyle(ChatFormatting.DARK_GRAY));
 		searchBar.setValue(searchText);
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
+
+		sortButton = addRenderableWidget(Button.builder(Component.translatable(SortMode.current().labelKey()),
+						b -> cycleSort())
+				.bounds(MARGIN + searchWidth + GAP, 26, SORT_BUTTON_WIDTH, 18).build());
+		sortButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.sort")));
 
 		list = new ScreenshotListWidget(minecraft, listWidth, listBottom - CONTENT_TOP, CONTENT_TOP, this::onSelected);
 		list.setX(MARGIN);
@@ -129,13 +139,23 @@ public class GuiScreenShotManager extends Screen {
 			return;
 		}
 		searchText = text;
-		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, text);
+		// Only the list contents change while typing, so the search field itself is
+		// left alone and keeps focus and cursor position.
+		refreshFiles();
+	}
+
+	private void cycleSort() {
+		SortMode.setCurrent(SortMode.current().next());
+		sortButton.setMessage(Component.translatable(SortMode.current().labelKey()));
+		refreshFiles();
+	}
+
+	private void refreshFiles() {
+		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
 		List<File> files = VoxelCamIO.getScreenShotFiles();
 		if (selected == null || !files.contains(selected)) {
 			selected = files.isEmpty() ? null : files.get(0);
 		}
-		// Only the list contents change while typing, so the search field itself is
-		// left alone and keeps focus and cursor position.
 		list.setScreenshots(files, selected);
 		updateButtonStates();
 	}

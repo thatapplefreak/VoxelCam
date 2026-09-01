@@ -2,7 +2,6 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -26,7 +25,7 @@ public final class VoxelCamIO {
 		return selected;
 	}
 
-	/** Lists .png files in the directory, newest first, filtered by a case-insensitive name match. */
+	/** Lists .png files in the directory, ordered by {@link SortMode#current()}, filtered by a case-insensitive name match. */
 	public static void updateScreenShotFilesList(File screenshotsDir, String filter) {
 		File[] filesInDir = screenshotsDir.listFiles();
 		String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
@@ -40,7 +39,7 @@ public final class VoxelCamIO {
 				}
 			}
 		}
-		files.sort(Comparator.comparingLong(File::lastModified).reversed());
+		files.sort(SortMode.current().comparator());
 		screenShotFiles = files;
 	}
 
