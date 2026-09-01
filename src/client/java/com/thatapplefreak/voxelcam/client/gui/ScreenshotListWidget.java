@@ -107,9 +107,12 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 			// Badge only appears when starred — an empty corner already reads as "not
 			// starred" without a dim placeholder cluttering every other row.
 			if (ScreenshotMetadata.isStarred(file)) {
+				// blit's params are (u, v, width, height, srcWidth, srcHeight, texW, texH):
+				// the draw size comes before the sampled region size, not after — swapping
+				// them samples a corner of the icon and stretches it, not the whole star.
 				context.blit(RenderPipelines.GUI_TEXTURED, STAR_TEXTURE,
 						thumbX + THUMBNAIL_WIDTH - BADGE_SIZE - 1, thumbY + 1,
-						0F, 0F, BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_SIZE, BADGE_SIZE,
+						0F, 0F, BADGE_SIZE, BADGE_SIZE, BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE,
 						BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_GOLD);
 			}
 
