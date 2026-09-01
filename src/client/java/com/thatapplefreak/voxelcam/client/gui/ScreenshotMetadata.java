@@ -1,11 +1,9 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,15 +40,13 @@ public final class ScreenshotMetadata {
 		if (cached != null) {
 			return cached;
 		}
-		try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
-			// 8-byte PNG signature, 4-byte chunk length, 4-byte "IHDR", then width/height.
-			in.skipNBytes(16);
-			Dimensions dimensions = new Dimensions(in.readInt(), in.readInt());
-			DIMENSIONS.put(file, dimensions);
-			return dimensions;
-		} catch (IOException | RuntimeException e) {
+		PngDimensions.Dimensions read = PngDimensions.read(file);
+		if (read == null) {
 			return null;
 		}
+		Dimensions dimensions = new Dimensions(read.width(), read.height());
+		DIMENSIONS.put(file, dimensions);
+		return dimensions;
 	}
 
 	/**
