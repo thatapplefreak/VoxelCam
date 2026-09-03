@@ -40,7 +40,6 @@ public class RenamePopup extends Screen {
 		nameField.setValue(originalName);
 		nameField.setResponder(text -> updateConfirmState());
 		addRenderableWidget(nameField);
-		setInitialFocus(nameField);
 
 		int buttonWidth = (FIELD_WIDTH - 6) / 2;
 		confirmButton = addRenderableWidget(Button.builder(Component.translatable("voxelcam.ok"), b -> confirm())
@@ -49,6 +48,20 @@ public class RenamePopup extends Screen {
 				.bounds(fieldX + buttonWidth + 6, fieldY + 28, buttonWidth, 20).build());
 
 		updateConfirmState();
+	}
+
+	/**
+	 * Vanilla's idiom (DirectJoinServerScreen, AnvilScreen) for a screen whose text field
+	 * should start focused. Both {@code Screen.init(int,int)} and {@code rebuildWidgets()}
+	 * call this hook <em>after</em> {@code init()} returns, so calling
+	 * {@code setInitialFocus(nameField)} from {@code init()} instead is undone: when the last
+	 * input was a keyboard one the hook's forward tab navigation starts past the already
+	 * focused field, skips the still-inactive OK button and lands on Cancel — leaving the
+	 * dialog inert, since typing then goes to a button and Enter confirms nothing.
+	 */
+	@Override
+	protected void setInitialFocus() {
+		setInitialFocus(nameField);
 	}
 
 	/** Blocks names that are empty, unchanged, or would collide with an existing file. */

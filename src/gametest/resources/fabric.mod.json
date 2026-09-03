@@ -10,7 +10,8 @@
 			"com.thatapplefreak.voxelcam.gametest.PauseScreenButtonTest",
 			"com.thatapplefreak.voxelcam.gametest.ScreenshotManagerTest",
 			"com.thatapplefreak.voxelcam.gametest.CaptureTest",
-			"com.thatapplefreak.voxelcam.gametest.SharePopupTest"
+			"com.thatapplefreak.voxelcam.gametest.SharePopupTest",
+			"com.thatapplefreak.voxelcam.gametest.RenamePopupFocusTest"
 		]
 	},
 	"depends": {
