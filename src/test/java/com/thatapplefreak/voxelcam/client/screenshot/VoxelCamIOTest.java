@@ -240,6 +240,25 @@ class VoxelCamIOTest {
 		assertNull(VoxelCamIO.rename(dir.toFile(), "whatever"));
 	}
 
+	/**
+	 * The failure the popup has to report. {@code renameTo} answers a source that another
+	 * program moved or deleted with a bare false and no exception, so null is the only
+	 * signal there is — and it has to be distinguishable from a rename that happened, or
+	 * the player is told nothing while the old name stays on screen.
+	 */
+	@Test
+	void renameOfAFileThatIsGoneFails() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		VoxelCamIO.selectPhoto(original);
+		Files.delete(original.toPath());
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dawn"));
+		// Nothing was created under the new name either: there is no half-done rename to
+		// leave the selection pointing at.
+		assertFalse(dir.resolve("dawn.png").toFile().exists());
+		assertEquals(original, VoxelCamIO.getSelectedPhoto());
+	}
+
 	@Test
 	void deleteRemovesTheFileAndClearsTheSelection() throws IOException {
 		File doomed = shot("doomed.png", 1_000L);

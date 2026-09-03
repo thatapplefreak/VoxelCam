@@ -71,7 +71,17 @@ public final class VoxelCamIO {
 		}
 	}
 
-	/** Renames the selected screenshot, returning the new file (or null if it failed). */
+	/**
+	 * Renames the selected screenshot, returning the new file — or null if it did not
+	 * happen, which the caller has to tell the player about: nothing here throws, the file
+	 * keeps its old name, and the manager re-lists it as if nothing had been asked.
+	 *
+	 * {@code File.renameTo} rather than {@link Files#move}: move reports success without
+	 * moving anything for a case-only rename on a case-insensitive filesystem, where it
+	 * finds source and target are the same file — silently undoing the recapitalisation
+	 * renameTo performs. The reason for a failure is lost to a bare false, so it is only
+	 * ever as good as the log line below.
+	 */
 	public static File rename(File screenshotsDir, String newName) {
 		if (selected == null) {
 			return null;
@@ -80,7 +90,11 @@ public final class VoxelCamIO {
 		// The names, not the Files: WinNTFileSystem compares paths with
 		// compareToIgnoreCase, so File.equals would make this guard swallow the case-only
 		// rename it is not meant to catch — it only exists to refuse an unchanged name.
-		if (target.getName().equals(selected.getName()) || !selected.renameTo(target)) {
+		if (target.getName().equals(selected.getName())) {
+			return null;
+		}
+		if (!selected.renameTo(target)) {
+			VoxelCamClient.LOGGER.error("Failed to rename {} to {}", selected, target);
 			return null;
 		}
 		ScreenshotImageCache.release(selected);

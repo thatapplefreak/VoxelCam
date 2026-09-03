@@ -70,6 +70,7 @@
 
 	"voxelcam.rename.exists": "A map by that name already sails these waters",
 	"voxelcam.rename.invalid": "That name's got scallywag characters that ain't allowed",
+	"voxelcam.rename.failed": "Couldn't re-christen this map — try another name",
 
 	"voxelcam.bigshot.current": "Yer big map size be %s. Shift+F2 t' chart one.",
 	"voxelcam.bigshot.set": "Big map size set t' %s",

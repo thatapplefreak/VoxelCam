@@ -23,6 +23,7 @@ public class RenamePopup extends Screen {
 
 	private EditBox nameField;
 	private Button confirmButton;
+	private boolean renameFailed;
 
 	public RenamePopup(GuiScreenShotManager parent, File screenshotsDir, File currentFile) {
 		super(Component.translatable("voxelcam.rename"));
@@ -40,7 +41,12 @@ public class RenamePopup extends Screen {
 		nameField = new EditBox(font, fieldX, fieldY, FIELD_WIDTH, 20, Component.translatable("voxelcam.rename"));
 		nameField.setMaxLength(128);
 		nameField.setValue(originalName);
-		nameField.setResponder(text -> updateConfirmState());
+		nameField.setResponder(text -> {
+			// Typing is the retry, so a "could not rename" must not outlive the name it
+			// was about. A rebuild is not: init() runs again on every resize.
+			renameFailed = false;
+			updateConfirmState();
+		});
 		addRenderableWidget(nameField);
 
 		int buttonWidth = (FIELD_WIDTH - 6) / 2;
@@ -100,7 +106,14 @@ public class RenamePopup extends Screen {
 		if (!canConfirm()) {
 			return;
 		}
-		VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim());
+		if (VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim()) == null) {
+			// The file kept its old name and the manager would re-list it with nothing to
+			// say why, so the dialog stays up instead — holding the typed name for a retry,
+			// which is all a Windows-forbidden character or a moved file needs. The reason
+			// is only in the log: renameTo has none to give.
+			renameFailed = true;
+			return;
+		}
 		onClose();
 	}
 
@@ -119,7 +132,9 @@ public class RenamePopup extends Screen {
 		int fieldY = height / 2 - 10;
 		context.centeredText(font, title, width / 2, fieldY - 28, 0xFFFFFFFF);
 
-		String error = validationError();
+		// A rename the filesystem refused outranks the validation line: the name in the
+		// field passed every check this screen can make, so there is nothing else to say.
+		String error = renameFailed ? "voxelcam.rename.failed" : validationError();
 		if (error != null) {
 			context.centeredText(font,
 					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);
