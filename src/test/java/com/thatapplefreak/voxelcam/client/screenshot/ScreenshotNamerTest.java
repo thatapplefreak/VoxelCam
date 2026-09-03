@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.Locale;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +22,17 @@ class ScreenshotNamerTest {
 
 	@TempDir
 	Path dir;
+
+	private final Locale defaultLocale = Locale.getDefault();
+
+	/**
+	 * Locale.setDefault is JVM-global and Gradle runs the whole suite in one JVM, so a leaked
+	 * locale would reach every later test — ScreenshotMetadata's "d MMM" formatter among them.
+	 */
+	@AfterEach
+	void restoreDefaultLocale() {
+		Locale.setDefault(defaultLocale);
+	}
 
 	@Test
 	void picksAnUnusedNameInTheGivenDirectory() {
@@ -35,6 +49,33 @@ class ScreenshotNamerTest {
 		String name = ScreenshotNamer.getScreenshotName(dir.toFile()).getName();
 
 		assertTrue(name.matches("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}\\.png"), name);
+	}
+
+	/**
+	 * A locale with its own digit set must not reach the filename: the manager gates the
+	 * friendly "Today 14:32" label on an ASCII-only \d regex, so Arabic-Indic digits would
+	 * leave every capture listed as a raw timestamp.
+	 */
+	@Test
+	void namesUseAsciiDigitsUnderALocaleThatDoesNot() {
+		Locale.setDefault(Locale.forLanguageTag("fa-IR"));
+
+		String name = ScreenshotNamer.getScreenshotName(dir.toFile()).getName();
+
+		assertTrue(name.matches("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}\\.png"), name);
+	}
+
+	/**
+	 * Thai defaults to the Buddhist calendar, whose year is 543 ahead — ASCII, so the regex
+	 * above sees nothing wrong, but the stamp sorts and reads wrong against every other machine.
+	 */
+	@Test
+	void namesUseTheIsoYearUnderANonIsoCalendarLocale() {
+		Locale.setDefault(Locale.forLanguageTag("th-TH-u-ca-buddhist"));
+
+		String name = ScreenshotNamer.getScreenshotName(dir.toFile()).getName();
+
+		assertTrue(name.startsWith(LocalDate.now().getYear() + "-"), name);
 	}
 
 	@Test
