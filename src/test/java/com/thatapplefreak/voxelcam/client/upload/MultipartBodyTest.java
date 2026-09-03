@@ -70,6 +70,38 @@ class MultipartBodyTest {
 		assertTrue(at >= 0, "raw file bytes should appear in the body verbatim");
 	}
 
+	/**
+	 * RenamePopup rejects only / \ and :, so a quote reaches the uploader intact and
+	 * would otherwise close the quoted-string early, filing the part under a truncated
+	 * name — reported to the player as nothing more than the generic 'link failed'.
+	 */
+	@Test
+	void quotesAndBackslashesInTheFilenameAreEscaped() {
+		String body = bodyOf(new MultipartBody()
+				.addFile("fileToUpload", "my \"best\" c:\\shot.png", "image/png", new byte[] { 1 }));
+
+		assertTrue(body.contains(
+				"filename=\"my \\\"best\\\" c:\\\\shot.png\"\r\n"),
+				body);
+	}
+
+	/**
+	 * CR and LF have no escape inside a quoted-string, so they have to be dropped
+	 * outright: left in, they end the header line and the part's header block is
+	 * framed as something else entirely.
+	 */
+	@Test
+	void newlinesInTheFilenameCannotSplitTheHeaderBlock() {
+		String body = bodyOf(new MultipartBody()
+				.addFile("fileToUpload", "sh\r\not\nX-Injected: 1.png", "image/png", new byte[] { 1 }));
+
+		int disposition = body.indexOf("Content-Disposition: form-data;");
+		String headers = body.substring(disposition, body.indexOf("\r\n\r\n", disposition));
+
+		assertEquals(2, headers.split("\r\n", -1).length, headers);
+		assertTrue(headers.endsWith("\r\nContent-Type: image/png"), headers);
+	}
+
 	@Test
 	void fieldsAndFilesAccumulateInOrder() {
 		String body = bodyOf(new MultipartBody()
