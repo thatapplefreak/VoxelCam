@@ -17,6 +17,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 
 /**
@@ -44,6 +45,7 @@ public class CaptureTest implements FabricClientGameTest {
 			assertOrdinaryCaptureWritesAFile(context, dir);
 			assertOversizedCaptureMatchesTheRequest(context, dir);
 			assertWindowIsRestored(context);
+			assertArmedCaptureIsDroppedWhenAScreenOpensFirst(context, dir);
 		}
 	}
 
@@ -159,6 +161,39 @@ public class CaptureTest implements FabricClientGameTest {
 		if (BigScreenshot.isBusy()) {
 			throw new AssertionError("capture never returned to idle");
 		}
+	}
+
+	/**
+	 * A whole client tick separates the gate in {@code request()} from the resize in the render
+	 * frame — long enough for the world to go away or a screen to open — so the state the gate
+	 * refuses has to be refused again when the resize actually runs. Arming and opening the screen
+	 * in one client-thread task is what makes that ordering deterministic here.
+	 *
+	 * <p>The written file is the discriminator rather than the window size: a capture that goes
+	 * ahead anyway puts the window back by itself a frame later, but it cannot un-write its png.
+	 */
+	private static void assertArmedCaptureIsDroppedWhenAScreenOpensFirst(
+			ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+
+		context.runOnClient(client -> {
+			BigScreenshot.request();
+			client.gui.setScreen(new PauseScreen(false));
+		});
+		context.waitTicks(40);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> !name.endsWith(".png"));
+		if (!after.isEmpty()) {
+			throw new AssertionError("a request overtaken by a screen should have been dropped, wrote " + after);
+		}
+		if (BigScreenshot.isBusy()) {
+			throw new AssertionError("a dropped request should leave the state machine idle");
+		}
+
+		context.setScreen(() -> null);
+		context.waitForScreen(null);
 	}
 
 	private record Dimensions(int width, int height) {

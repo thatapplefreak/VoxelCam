@@ -84,17 +84,23 @@ public final class BigScreenshot {
 			return;
 		}
 
-		Minecraft client = Minecraft.getInstance();
-		// Resizing runs Screen.resize, which the manager turns into a full clearAndInit at an
-		// absurd scaled width; and with no world ChatMessages is silent, so a multi-second
-		// freeze would come with no explanation at all. This is the old ScreenshotIncapable.
-		if (client.level == null || client.gui.screen() != null) {
+		if (!canCapture(Minecraft.getInstance())) {
 			ChatMessages.send("voxelcam.bigshot.unavailable");
 			return;
 		}
 
 		state = State.REQUESTED;
 		framesInState = 0;
+	}
+
+	/**
+	 * The modern {@code ScreenshotIncapable}: resizing runs {@code Screen.resize}, which the
+	 * manager turns into a full {@code clearAndInit} at an absurd scaled width; and with no world
+	 * {@code ChatMessages} is silent, so a multi-second freeze would come with no explanation at
+	 * all.
+	 */
+	private static boolean canCapture(Minecraft client) {
+		return client.level != null && client.gui.screen() == null;
 	}
 
 	/**
@@ -151,6 +157,18 @@ public final class BigScreenshot {
 
 	private static void beginCapture() {
 		Minecraft client = Minecraft.getInstance();
+
+		// request()'s gate is a whole tick stale by now: the screenshot key is handled from
+		// RenderSystem.pollEvents(), which run() calls before runTick, and renderFrame is the last
+		// thing runTick does — so a disconnect or a screen opening in between would land the resize
+		// in exactly the state the gate exists to forbid. Nothing has been touched yet, so the
+		// request is simply dropped; there is no window to put back and no screen to say so in.
+		if (!canCapture(client)) {
+			state = State.IDLE;
+			framesInState = 0;
+			return;
+		}
+
 		Window window = client.getWindow();
 
 		// Snapshotted only on this transition. A second request mid-capture is refused in
