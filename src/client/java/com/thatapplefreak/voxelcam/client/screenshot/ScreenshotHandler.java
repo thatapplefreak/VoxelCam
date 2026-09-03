@@ -81,7 +81,7 @@ public final class ScreenshotHandler {
 	private static void write(NativeImage image, File target, CaptureContext context) {
 		Minecraft client = Minecraft.getInstance();
 		try (image) {
-			image.writeToFile(target);
+			writeOrDiscard(target, image::writeToFile);
 			embedMetadata(target, context);
 			client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
 		} catch (IOException e) {
@@ -90,6 +90,34 @@ public final class ScreenshotHandler {
 		} finally {
 			saving = false;
 		}
+	}
+
+	/**
+	 * {@code NativeImage.writeToFile} opens the target WRITE|CREATE|TRUNCATE_EXISTING and only
+	 * then throws if the stb encode fails, so a failed save would otherwise leave an empty or
+	 * half-written .png behind: the manager lists it forever, never decodes it, and re-reads its
+	 * header every frame it is on screen. A file that was already there is left alone — this
+	 * undoes what the failed write itself created, nothing else.
+	 *
+	 * <p>Split out from {@link #write} so it can be tested; encoding a real NativeImage needs a
+	 * GL context.
+	 */
+	static void writeOrDiscard(File target, PngWriter writer) throws IOException {
+		boolean existed = target.exists();
+		try {
+			writer.writeTo(target);
+		} catch (IOException e) {
+			if (!existed) {
+				target.delete();
+			}
+			throw e;
+		}
+	}
+
+	/** The encode step of a save, as a seam. */
+	@FunctionalInterface
+	interface PngWriter {
+		void writeTo(File target) throws IOException;
 	}
 
 	/**
