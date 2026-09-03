@@ -43,6 +43,8 @@
 	"voxelcam.share.saved": "Saved as %s",
 	"voxelcam.share.savefailed": "Could not save a copy",
 	"voxelcam.share.revealed": "Opened your file manager",
+	"voxelcam.share.revealed.folder": "Opened the containing folder",
+	"voxelcam.share.revealfailed": "Could not open your file manager",
 	"voxelcam.share.pathcopied": "Path copied to clipboard",
 	"voxelcam.share.uploading.link": "Uploading…",
 	"voxelcam.share.linkfailed": "Could not get a share link",

@@ -47,10 +47,12 @@ mock the world.
 dialog blocks on a native window, revealing spawns the platform file manager, and the link button
 would upload to the real catbox.
 
-**Still untested, and not by oversight:** the native Save-As dialog itself, `revealInFileManager`'s
-process launch, and the upload-result branch of `SharePopup` (which would need an injectable
-endpoint the popup does not have). Those are manual checks before a release. `copyPath` *is*
-covered, end to end through the real GLFW clipboard, in `SharePopupTest`.
+**Still untested, and not by oversight:** the native Save-As dialog itself, the real `open -R` /
+`explorer.exe` reveal and the `Util.OS.openFile` fallback it lands on, and the upload-result branch
+of `SharePopup` (which would need an injectable endpoint the popup does not have). Those are manual
+checks before a release. `copyPath` *is* covered, end to end through the real GLFW clipboard, in
+`SharePopupTest`, and `NativeShare.reveal`'s choice between revealing, opening the folder and giving
+up is covered in `NativeShareTest` by running harmless commands with known exit codes.
 
 Anything a test cannot express still means running `runClient` and looking at the result. The usual
 pattern for that is to temporarily add a tick counter in `VoxelCamClient` that calls

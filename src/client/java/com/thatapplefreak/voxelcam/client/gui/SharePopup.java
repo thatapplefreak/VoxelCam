@@ -31,6 +31,7 @@ public class SharePopup extends Screen {
 	private final File screenshot;
 
 	private Button saveButton;
+	private Button revealButton;
 	private Button linkButton;
 
 	private Component status = null;
@@ -49,7 +50,7 @@ public class SharePopup extends Screen {
 
 		saveButton = addButton("voxelcam.share.savecopy", "voxelcam.tooltip.savecopy", x, y, this::saveCopy);
 		y += BUTTON_HEIGHT + GAP;
-		addButton("voxelcam.share.reveal", "voxelcam.tooltip.reveal", x, y, this::reveal);
+		revealButton = addButton("voxelcam.share.reveal", "voxelcam.tooltip.reveal", x, y, this::reveal);
 		y += BUTTON_HEIGHT + GAP;
 		addButton("voxelcam.share.copypath", "voxelcam.tooltip.copypath", x, y, this::copyPath);
 		y += BUTTON_HEIGHT + GAP;
@@ -89,8 +90,22 @@ public class SharePopup extends Screen {
 	}
 
 	private void reveal() {
-		NativeShare.revealInFileManager(screenshot);
-		setStatus("voxelcam.share.revealed", false);
+		// The command is waited on off-thread, so the outcome arrives later; keep the
+		// button from queueing a second file manager window in the meantime.
+		revealButton.active = false;
+		NativeShare.revealInFileManager(screenshot).whenComplete((outcome, error) -> minecraft.execute(() -> {
+			revealButton.active = true;
+			if (error != null) {
+				VoxelCamClient.LOGGER.warn("Revealing {} failed", screenshot, error);
+				setStatus("voxelcam.share.revealfailed", true);
+				return;
+			}
+			switch (outcome) {
+				case REVEALED -> setStatus("voxelcam.share.revealed", false);
+				case OPENED_FOLDER -> setStatus("voxelcam.share.revealed.folder", false);
+				case FAILED -> setStatus("voxelcam.share.revealfailed", true);
+			}
+		}));
 	}
 
 	private void copyPath() {

@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.share;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,8 +12,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.thatapplefreak.voxelcam.client.share.NativeShare.RevealOutcome;
 import net.minecraft.util.Util;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -166,5 +171,87 @@ class NativeShareTest {
 				throw new AssertionError(platform + " produced an empty command");
 			}
 		}
+	}
+
+	// --- what the reveal command's exit status is taken to mean ---------------
+
+	/**
+	 * The bug this guards: a reveal that launches and then fails — "open -R" on a
+	 * file a cloud-sync client removed between opening the popup and clicking —
+	 * exits non-zero instead of throwing. Ignore the exit status and the fallback
+	 * never runs while the popup still reports success, so no window ever appears.
+	 */
+	@Test
+	@DisabledOnOs(OS.WINDOWS)
+	void aRevealThatLaunchesAndFailsFallsBackToTheFolder() {
+		AtomicInteger folderOpened = new AtomicInteger();
+
+		RevealOutcome outcome = NativeShare.reveal(
+				new String[] { "sh", "-c", "exit 1" }, dir.toFile(), folderOpened::incrementAndGet);
+
+		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
+		assertEquals(1, folderOpened.get());
+	}
+
+	@Test
+	@DisabledOnOs(OS.WINDOWS)
+	void aRevealThatSucceedsLeavesTheFolderAlone() {
+		AtomicInteger folderOpened = new AtomicInteger();
+
+		RevealOutcome outcome = NativeShare.reveal(
+				new String[] { "sh", "-c", "exit 0" }, dir.toFile(), folderOpened::incrementAndGet);
+
+		assertEquals(RevealOutcome.REVEALED, outcome);
+		assertEquals(0, folderOpened.get());
+	}
+
+	/** A command that cannot be launched at all is the older IOException path. */
+	@Test
+	void aRevealCommandThatIsNotInstalledFallsBackToTheFolder() {
+		AtomicInteger folderOpened = new AtomicInteger();
+
+		RevealOutcome outcome = NativeShare.reveal(
+				new String[] { "voxelcam-no-such-program" }, dir.toFile(), folderOpened::incrementAndGet);
+
+		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
+		assertEquals(1, folderOpened.get());
+	}
+
+	/** Linux and friends have no reveal command, so the folder is the intended path there. */
+	@Test
+	void noRevealCommandOpensTheFolderDirectly() {
+		AtomicInteger folderOpened = new AtomicInteger();
+
+		RevealOutcome outcome = NativeShare.reveal(null, dir.toFile(), folderOpened::incrementAndGet);
+
+		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
+		assertEquals(1, folderOpened.get());
+	}
+
+	/** With the folder gone too there is nothing left to open, so say so rather than claim success. */
+	@Test
+	void aMissingFolderIsReportedRatherThanOpened() {
+		AtomicInteger folderOpened = new AtomicInteger();
+
+		RevealOutcome outcome = NativeShare.reveal(
+				null, dir.resolve("deleted").toFile(), folderOpened::incrementAndGet);
+
+		assertEquals(RevealOutcome.FAILED, outcome);
+		assertEquals(0, folderOpened.get());
+	}
+
+	@Test
+	void openReportsItsFailureThroughTheExitCode() {
+		assertTrue(NativeShare.revealed(new String[] { "open", "-R", "/tmp/shot.png" }, 0));
+		assertFalse(NativeShare.revealed(new String[] { "open", "-R", "/tmp/shot.png" }, 1));
+	}
+
+	/**
+	 * explorer.exe exits 1 whether or not it opened the window, so trusting its
+	 * status would stack the containing folder on top of every Windows reveal.
+	 */
+	@Test
+	void explorersExitStatusIsIgnored() {
+		assertTrue(NativeShare.revealed(new String[] { "explorer.exe", "/select,C:\\shot.png" }, 1));
 	}
 }
