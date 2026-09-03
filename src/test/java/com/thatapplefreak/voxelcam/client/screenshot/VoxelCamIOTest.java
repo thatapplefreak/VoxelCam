@@ -186,11 +186,34 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(doomed);
 
-		VoxelCamIO.delete();
+		assertTrue(VoxelCamIO.delete());
 
 		assertFalse(doomed.exists());
 		assertNull(VoxelCamIO.getSelectedPhoto());
 		assertFalse(VoxelCamIO.getScreenShotFiles().contains(doomed));
+	}
+
+	/**
+	 * A non-empty directory named like a screenshot is listed the same as a file and
+	 * refuses to be deleted, which is the portable stand-in for the file a Windows image
+	 * viewer holds open — it relies on updateScreenShotFilesList listing by extension
+	 * alone, so adding an isFile() guard there means picking another way to fail. The row and the selection have to survive it: the manager
+	 * re-lists the directory on the way back from the popup, so an entry dropped anyway
+	 * would silently reappear and make the confirmation look like it had worked.
+	 */
+	@Test
+	void aRefusedDeleteKeepsTheEntryAndTheSelection() throws IOException {
+		File stubborn = dir.resolve("stubborn.png").toFile();
+		assertTrue(stubborn.mkdir());
+		Files.writeString(stubborn.toPath().resolve("holding-it-open.txt"), "x");
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(stubborn);
+
+		assertFalse(VoxelCamIO.delete());
+
+		assertTrue(stubborn.exists());
+		assertEquals(stubborn, VoxelCamIO.getSelectedPhoto());
+		assertTrue(VoxelCamIO.getScreenShotFiles().contains(stubborn));
 	}
 
 	@Test
@@ -198,7 +221,7 @@ class VoxelCamIOTest {
 		File keep = shot("keep.png", 1_000L);
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 
-		VoxelCamIO.delete();
+		assertFalse(VoxelCamIO.delete());
 
 		assertTrue(keep.exists());
 	}

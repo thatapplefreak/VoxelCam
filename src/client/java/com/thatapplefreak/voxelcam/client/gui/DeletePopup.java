@@ -19,8 +19,11 @@ public final class DeletePopup {
 				: Component.translatable("voxelcam.delete.confirm", target.getName());
 
 		return new ConfirmScreen(confirmed -> {
-			if (confirmed) {
-				VoxelCamIO.delete();
+			if (confirmed && target != null) {
+				// A delete that failed leaves the file on disk, and the manager re-lists the
+				// directory as it comes back, so the row returns on its own; the manager has
+				// to say why. Chat cannot: it is silent from the title screen.
+				parent.reportDeleteResult(target, VoxelCamIO.delete());
 			}
 			Minecraft.getInstance().setScreenAndShow(parent);
 		}, Component.translatable("voxelcam.delete.title"), message,

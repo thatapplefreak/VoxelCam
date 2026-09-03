@@ -19,6 +19,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Screenshot browser: searchable list on the left, large preview and details
@@ -52,6 +53,8 @@ public class GuiScreenShotManager extends Screen {
 	private String searchText = "";
 	private boolean favoritesOnly = false;
 	private File selected;
+	/** A failed file action, shown in place of the details line until the selection moves. */
+	private Component actionError;
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
@@ -214,9 +217,24 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	private void onSelected(File file) {
+		// Only a move to a different file clears the message. init() re-reports the
+		// current selection through setScreenshots, and that rebuild is exactly what
+		// returning from a popup triggers, so clearing unconditionally would wipe a
+		// failure before its first frame.
+		if (!Objects.equals(selected, file)) {
+			actionError = null;
+		}
 		selected = file;
 		VoxelCamIO.selectPhoto(file);
 		updateButtonStates();
+	}
+
+	/**
+	 * Set by {@link DeletePopup} on its way out, since the popup itself is gone by the
+	 * time anyone could read it.
+	 */
+	void reportDeleteResult(File file, boolean deleted) {
+		actionError = deleted ? null : Component.translatable("voxelcam.delete.failed", file.getName());
 	}
 
 	private void updateButtonStates() {
@@ -314,6 +332,14 @@ public class GuiScreenShotManager extends Screen {
 			context.blit(RenderPipelines.GUI_TEXTURED, image.id(),
 					previewX + (previewWidth - drawWidth) / 2, previewY + (previewHeight - drawHeight) / 2,
 					0F, 0F, drawWidth, drawHeight, image.width(), image.height(), image.width(), image.height());
+		}
+
+		if (actionError != null) {
+			// The details line is the only row free at every GUI scale, and it sits under
+			// the preview of the file the failure is about.
+			context.centeredText(font, actionError.copy().withStyle(ChatFormatting.RED),
+					previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFFF5555);
+			return;
 		}
 
 		// The list row already carries the capture time, so this line stays short
