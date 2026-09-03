@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -57,6 +58,27 @@ class BigScreenshotSizeTest {
 	@Test
 	void widthByHeightWinsOverMultiple() {
 		assertEquals("2x2", BigScreenshotSize.parse("2x2").token());
+	}
+
+	/**
+	 * The preset keys are ASCII literals, so folding under the JVM default locale lets the
+	 * player's system decide whether a preset exists: under tr/az 'I' folds to a dotless one
+	 * (U+0131), and "IMAX" stops being "imax". The default has to be restored, because every
+	 * test class shares one JVM and the date and size formatting elsewhere reads it.
+	 */
+	@Test
+	void presetsParseUnderALocaleWithItsOwnCaseRules() {
+		Locale saved = Locale.getDefault();
+		try {
+			Locale.setDefault(Locale.forLanguageTag("tr"));
+
+			BigScreenshotSize size = BigScreenshotSize.parse("IMAX");
+
+			assertNotNull(size, "IMAX is a preset whatever the system locale is");
+			assertEquals("imax", size.token());
+		} finally {
+			Locale.setDefault(saved);
+		}
 	}
 
 	@Test
