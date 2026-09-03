@@ -43,6 +43,8 @@
 	"voxelcam.share.saved": "Stowed as %s",
 	"voxelcam.share.savefailed": "Couldn't stow a copy",
 	"voxelcam.share.revealed": "Opened yer chest keeper",
+	"voxelcam.share.revealed.folder": "Opened th' hold it sits in",
+	"voxelcam.share.revealfailed": "Couldn't open yer chest keeper",
 	"voxelcam.share.pathcopied": "Route copied t' yer parchment",
 	"voxelcam.share.uploading.link": "Sendin' it off…",
 	"voxelcam.share.linkfailed": "Couldn't get a tradin' link",
