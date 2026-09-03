@@ -73,9 +73,10 @@ public class GuiScreenShotManager extends Screen {
 	protected void init() {
 		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
 		List<File> files = filteredFiles();
-		if (selected == null || !files.contains(selected)) {
-			selected = files.isEmpty() ? null : files.get(0);
-		}
+		// Not just "keep it if it is still listed": init() runs again on the way back from
+		// every popup, and after a rename this field still names the file that was renamed
+		// away, so VoxelCamIO's selection is the only one that followed it.
+		selected = VoxelCamIO.selectionFor(files, selected);
 
 		// Split the content area so preview : list == phi : 1, which holds the two
 		// panes in proportion at every GUI scale instead of the preview swallowing
@@ -176,9 +177,9 @@ public class GuiScreenShotManager extends Screen {
 	private void refreshFiles() {
 		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
 		List<File> files = filteredFiles();
-		if (selected == null || !files.contains(selected)) {
-			selected = files.isEmpty() ? null : files.get(0);
-		}
+		// Same resolution as init(), so a filter that empties the list and is then cleared
+		// comes back to the file it was on rather than to the head of the list.
+		selected = VoxelCamIO.selectionFor(files, selected);
 		visibleFiles = files;
 		list.setScreenshots(files, selected);
 		updateButtonStates();

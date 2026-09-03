@@ -259,6 +259,79 @@ class VoxelCamIOTest {
 		assertEquals(original, VoxelCamIO.getSelectedPhoto());
 	}
 
+	/**
+	 * The manager holds its own copy of the selection and rebuilds itself whenever a popup
+	 * closes, so by the time it re-lists the directory its copy names the file the rename
+	 * moved away from. The newer file here is what makes that visible: the head of the list
+	 * is a screenshot the player never touched, and that is what the next Delete would aim
+	 * at.
+	 */
+	@Test
+	void selectionFollowsARenameTheScreenHasNotSeen() throws IOException {
+		File stale = shot("sunset.png", 1_000L);
+		File newest = shot("newest.png", 2_000L);
+		VoxelCamIO.selectPhoto(stale);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "dawn");
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		List<File> files = VoxelCamIO.getScreenShotFiles();
+
+		assertEquals(newest, files.get(0));
+		assertEquals(renamed, VoxelCamIO.selectionFor(files, stale));
+	}
+
+	/**
+	 * The case-only rename 995e05f enabled, re-listed. {@code File.equals} folds case on
+	 * Windows and does not elsewhere, so which of the two branches answers depends on the
+	 * filesystem — the assertion is that the recapitalised file is found either way rather
+	 * than falling through to the head of the list, and it compares Files, not names, for
+	 * the same reason.
+	 */
+	@Test
+	void selectionSurvivesACaseOnlyRename() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		shot("newest.png", 2_000L);
+		VoxelCamIO.selectPhoto(original);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "Sunset");
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(renamed, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), original));
+	}
+
+	/**
+	 * A selection that is still listed wins over the one here, which is what keeps a failed
+	 * delete's message pinned to the file it is about: that file is still on disk, and the
+	 * rebuild the popup's return triggers must not move off it.
+	 */
+	@Test
+	void aListedSelectionIsKeptOverTheOneInIO() throws IOException {
+		File shown = shot("shown.png", 1_000L);
+		File other = shot("other.png", 2_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(other);
+
+		assertEquals(shown, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), shown));
+	}
+
+	@Test
+	void withBothSelectionsGoneTheHeadOfTheListIsTaken() throws IOException {
+		File newest = shot("newest.png", 2_000L);
+		shot("oldest.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(dir.resolve("deleted-elsewhere.png").toFile());
+
+		assertEquals(newest,
+				VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), dir.resolve("also-gone.png").toFile()));
+	}
+
+	@Test
+	void anEmptyListSelectsNothing() {
+		VoxelCamIO.selectPhoto(dir.resolve("filtered-out.png").toFile());
+
+		assertNull(VoxelCamIO.selectionFor(List.of(), null));
+	}
+
 	@Test
 	void deleteRemovesTheFileAndClearsTheSelection() throws IOException {
 		File doomed = shot("doomed.png", 1_000L);

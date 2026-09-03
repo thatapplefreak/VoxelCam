@@ -72,6 +72,30 @@ public final class VoxelCamIO {
 	}
 
 	/**
+	 * The screenshot a browser listing {@code files} should have selected, given the
+	 * {@code current} one it is already showing.
+	 *
+	 * A screen that keeps its own copy of the selection has one that predates whatever a
+	 * popup just did, since returning from a popup rebuilds it: after a rename {@code current}
+	 * names a file that no longer exists, and defaulting straight to the head of the list
+	 * would silently move the player onto whichever screenshot the sort happens to put first
+	 * — the one the next Delete would then be aimed at. The selection {@link #rename} left
+	 * here is the one that followed the file, so it gets asked before the fallback.
+	 *
+	 * It lives beside {@code rename} rather than in the manager so a plain JUnit test can
+	 * reach it, the same reason {@link #nameCollides} is here and not in the popup.
+	 */
+	public static File selectionFor(List<File> files, File current) {
+		if (current != null && files.contains(current)) {
+			return current;
+		}
+		if (selected != null && files.contains(selected)) {
+			return selected;
+		}
+		return files.isEmpty() ? null : files.get(0);
+	}
+
+	/**
 	 * Renames the selected screenshot, returning the new file — or null if it did not
 	 * happen, which the caller has to tell the player about: nothing here throws, the file
 	 * keeps its old name, and the manager re-lists it as if nothing had been asked.
