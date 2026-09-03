@@ -28,6 +28,9 @@ import net.minecraft.client.Screenshot;
  * issued: {@code copyTextureToBuffer} does its {@code glReadPixels} into a buffer immediately
  * but finishes the work in a fenced task next frame, and restoring runs
  * {@code Framebuffer.resize}, which deletes the texture that task is still reading from.
+ *
+ * <p>A failed readback owes the window the same restore and is under the same constraint, so it
+ * is deferred to the head of the next frame too — see {@link #deferRestore()}.
  */
 public final class BigScreenshot {
 
@@ -35,14 +38,18 @@ public final class BigScreenshot {
 		IDLE,
 		REQUESTED,
 		CAPTURING,
-		AWAITING_READBACK
+		AWAITING_READBACK,
+		RESTORE_PENDING
 	}
 
 	/**
-	 * Frames a capture may sit unfinished before the window size is put back by force.
-	 * Neither injection fires while the window is minimised, and another mod setting
+	 * Frames a resized capture may sit waiting for its blit before the window size is put back by
+	 * force. Neither injection fires while the window is minimised, and another mod setting
 	 * {@code skipGameRender} would skip the blit too — without this the window would stay
 	 * oversized for the rest of the session.
+	 *
+	 * <p>Both of those leave the capture in {@code CAPTURING}, where no readback has been issued
+	 * and a restore is safe. It deliberately does not apply to {@code AWAITING_READBACK}.
 	 */
 	private static final int STALE_FRAMES = 8;
 
@@ -55,6 +62,12 @@ public final class BigScreenshot {
 	private static int savedWidth;
 	private static int savedHeight;
 	private static int framesInState;
+
+	// Identifies the readback a consumer belongs to. Consumers arrive from a fenced task and
+	// carry no other way of telling whether the capture they were issued for is still the one
+	// in flight, so finishing on the strength of the state alone would let a late one end
+	// somebody else's capture.
+	private static int readback;
 
 	private BigScreenshot() {
 	}
@@ -80,11 +93,7 @@ public final class BigScreenshot {
 			return;
 		}
 
-		Minecraft client = Minecraft.getInstance();
-		// Resizing runs Screen.resize, which the manager turns into a full clearAndInit at an
-		// absurd scaled width; and with no world ChatMessages is silent, so a multi-second
-		// freeze would come with no explanation at all. This is the old ScreenshotIncapable.
-		if (client.level == null || client.gui.screen() != null) {
+		if (!canCapture(Minecraft.getInstance())) {
 			ChatMessages.send("voxelcam.bigshot.unavailable");
 			return;
 		}
@@ -93,17 +102,39 @@ public final class BigScreenshot {
 		framesInState = 0;
 	}
 
-	/** Head of {@code MinecraftClient.render}: applies the resize, or unsticks a stalled capture. */
+	/**
+	 * The modern {@code ScreenshotIncapable}: resizing runs {@code Screen.resize}, which the
+	 * manager turns into a full {@code clearAndInit} at an absurd scaled width; and with no world
+	 * {@code ChatMessages} is silent, so a multi-second freeze would come with no explanation at
+	 * all.
+	 */
+	private static boolean canCapture(Minecraft client) {
+		return client.level != null && client.gui.screen() == null;
+	}
+
+	/**
+	 * Head of {@code MinecraftClient.render}: applies the resize, puts the window back after a
+	 * failed readback, or unsticks a stalled capture.
+	 */
 	public static void beforeFrame() {
 		switch (state) {
 			case IDLE -> {
 			}
 			case REQUESTED -> beginCapture();
-			case CAPTURING, AWAITING_READBACK -> {
+			case RESTORE_PENDING -> finish();
+			case CAPTURING -> {
 				if (++framesInState > STALE_FRAMES) {
-					VoxelCamClient.LOGGER.warn("Big screenshot stalled in {}, restoring window size", state);
+					VoxelCamClient.LOGGER.warn("Big screenshot stalled before its blit, restoring window size");
 					finish();
 				}
+			}
+			// A readback in flight is waited out however long it takes, at no frame budget at all:
+			// finish() resizes the main render target, which closes the colour texture the
+			// outstanding copyTextureToBuffer is still sourcing from — the same hazard the restore
+			// is deferred into the consumer to avoid. An imax capture moves ~280 MB across the bus
+			// and can outlast any count worth picking, and only the consumer knows the GPU is done,
+			// so an oversized window for a few more frames is the cheaper of the two failures.
+			case AWAITING_READBACK -> {
 			}
 		}
 	}
@@ -113,21 +144,69 @@ public final class BigScreenshot {
 		if (state != State.CAPTURING) {
 			return;
 		}
-		state = State.AWAITING_READBACK;
-		framesInState = 0;
+		int issued = beginReadback();
 
 		Minecraft client = Minecraft.getInstance();
 		try {
-			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), BigScreenshot::onImageReady);
+			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(),
+					image -> onImageReady(issued, image));
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
+			deferRestore();
+		}
+	}
+
+	/**
+	 * Marks a capture as owing the window a restore, without performing one.
+	 *
+	 * <p>Kept out of {@link #beforeBlit()}'s catch body because the deferral is the whole point:
+	 * at that injection vanilla has already fetched {@code mainRenderTarget().getColorTextureView()}
+	 * and blits from it a couple of instructions after control comes back. Restoring here would run
+	 * {@code GameRenderer.resize} -> {@code RenderTarget.resize} -> {@code destroyBuffers}, closing
+	 * that exact view, and {@code GpuSurface.blitFromTexture} does not check {@code isClosed()}.
+	 * The head of the next frame holds nothing of vanilla's, so that is where the resize goes.
+	 */
+	static void deferRestore() {
+		state = State.RESTORE_PENDING;
+		framesInState = 0;
+	}
+
+	/** Hands the frame to a readback, returning the tag its consumer has to come back with. */
+	static int beginReadback() {
+		state = State.AWAITING_READBACK;
+		framesInState = 0;
+		return ++readback;
+	}
+
+	/**
+	 * Ends the capture the given readback was issued for, if it is still the one in flight.
+	 *
+	 * <p>The tag is what makes a late consumer harmless. Nothing abandons an outstanding readback
+	 * any more, but a consumer that arrives after its own capture ended some other way would
+	 * otherwise reset the state mid-capture and restore the window to a size a newer capture has
+	 * not saved yet, silently swallowing that newer shot.
+	 */
+	static void completeReadback(int issued) {
+		if (issued == readback && state == State.AWAITING_READBACK) {
 			finish();
 		}
 	}
 
 	private static void beginCapture() {
 		Minecraft client = Minecraft.getInstance();
+
+		// request()'s gate is a whole tick stale by now: the screenshot key is handled from
+		// RenderSystem.pollEvents(), which run() calls before runTick, and renderFrame is the last
+		// thing runTick does — so a disconnect or a screen opening in between would land the resize
+		// in exactly the state the gate exists to forbid. Nothing has been touched yet, so the
+		// request is simply dropped; there is no window to put back and no screen to say so in.
+		if (!canCapture(client)) {
+			state = State.IDLE;
+			framesInState = 0;
+			return;
+		}
+
 		Window window = client.getWindow();
 
 		// Snapshotted only on this transition. A second request mid-capture is refused in
@@ -150,10 +229,11 @@ public final class BigScreenshot {
 		}
 	}
 
-	private static void onImageReady(NativeImage image) {
+	private static void onImageReady(int issued, NativeImage image) {
 		// Restore before anything else: the fenced task that built this image is done with the
-		// oversized texture only now, and finish() deletes it.
-		finish();
+		// oversized texture only now, and finish() deletes it. The image is saved either way —
+		// it is a finished capture even if the state machine has moved past it.
+		completeReadback(issued);
 		ScreenshotHandler.saveCapturedImage(image);
 	}
 
