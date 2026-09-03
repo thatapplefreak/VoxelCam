@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,7 +65,9 @@ public final class BigScreenshotSize {
 
 	/** @return the parsed size, or null if the token is not a preset, a multiple or WxH. */
 	public static BigScreenshotSize parse(String input) {
-		String token = input.trim().toLowerCase();
+		// ROOT, not the default locale: the preset keys are ASCII literals, and under tr/az
+		// 'I' folds to a dotless one, so "IMAX" would stop being a preset on a Turkish system.
+		String token = input.trim().toLowerCase(Locale.ROOT);
 
 		BigScreenshotSize preset = PRESETS.get(token);
 		if (preset != null) {
