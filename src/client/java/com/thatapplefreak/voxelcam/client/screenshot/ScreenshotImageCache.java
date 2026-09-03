@@ -34,7 +34,7 @@ public final class ScreenshotImageCache {
 	private record Key(File file, boolean thumbnail) {
 	}
 
-	private record Decoded(Key key, NativeImage image, int generation) {
+	private record Decoded(Key key, NativeImage image, int generation, int claim) {
 	}
 
 	/** What {@link #uploadPending()} should do with one finished decode. */
@@ -48,7 +48,13 @@ public final class ScreenshotImageCache {
 	private static final int THUMBNAIL_WIDTH = 128;
 
 	private static final Map<Key, Loaded> LOADED = new HashMap<>();
-	private static final Set<Key> IN_FLIGHT = new HashSet<>();
+	/**
+	 * The claim number of the decode currently running for each key. A number rather than
+	 * bare membership because {@link #release(File)} can drop a claim while its decode is
+	 * still running and the key can then be asked for again: the result that eventually
+	 * lands has to be told apart from the one the cache is now waiting for.
+	 */
+	private static final Map<Key, Integer> IN_FLIGHT = new HashMap<>();
 	private static final Set<Key> FAILED = new HashSet<>();
 	private static final Queue<Decoded> DECODED = new ConcurrentLinkedQueue<>();
 
@@ -62,6 +68,7 @@ public final class ScreenshotImageCache {
 	private static ExecutorService executor;
 	private static int nextId = 0;
 	private static int generation = 0;
+	private static int nextClaim = 0;
 
 	private ScreenshotImageCache() {
 	}
@@ -79,18 +86,24 @@ public final class ScreenshotImageCache {
 		if (ready != null) {
 			return ready;
 		}
-		if (!IN_FLIGHT.contains(key) && !FAILED.contains(key)) {
-			IN_FLIGHT.add(key);
-			submit(key);
+		if (!isLoading(file, thumbnail) && !FAILED.contains(key)) {
+			int claim = nextClaim++;
+			IN_FLIGHT.put(key, claim);
+			submit(key, claim);
 		}
 		return null;
+	}
+
+	/** Whether a decode is already running for this file at this size. */
+	static boolean isLoading(File file, boolean thumbnail) {
+		return IN_FLIGHT.containsKey(new Key(file, thumbnail));
 	}
 
 	public static boolean hasFailed(File file, boolean thumbnail) {
 		return FAILED.contains(new Key(file, thumbnail));
 	}
 
-	private static void submit(Key key) {
+	private static void submit(Key key, int claim) {
 		if (executor == null) {
 			executor = Executors.newFixedThreadPool(2, runnable -> {
 				Thread thread = new Thread(runnable, "VoxelCam Image Loader");
@@ -116,7 +129,7 @@ public final class ScreenshotImageCache {
 					}
 					return;
 				}
-				DECODED.add(new Decoded(key, image, submittedIn));
+				DECODED.add(new Decoded(key, image, submittedIn, claim));
 			}
 		});
 	}
@@ -160,15 +173,40 @@ public final class ScreenshotImageCache {
 		return decodeSucceeded ? Disposition.UPLOAD : Disposition.FAIL;
 	}
 
+	/**
+	 * The render thread's finer form of the same question: it can also see whether the key
+	 * still claims this particular decode, which a loader thread cannot, since
+	 * {@link #IN_FLIGHT} is only ever touched from the render thread.
+	 *
+	 * <p>A claim is dropped by {@link #release(File)}, which the manager calls after a file
+	 * has been deleted or renamed away. Uploading a result whose claim is gone would
+	 * register a texture under a path that no longer exists, and since {@code release} can
+	 * never be called for that path again and {@link #LOADED} is the only handle on a
+	 * registered id, it would sit in {@code TextureManager} — with its full-size image —
+	 * for the rest of the session. Recording a stale failure would poison a key that a
+	 * later request may well be able to read.
+	 */
+	static Disposition dispositionOf(int decodeGeneration, boolean stillClaimed, boolean decodeSucceeded) {
+		if (!stillClaimed) {
+			return Disposition.DISCARD;
+		}
+		return dispositionOf(decodeGeneration, decodeSucceeded);
+	}
+
+	private static boolean stillClaimed(Decoded decoded) {
+		Integer claim = IN_FLIGHT.get(decoded.key());
+		return claim != null && claim.intValue() == decoded.claim();
+	}
+
 	/** Uploads images decoded since the last call. Must run on the render thread. */
 	public static void uploadPending() {
 		Decoded decoded;
 		while ((decoded = DECODED.poll()) != null) {
 			NativeImage image = decoded.image();
-			Disposition disposition = dispositionOf(decoded.generation(), image != null);
+			Disposition disposition = dispositionOf(decoded.generation(), stillClaimed(decoded), image != null);
 			if (disposition == Disposition.DISCARD) {
-				// IN_FLIGHT is deliberately untouched: releaseAll() cleared it, so the key may
-				// already have been re-submitted, and that live decode still owns the entry.
+				// IN_FLIGHT is deliberately untouched: whatever entry the key holds now was
+				// taken by a later request, and that live decode still owns it.
 				if (image != null) {
 					image.close();
 				}
@@ -207,7 +245,16 @@ public final class ScreenshotImageCache {
 		}
 	}
 
-	/** Drops every cached texture for one file (both sizes), e.g. after it is deleted. */
+	/**
+	 * Drops every cached texture for one file (both sizes), e.g. after it is deleted.
+	 *
+	 * <p>Dropping the claim covers the case where the file is deleted or renamed while its
+	 * decode is still running — a full-size PNG takes long enough that a confirmed delete
+	 * easily beats it. That decode cannot be cancelled, but {@link #uploadPending()} will
+	 * now free the image instead of registering a texture nothing can ever release. It is
+	 * left to land there rather than freed on the loader thread the way a stale generation
+	 * is: the manager is by definition still open on this path, so a sweep is one frame away.
+	 */
 	public static void release(File file) {
 		for (boolean thumbnail : new boolean[] { true, false }) {
 			Key key = new Key(file, thumbnail);
@@ -216,6 +263,7 @@ public final class ScreenshotImageCache {
 				Minecraft.getInstance().getTextureManager().release(loaded.id());
 			}
 			FAILED.remove(key);
+			IN_FLIGHT.remove(key);
 		}
 	}
 
