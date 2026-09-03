@@ -28,6 +28,9 @@ import net.minecraft.client.Screenshot;
  * issued: {@code copyTextureToBuffer} does its {@code glReadPixels} into a buffer immediately
  * but finishes the work in a fenced task next frame, and restoring runs
  * {@code Framebuffer.resize}, which deletes the texture that task is still reading from.
+ *
+ * <p>A failed readback owes the window the same restore and is under the same constraint, so it
+ * is deferred to the head of the next frame too — see {@link #deferRestore()}.
  */
 public final class BigScreenshot {
 
@@ -35,7 +38,8 @@ public final class BigScreenshot {
 		IDLE,
 		REQUESTED,
 		CAPTURING,
-		AWAITING_READBACK
+		AWAITING_READBACK,
+		RESTORE_PENDING
 	}
 
 	/**
@@ -93,12 +97,16 @@ public final class BigScreenshot {
 		framesInState = 0;
 	}
 
-	/** Head of {@code MinecraftClient.render}: applies the resize, or unsticks a stalled capture. */
+	/**
+	 * Head of {@code MinecraftClient.render}: applies the resize, puts the window back after a
+	 * failed readback, or unsticks a stalled capture.
+	 */
 	public static void beforeFrame() {
 		switch (state) {
 			case IDLE -> {
 			}
 			case REQUESTED -> beginCapture();
+			case RESTORE_PENDING -> finish();
 			case CAPTURING, AWAITING_READBACK -> {
 				if (++framesInState > STALE_FRAMES) {
 					VoxelCamClient.LOGGER.warn("Big screenshot stalled in {}, restoring window size", state);
@@ -122,8 +130,23 @@ public final class BigScreenshot {
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
-			finish();
+			deferRestore();
 		}
+	}
+
+	/**
+	 * Marks a capture as owing the window a restore, without performing one.
+	 *
+	 * <p>Kept out of {@link #beforeBlit()}'s catch body because the deferral is the whole point:
+	 * at that injection vanilla has already fetched {@code mainRenderTarget().getColorTextureView()}
+	 * and blits from it a couple of instructions after control comes back. Restoring here would run
+	 * {@code GameRenderer.resize} -> {@code RenderTarget.resize} -> {@code destroyBuffers}, closing
+	 * that exact view, and {@code GpuSurface.blitFromTexture} does not check {@code isClosed()}.
+	 * The head of the next frame holds nothing of vanilla's, so that is where the resize goes.
+	 */
+	static void deferRestore() {
+		state = State.RESTORE_PENDING;
+		framesInState = 0;
 	}
 
 	private static void beginCapture() {
