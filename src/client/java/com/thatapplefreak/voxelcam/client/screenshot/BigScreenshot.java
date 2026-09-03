@@ -10,10 +10,11 @@ import net.minecraft.client.Screenshot;
 /**
  * Oversized ("big") screenshots, the successor to the LiteLoader build's BigScreenshotTaker.
  *
- * <p>The old mod resized the real game window through a VoxelCommon reflection helper. On
- * 1.21.11 that is plain public API — {@link Window#setWidth(int)} plus
- * {@link Minecraft#framebufferSizeChanged()}, the same call GLFW's framebuffer-size
- * callback makes — so everything that caches a viewport size is notified by construction.
+ * <p>The old mod resized the real game window through a VoxelCommon reflection helper. Here it
+ * is plain public API — {@link Window#setWidth(int)} plus
+ * {@link Minecraft#framebufferSizeChanged()}, the same call GLFW's framebuffer-size callback
+ * makes. That alone is not enough on 26.x, where it only recalculates the GUI scale, so
+ * {@code GameRenderer.resize} has to be driven alongside it — see {@code applySize}.
  *
  * <p>The capture spans two frames:
  * <ol>
@@ -27,7 +28,7 @@ import net.minecraft.client.Screenshot;
  * <p>The restore has to happen in the consumer rather than straight after the readback is
  * issued: {@code copyTextureToBuffer} does its {@code glReadPixels} into a buffer immediately
  * but finishes the work in a fenced task next frame, and restoring runs
- * {@code Framebuffer.resize}, which deletes the texture that task is still reading from.
+ * {@code RenderTarget.resize}, which deletes the texture that task is still reading from.
  *
  * <p>A failed readback owes the window the same restore and is under the same constraint, so it
  * is deferred to the head of the next frame too — see {@link #deferRestore()}.
@@ -104,7 +105,7 @@ public final class BigScreenshot {
 
 	/**
 	 * The modern {@code ScreenshotIncapable}: resizing runs {@code Screen.resize}, which the
-	 * manager turns into a full {@code clearAndInit} at an absurd scaled width; and with no world
+	 * manager turns into a full {@code rebuildWidgets} at an absurd scaled width; and with no world
 	 * {@code ChatMessages} is silent, so a multi-second freeze would come with no explanation at
 	 * all.
 	 */
@@ -113,7 +114,7 @@ public final class BigScreenshot {
 	}
 
 	/**
-	 * Head of {@code MinecraftClient.render}: applies the resize, puts the window back after a
+	 * Head of {@code Minecraft.renderFrame}: applies the resize, puts the window back after a
 	 * failed readback, or unsticks a stalled capture.
 	 */
 	public static void beforeFrame() {

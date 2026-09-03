@@ -102,8 +102,9 @@ public class VoxelCamClient implements ClientModInitializer {
 	}
 
 	/**
-	 * The contiguous run of square, icon-sized buttons vanilla centres above the
-	 * Options/Quit row, ordered left to right. Empty if nothing matches.
+	 * The lowest row of square, icon-sized buttons on the screen, ordered left to right.
+	 * Grouped by y alone: a gap in the middle is not checked for, and nothing ties the
+	 * match to vanilla's own row beyond its shape. Empty if nothing matches.
 	 */
 	private static List<AbstractWidget> findIconRow(Screen screen) {
 		Map<Integer, List<AbstractWidget>> rows = new HashMap<>();

@@ -88,8 +88,9 @@ public final class NativeShare {
 	/**
 	 * How long to wait for the reveal command before assuming it worked. Both
 	 * {@code open} and {@code explorer.exe} hand off to an already-running file
-	 * manager and return immediately, so anything still alive after this is
-	 * misbehaving rather than slow.
+	 * manager and return immediately, so a child still alive after this is unusual —
+	 * but that is not proof it failed, which is why {@link #runReveal} still credits
+	 * it rather than stacking a folder window on top of a slow reveal.
 	 */
 	private static final int REVEAL_TIMEOUT_SECONDS = 2;
 

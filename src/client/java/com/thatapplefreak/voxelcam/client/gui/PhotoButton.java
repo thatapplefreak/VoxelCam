@@ -6,12 +6,13 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 
 /**
- * Square camera button added to the title screen. Carries no label of its own,
- * the same way vanilla's icon-only buttons pass an empty message.
+ * Square camera button added to the title screen and the pause menu. Carries no
+ * label of its own, the same way vanilla's icon-only buttons pass an empty message.
  */
 public class PhotoButton extends Button {
 
@@ -30,9 +31,7 @@ public class PhotoButton extends Button {
 	public PhotoButton(int x, int y, OnPress onPress) {
 		super(x, y, SIZE, SIZE, CommonComponents.EMPTY, onPress, DEFAULT_NARRATION);
 		// Doubles as the narration, since the button has no message to read out.
-		// Text is spelled out in full because ButtonWidget has a nested class of
-		// that name, and an inherited member type shadows a single-type import.
-		setTooltip(Tooltip.create(net.minecraft.network.chat.Component.translatable("voxelcam.tooltip.openmanager")));
+		setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.openmanager")));
 	}
 
 	@Override

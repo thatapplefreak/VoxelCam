@@ -23,9 +23,16 @@ was left behind.
 **Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
 logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` was checked
 and does load outside the game; `./gradlew runClientGameTest` launches a real client and runs
-the Fabric client game tests in `src/gametest/java`, which cover the title-screen placement, the
-manager's render path, and both capture paths (including an in-world oversized capture asserted at
-exactly 2x the window). A game test failure fails the Gradle build.
+the Fabric client game tests in `src/gametest/java`, which cover the title-screen and pause-screen
+buttons, the manager's render path, both capture paths (including an in-world oversized capture
+asserted at exactly 2x the window), the share popup, and the rename dialog's focus, its failure
+path, and the selection following a rename.
+
+**`./gradlew build` does not run the client game tests.** `check` pulls in `test` and vanilla's
+server-side `runGameTest`; `runClientGameTest` is outside `build` entirely, and CI
+(`.github/workflows/`) gets both suites only by invoking `test`, `runClientGameTest` and `build` as
+three separate steps. A green `build` locally says nothing about the client tests — run the task by
+name.
 
 The client game test API is **not bundled in fabric-api** and is pinned separately in
 `gradle.properties` as `client_gametest_version`; its `+515ac5339e` build suffix is the one 26.2's
@@ -40,8 +47,11 @@ counts rather than the exit code.
 `CatboxUploaderTest` stubs catbox with a `com.sun.net.httpserver` server on loopback rather than
 touching the network, which is also the only way to reproduce its refusal-as-HTTP-200. Where a
 class wraps something untestable, the pattern has been to extract a package-private seam beside it
-(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`) rather than
-mock the world.
+(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`,
+`ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
+`ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`) rather
+than mock the world. The last two pairs live on `VoxelCamIO` rather than in the popup that uses them
+for exactly this reason.
 
 `SharePopupTest` presses only "Copy file path". The other three targets each escape a test: the save
 dialog blocks on a native window, revealing spawns the platform file manager, and the link button
@@ -148,13 +158,22 @@ scale; nothing in `Minecraft` resizes the main render target for you, so omittin
 `WindowEventHandler` entry point GLFW's own callback uses; `resizeGui` is a narrower GUI-only path
 and is **not** a substitute.
 
-Four things here are load-bearing and were each found the hard way:
+Five things here are load-bearing and were each found the hard way:
 
-- **The window restore has to happen inside the readback consumer.** `copyTextureToBuffer` does its
-  `glReadPixels` immediately but finishes in a `queueFencedTask` that runs next frame, and restoring
-  calls `Framebuffer.resize` → `delete()`, which would close the texture that task is still reading.
-  The consumer runs during `executePendingTasks()` *before* the next frame's clear, so nothing is
-  lost by waiting.
+- **No restore may run while a readback is outstanding, on either path.** `copyTextureToBuffer` does
+  its `glReadPixels` immediately but finishes in a `queueFencedTask` that runs next frame, and
+  restoring calls `RenderTarget.resize` → `destroyBuffers()`, which would close the texture it is still
+  reading. So the success path restores *inside* the readback consumer, which runs during
+  `executePendingTasks()` before the next frame's clear. Two corollaries that each cost a bug:
+  `beforeBlit`'s failure path may **not** restore on the spot either (vanilla has
+  `getColorTextureView()` on the stack there and `blitFromTexture` never checks `isClosed()`), so it
+  sets `RESTORE_PENDING` and the next frame's head does the resize; and `STALE_FRAMES` applies **only
+  to `CAPTURING`**. `AWAITING_READBACK` has no frame budget at all — only the consumer knows the GPU
+  is done, and an oversized window for a few extra frames beats tearing down a texture mid-read.
+- **Each readback carries a generation tag, and only the matching one may finish the capture.**
+  Consumers arrive from a fenced task with no other way of telling whether the capture they were
+  issued for is still in flight, so finishing on the strength of the state alone lets a late consumer
+  end somebody else's capture and restore the window to a size the newer one has not saved yet.
 - **Clamp to `RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize()` yourself.**
   `RenderTarget.createBuffers` (was `initFbo`) *throws* above it, and the window's target does not
   override `resize`, so its forgiving size search never runs on this path.
@@ -163,31 +182,44 @@ Four things here are load-bearing and were each found the hard way:
   one and every restore path leaves the window permanently huge.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
   `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
-  `clearAndInit`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
-  with no explanation.
+  `rebuildWidgets`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
+  with no explanation. The gate has to be checked **twice**: `request()` runs from
+  `RenderSystem.pollEvents()`, `beginCapture()` a whole tick later at the head of `renderFrame`, and a
+  disconnect or a screen opening in between would land the resize in exactly the state it forbids.
 
 The oversized frame is still presented for exactly one frame, so a single zoomed-corner frame is
 expected and not a bug. Sizes are session-only in `BigScreenshot`, never written to disk. PNG
-encoding runs on `Util.getIoWorkerExecutor()`, so `ScreenshotHandler.saving` clears in that task, not
+encoding runs on `Util.ioPool()`, so `ScreenshotHandler.saving` clears in that task, not
 at the call site, and its chat feedback is bounced back through `client.execute`.
 
 **Manager UI** — `GuiScreenShotManager` is the hub: `ScreenshotListWidget` (rows) on the left,
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
 rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display names.
 
-Two invariants that are easy to break:
+Four invariants that are easy to break:
 
 - **`ScreenshotImageCache` decodes off-thread but GPU uploads must happen on the render thread.**
   `GuiScreenShotManager.render()` calls `ScreenshotImageCache.uploadPending()` first for that reason.
   Its `extractRenderState()` must **not** call `extractBackground()` —
   `Screen.extractRenderStateWithTooltipAndSubtitles` already does, and the blur pass throws
   "Can only blur once per frame" if repeated.
+- **A decode already running cannot be cancelled, so it is tagged and discarded instead.** `IN_FLIGHT`
+  maps each key to a claim number rather than being a bare set, and every decode carries the cache
+  `generation` it was submitted under; `dispositionOf` is asked twice, on the loader thread before
+  queueing and on the render thread before uploading. Uploading a stale result registers a texture
+  nothing holds a handle on — `LOADED` is the only one — stranding it in `TextureManager` for the
+  session.
 - **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
-  manager overrides `refreshWidgetPositions()` to `clearAndInit()` so it rebuilds — that is what picks
+  manager overrides `repositionElements()` to `rebuildWidgets()` so it rebuilds — that is what picks
   up files renamed or deleted while a popup was open, not just resize handling.
+- **That rebuild is also why the manager's own `selected` field is not authoritative.** It predates
+  whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
+  and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the
+  list instead moves the player onto whichever screenshot the sort puts first — the one the next
+  Delete would be aimed at.
 
 **Sharing** — `SharePopup` offers four targets, none needing credentials: `NativeShare.saveCopy`
-(LWJGL `TinyFileDialogs` native Save-As, run on `Util.getIoWorkerExecutor()` because it blocks and
+(LWJGL `TinyFileDialogs` native Save-As, run on `Util.ioPool()` because it blocks and
 drives AppleScript on macOS), `NativeShare.revealInFileManager` (`open -R` / `explorer /select,`,
 falling back to opening the parent directory), `NativeShare.copyPath` (GLFW clipboard, **text only**),
 and `CatboxUploader` (catbox.moe, no key; it signals refusals with HTTP 200 plus an error body, so the
@@ -222,6 +254,13 @@ These cost real debugging time and are not guessable from the class names:
   any more, and no getter that returns one.
 - **`Minecraft` has no `getMainRenderTarget()`.** It is `Minecraft.gameRenderer.mainRenderTarget()`;
   `Minecraft.windowSurface()` is the swapchain, which is a different thing.
+- **To focus a text field on open, override the no-arg `setInitialFocus()`** — do not call
+  `setInitialFocus(field)` from `init()`. Both `Screen.init(int,int)` and `rebuildWidgets()` invoke
+  the no-arg hook *after* `init()` returns, and after a keyboard input it tab-navigates forward from
+  the already-focused field onto the next active widget, leaving the dialog inert. Vanilla's own
+  screens (`DirectJoinServerScreen`, `AnvilScreen`, `CreateWorldScreen`) all override the hook.
+  Keeping both would make the override a no-op: `AbstractWidget.nextFocusPath` returns null for an
+  already-focused widget.
 
 ## Conventions
 
@@ -230,6 +269,13 @@ alternative — not what the line does; match that rather than annotating mechan
 
 **`ChatMessages` silently does nothing when `client.player == null`**, which is the normal case since
 the manager is reachable from the title screen. New user-facing feedback belongs in the GUI, not chat.
+A refused rename keeps `RenamePopup` open with the typed name; a refused delete goes to the manager's
+details line via `reportDeleteResult`. Both add strings to **both** `en_us.json` and `en_pt.json`.
+
+**Anything parsed or written by the machine takes `Locale.ROOT` explicitly.** The default locale folds
+`"IMAX"` to a dotless `ı` under `tr`, and a bare `SimpleDateFormat` writes Arabic-Indic digits or a
+Buddhist year into a filename that later has to match an ASCII `\d` regex. Display strings that should
+follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.

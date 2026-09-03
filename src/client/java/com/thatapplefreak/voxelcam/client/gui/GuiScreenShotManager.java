@@ -31,7 +31,7 @@ public class GuiScreenShotManager extends Screen {
 	private static final int GAP = 6;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int CONTENT_TOP = 52;
-	/** Wide enough for the longest label ("Dims ↓") at the default GUI scale. */
+	/** Wide enough for the longest label ("Name ↓") at the default GUI scale. */
 	private static final int SORT_BUTTON_WIDTH = 54;
 	/** Matches the search bar and sort button's own height. */
 	private static final int FILTER_BUTTON_SIZE = 18;

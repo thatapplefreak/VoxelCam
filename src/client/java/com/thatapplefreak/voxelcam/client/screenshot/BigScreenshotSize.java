@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  */
 public final class BigScreenshotSize {
 
-	/** Nothing useful renders below this, and {@code Framebuffer.initFbo} dislikes tiny sizes. */
+	/** Nothing useful renders below this, and {@code RenderTarget.createBuffers} dislikes tiny sizes. */
 	private static final int MIN_EDGE = 16;
 
 	private static final Pattern ABSOLUTE = Pattern.compile("(\\d{1,6})[x*](\\d{1,6})");
@@ -100,8 +100,8 @@ public final class BigScreenshotSize {
 
 	/**
 	 * Turns the setting into the dimensions to render at, clamped to what the GPU
-	 * will actually allocate. The clamp is ours to apply: {@code Framebuffer.initFbo}
-	 * throws above {@code getMaxTextureSize()}, and {@code WindowFramebuffer} does not
+	 * will actually allocate. The clamp is ours to apply: {@code RenderTarget.createBuffers}
+	 * throws above the device's {@code maxTextureSize}, and {@code MainTarget} does not
 	 * override {@code resize}, so its forgiving size search never runs on this path.
 	 */
 	public Resolved resolve(Window window) {

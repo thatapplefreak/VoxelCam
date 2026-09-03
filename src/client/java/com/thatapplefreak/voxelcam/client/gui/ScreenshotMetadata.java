@@ -14,7 +14,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/** Cheap, cached file facts shown alongside screenshots. */
+/**
+ * File facts shown alongside screenshots. The reads that open the file — dimensions from the
+ * PNG header, the embedded capture context, the starred flag — are cached until
+ * {@link #forgetAll()}. {@link #fileSize(File)} and {@link #displayName(File)} are not: both
+ * stat the file on every call, once per visible row per frame.
+ */
 public final class ScreenshotMetadata {
 
 	public record Dimensions(int width, int height) {
@@ -113,7 +118,7 @@ public final class ScreenshotMetadata {
 		return name;
 	}
 
-	/** "14:32" for today, "Yesterday 14:32", otherwise "17 Aug, 14:32". */
+	/** "Today 14:32", "Yesterday 14:32", otherwise "17 Aug, 14:32". */
 	public static String relativeTime(File file) {
 		LocalDateTime when = modifiedAt(file);
 		LocalDate today = LocalDate.now();
