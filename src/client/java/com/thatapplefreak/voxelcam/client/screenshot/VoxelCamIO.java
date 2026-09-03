@@ -46,13 +46,41 @@ public final class VoxelCamIO {
 		screenShotFiles = files;
 	}
 
+	/**
+	 * Whether {@code newName} is already taken by a file other than {@code currentFile}.
+	 * A bare {@code exists()} probe answers yes for a case-only rename on macOS and Windows,
+	 * where the case variant resolves to the very file being renamed — so the popup would
+	 * refuse a rename that {@code File.renameTo} performs happily. {@link Files#isSameFile}
+	 * asks by file identity instead, which is false for that self-match on a
+	 * case-insensitive filesystem and still true for a genuine collision anywhere.
+	 * A candidate that cannot be compared counts as taken: refusing is the safe direction,
+	 * and the rename would fail anyway.
+	 */
+	public static boolean nameCollides(File screenshotsDir, String newName, File currentFile) {
+		File candidate = new File(screenshotsDir, newName + ".png");
+		if (!candidate.exists()) {
+			return false;
+		}
+		if (currentFile == null) {
+			return true;
+		}
+		try {
+			return !Files.isSameFile(candidate.toPath(), currentFile.toPath());
+		} catch (IOException e) {
+			return true;
+		}
+	}
+
 	/** Renames the selected screenshot, returning the new file (or null if it failed). */
 	public static File rename(File screenshotsDir, String newName) {
 		if (selected == null) {
 			return null;
 		}
 		File target = new File(screenshotsDir, newName + ".png");
-		if (target.equals(selected) || !selected.renameTo(target)) {
+		// The names, not the Files: WinNTFileSystem compares paths with
+		// compareToIgnoreCase, so File.equals would make this guard swallow the case-only
+		// rename it is not meant to catch — it only exists to refuse an unchanged name.
+		if (target.getName().equals(selected.getName()) || !selected.renameTo(target)) {
 			return null;
 		}
 		ScreenshotImageCache.release(selected);

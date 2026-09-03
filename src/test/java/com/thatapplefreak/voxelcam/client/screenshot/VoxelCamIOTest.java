@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.zip.CRC32;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -173,6 +174,65 @@ class VoxelCamIOTest {
 
 		assertNull(VoxelCamIO.rename(dir.toFile(), "sunset"));
 		assertTrue(original.exists());
+	}
+
+	@Test
+	void aFreeNameDoesNotCollide() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+
+		assertFalse(VoxelCamIO.nameCollides(dir.toFile(), "dawn", original));
+	}
+
+	@Test
+	void anotherFilesNameCollides() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		shot("dawn.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameCollides(dir.toFile(), "dawn", original));
+	}
+
+	/**
+	 * The case-only rename the popup used to refuse. It is only a probe worth making on a
+	 * case-insensitive volume (macOS, Windows) — where the candidate resolves to the very
+	 * file being renamed — so the assumption skips rather than passing vacuously elsewhere.
+	 */
+	@Test
+	void aCaseVariantOfTheFileItselfIsNotACollision() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		File candidate = dir.resolve("Sunset.png").toFile();
+		Assumptions.assumeTrue(candidate.exists(), "case-sensitive filesystem: nothing to reproduce here");
+
+		assertFalse(VoxelCamIO.nameCollides(dir.toFile(), "Sunset", original));
+	}
+
+	/**
+	 * A file that is no longer there cannot be compared for identity — isSameFile throws —
+	 * and the name really is another file's, so the answer has to stay yes rather than
+	 * letting the exception open the way to clobbering it.
+	 */
+	@Test
+	void aVanishedCurrentFileStillLeavesTheNameTaken() throws IOException {
+		File gone = dir.resolve("gone.png").toFile();
+		shot("dawn.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameCollides(dir.toFile(), "dawn", gone));
+	}
+
+	/**
+	 * Recapitalising is a real rename, not a no-op: the guard in {@link VoxelCamIO#rename}
+	 * compares names rather than {@code File}s so that it stays a no-op check on Windows,
+	 * where {@code File.equals} folds case and would refuse this outright.
+	 */
+	@Test
+	void renameToACaseVariantGoesThrough() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		VoxelCamIO.selectPhoto(original);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "Sunset");
+
+		assertEquals("Sunset.png", renamed.getName());
+		assertEquals(List.of("Sunset.png"), List.of(dir.toFile().list()));
+		assertEquals(renamed, VoxelCamIO.getSelectedPhoto());
 	}
 
 	@Test

@@ -18,6 +18,7 @@ public class RenamePopup extends Screen {
 
 	private final GuiScreenShotManager parent;
 	private final File screenshotsDir;
+	private final File currentFile;
 	private final String originalName;
 
 	private EditBox nameField;
@@ -27,6 +28,7 @@ public class RenamePopup extends Screen {
 		super(Component.translatable("voxelcam.rename"));
 		this.parent = parent;
 		this.screenshotsDir = screenshotsDir;
+		this.currentFile = currentFile;
 		this.originalName = currentFile.getName().replaceFirst("(?i)\\.png$", "");
 	}
 
@@ -80,7 +82,10 @@ public class RenamePopup extends Screen {
 		if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0) {
 			return "voxelcam.rename.invalid";
 		}
-		if (new File(screenshotsDir, name + ".png").exists()) {
+		// Not a bare exists() probe: on a case-insensitive filesystem the candidate for a
+		// case-only rename is the file being renamed, and reporting that as a collision
+		// leaves the player unable to ever recapitalise a name.
+		if (VoxelCamIO.nameCollides(screenshotsDir, name, currentFile)) {
 			return "voxelcam.rename.exists";
 		}
 		return null;
