@@ -21,14 +21,14 @@ public final class MultipartBody {
 
 	public MultipartBody addField(String name, String value) {
 		write("--" + boundary + CRLF
-				+ "Content-Disposition: form-data; name=\"" + name + "\"" + CRLF + CRLF
+				+ "Content-Disposition: form-data; name=\"" + quoted(name) + "\"" + CRLF + CRLF
 				+ value + CRLF);
 		return this;
 	}
 
 	public MultipartBody addFile(String name, String fileName, String contentType, byte[] content) {
 		write("--" + boundary + CRLF
-				+ "Content-Disposition: form-data; name=\"" + name + "\"; filename=\"" + fileName + "\"" + CRLF
+				+ "Content-Disposition: form-data; name=\"" + quoted(name) + "\"; filename=\"" + quoted(fileName) + "\"" + CRLF
 				+ "Content-Type: " + contentType + CRLF + CRLF);
 		out.write(content, 0, content.length);
 		write(CRLF);
@@ -42,6 +42,28 @@ public final class MultipartBody {
 		System.arraycopy(withoutTerminator, 0, body, 0, withoutTerminator.length);
 		System.arraycopy(terminator, 0, body, withoutTerminator.length, terminator.length);
 		return body;
+	}
+
+	/**
+	 * RFC 7578 §4.2 wants these parameters as quoted-strings, and a screenshot's name
+	 * is whatever the player typed — RenamePopup blocks only / \ and :, so a quote can
+	 * reach here and close the string early. Control characters have no escape inside a
+	 * quoted-string, so CR/LF and friends are dropped rather than encoded; leaving them
+	 * in would end the header line and reframe the part's header block.
+	 */
+	private static String quoted(String value) {
+		StringBuilder escaped = new StringBuilder(value.length());
+		for (int i = 0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			if (c < 0x20 || c == 0x7F) {
+				continue;
+			}
+			if (c == '"' || c == '\\') {
+				escaped.append('\\');
+			}
+			escaped.append(c);
+		}
+		return escaped.toString();
 	}
 
 	private void write(String text) {
