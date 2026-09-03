@@ -64,6 +64,7 @@
 	"voxelcam.delete.title": "Delete screenshot?",
 	"voxelcam.delete.confirm": "%s will be permanently deleted.",
 	"voxelcam.delete.confirm.generic": "This screenshot will be permanently deleted.",
+	"voxelcam.delete.failed": "Could not delete %s",
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",

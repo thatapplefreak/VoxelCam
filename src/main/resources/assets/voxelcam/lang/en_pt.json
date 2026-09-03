@@ -64,6 +64,7 @@
 	"voxelcam.delete.title": "Scuttle th' map?",
 	"voxelcam.delete.confirm": "%s'll be sent t' Davy Jones's locker, permanent-like.",
 	"voxelcam.delete.confirm.generic": "This map'll be sent t' Davy Jones's locker, permanent-like.",
+	"voxelcam.delete.failed": "Couldn't scuttle %s",
 
 	"voxelcam.rename.exists": "A map by that name already sails these waters",
 	"voxelcam.rename.invalid": "That name's got scallywag characters that ain't allowed",

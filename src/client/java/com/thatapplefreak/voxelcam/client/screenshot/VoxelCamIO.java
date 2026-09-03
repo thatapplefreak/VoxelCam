@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -79,13 +80,27 @@ public final class VoxelCamIO {
 		}
 	}
 
-	public static void delete() {
+	/**
+	 * Deletes the selected screenshot, reporting whether the file actually went.
+	 * {@code File.delete} signals a locked, read-only or otherwise undeletable file with a
+	 * bare false, so {@link Files#delete} is used for the reason and the failure is logged.
+	 * The list and the selection are only touched once the file is gone: the manager
+	 * re-lists the directory when a popup closes, so a row dropped from an optimistic
+	 * delete would silently come back with nothing to explain it.
+	 */
+	public static boolean delete() {
 		if (selected == null) {
-			return;
+			return false;
+		}
+		try {
+			Files.delete(selected.toPath());
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to delete {}", selected, e);
+			return false;
 		}
 		ScreenshotImageCache.release(selected);
-		selected.delete();
 		screenShotFiles.remove(selected);
 		selected = null;
+		return true;
 	}
 }
