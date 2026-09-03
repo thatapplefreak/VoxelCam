@@ -34,7 +34,14 @@ public final class ScreenshotImageCache {
 	private record Key(File file, boolean thumbnail) {
 	}
 
-	private record Decoded(Key key, NativeImage image) {
+	private record Decoded(Key key, NativeImage image, int generation) {
+	}
+
+	/** What {@link #uploadPending()} should do with one finished decode. */
+	enum Disposition {
+		UPLOAD,
+		FAIL,
+		DISCARD
 	}
 
 	/** Wide enough to stay sharp at high GUI scales; still ~1/400th of a full screenshot's pixels. */
@@ -45,8 +52,16 @@ public final class ScreenshotImageCache {
 	private static final Set<Key> FAILED = new HashSet<>();
 	private static final Queue<Decoded> DECODED = new ConcurrentLinkedQueue<>();
 
+	/**
+	 * Guards the handover of a finished decode: held while a loader thread decides whether
+	 * to queue its result, and while {@link #releaseAll()} invalidates and drains the queue.
+	 * Never held across a decode — the render thread must not end up waiting on file I/O.
+	 */
+	private static final Object HANDOVER = new Object();
+
 	private static ExecutorService executor;
 	private static int nextId = 0;
+	private static int generation = 0;
 
 	private ScreenshotImageCache() {
 	}
@@ -83,7 +98,27 @@ public final class ScreenshotImageCache {
 				return thread;
 			});
 		}
-		executor.execute(() -> DECODED.add(new Decoded(key, decode(key))));
+		// Read on the render thread and captured, not read from inside the lambda: the
+		// generation that matters is the one this decode was asked for, not whatever it
+		// has become by the time a loader thread gets round to running.
+		int submittedIn = generation;
+		executor.execute(() -> {
+			NativeImage image = decode(key);
+			// Only the manager drains the queue, and it may never open again this session,
+			// so a decode that outlived its generation has to free itself here rather than
+			// wait for a sweep that will not come. Freeing off the render thread is safe:
+			// NativeImage.close() is a native free, not a GL call, and decode() already
+			// closes the full-size image on this thread when it downscales.
+			synchronized (HANDOVER) {
+				if (dispositionOf(submittedIn, image != null) == Disposition.DISCARD) {
+					if (image != null) {
+						image.close();
+					}
+					return;
+				}
+				DECODED.add(new Decoded(key, image, submittedIn));
+			}
+		});
 	}
 
 	private static NativeImage decode(Key key) {
@@ -104,21 +139,71 @@ public final class ScreenshotImageCache {
 		}
 	}
 
+	/**
+	 * Decides what to do with a decode that has just landed. Asked twice: on the loader
+	 * thread before the result is queued, and again on the render thread before it is
+	 * uploaded, since the queue can be invalidated in between.
+	 *
+	 * <p>A decode already running on a loader thread cannot be cancelled, so
+	 * {@link #releaseAll()} can only mark it: anything submitted under an older
+	 * generation belongs to a cache that no longer exists. Uploading it would register a
+	 * texture that the reopened cache's own decode is about to displace from
+	 * {@link #LOADED} — and since {@code LOADED} is the only handle on a registered id,
+	 * that texture would then be stranded in {@code TextureManager} for the rest of the
+	 * session. Recording a stale failure would likewise re-poison {@link #FAILED} for a
+	 * file the next open may well be able to read.
+	 */
+	static Disposition dispositionOf(int decodeGeneration, boolean decodeSucceeded) {
+		if (decodeGeneration != generation) {
+			return Disposition.DISCARD;
+		}
+		return decodeSucceeded ? Disposition.UPLOAD : Disposition.FAIL;
+	}
+
 	/** Uploads images decoded since the last call. Must run on the render thread. */
 	public static void uploadPending() {
 		Decoded decoded;
 		while ((decoded = DECODED.poll()) != null) {
+			NativeImage image = decoded.image();
+			Disposition disposition = dispositionOf(decoded.generation(), image != null);
+			if (disposition == Disposition.DISCARD) {
+				// IN_FLIGHT is deliberately untouched: releaseAll() cleared it, so the key may
+				// already have been re-submitted, and that live decode still owns the entry.
+				if (image != null) {
+					image.close();
+				}
+				continue;
+			}
 			IN_FLIGHT.remove(decoded.key());
-			if (decoded.image() == null) {
+			if (disposition == Disposition.FAIL) {
 				FAILED.add(decoded.key());
 				continue;
 			}
-			NativeImage image = decoded.image();
 			Identifier id = Identifier.fromNamespaceAndPath(VoxelCamClient.MOD_ID, "screenshot_" + (nextId++));
-			// NativeImageBackedTexture takes ownership and closes the image itself.
-			Minecraft.getInstance().getTextureManager()
-					.register(id, new DynamicTexture(decoded.key().file()::getName, image));
-			LOADED.put(decoded.key(), new Loaded(id, image.getWidth(), image.getHeight()));
+			int width = image.getWidth();
+			int height = image.getHeight();
+			// DynamicTexture takes ownership and closes the image itself — but only once it
+			// exists, so before that, and if the register throws, freeing it is still on us.
+			DynamicTexture texture = null;
+			try {
+				texture = new DynamicTexture(decoded.key().file()::getName, image);
+				Minecraft.getInstance().getTextureManager().register(id, texture);
+			} catch (Exception e) {
+				VoxelCamClient.LOGGER.warn("Failed to upload screenshot {}", decoded.key().file(), e);
+				if (texture != null) {
+					texture.close();
+				} else {
+					image.close();
+				}
+				// Neither in flight nor loaded any more, so without this the next frame just
+				// asks for the same decode again.
+				FAILED.add(decoded.key());
+				continue;
+			}
+			Loaded previous = LOADED.put(decoded.key(), new Loaded(id, width, height));
+			if (previous != null) {
+				Minecraft.getInstance().getTextureManager().release(previous.id());
+			}
 		}
 	}
 
@@ -141,13 +226,22 @@ public final class ScreenshotImageCache {
 		LOADED.clear();
 		FAILED.clear();
 		IN_FLIGHT.clear();
-		// Anything decoded but never uploaded owns native memory that nothing else
-		// will free, so close it here rather than leaking it.
-		Decoded pending;
-		while ((pending = DECODED.poll()) != null) {
-			if (pending.image() != null) {
-				pending.image().close();
+		// Decodes still running on a loader thread outlive this call. Bumping the
+		// generation under the handover lock is what makes each of them free its own
+		// result; draining covers the ones that finished before the bump landed.
+		synchronized (HANDOVER) {
+			generation++;
+			Decoded pending;
+			while ((pending = DECODED.poll()) != null) {
+				if (pending.image() != null) {
+					pending.image().close();
+				}
 			}
 		}
+	}
+
+	/** The generation decodes submitted from now on will carry. */
+	static int generation() {
+		return generation;
 	}
 }
