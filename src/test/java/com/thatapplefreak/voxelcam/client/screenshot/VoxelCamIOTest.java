@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.zip.CRC32;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -176,8 +177,159 @@ class VoxelCamIOTest {
 	}
 
 	@Test
+	void aFreeNameDoesNotCollide() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+
+		assertFalse(VoxelCamIO.nameCollides(dir.toFile(), "dawn", original));
+	}
+
+	@Test
+	void anotherFilesNameCollides() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		shot("dawn.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameCollides(dir.toFile(), "dawn", original));
+	}
+
+	/**
+	 * The case-only rename the popup used to refuse. It is only a probe worth making on a
+	 * case-insensitive volume (macOS, Windows) — where the candidate resolves to the very
+	 * file being renamed — so the assumption skips rather than passing vacuously elsewhere.
+	 */
+	@Test
+	void aCaseVariantOfTheFileItselfIsNotACollision() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		File candidate = dir.resolve("Sunset.png").toFile();
+		Assumptions.assumeTrue(candidate.exists(), "case-sensitive filesystem: nothing to reproduce here");
+
+		assertFalse(VoxelCamIO.nameCollides(dir.toFile(), "Sunset", original));
+	}
+
+	/**
+	 * A file that is no longer there cannot be compared for identity — isSameFile throws —
+	 * and the name really is another file's, so the answer has to stay yes rather than
+	 * letting the exception open the way to clobbering it.
+	 */
+	@Test
+	void aVanishedCurrentFileStillLeavesTheNameTaken() throws IOException {
+		File gone = dir.resolve("gone.png").toFile();
+		shot("dawn.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameCollides(dir.toFile(), "dawn", gone));
+	}
+
+	/**
+	 * Recapitalising is a real rename, not a no-op: the guard in {@link VoxelCamIO#rename}
+	 * compares names rather than {@code File}s so that it stays a no-op check on Windows,
+	 * where {@code File.equals} folds case and would refuse this outright.
+	 */
+	@Test
+	void renameToACaseVariantGoesThrough() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		VoxelCamIO.selectPhoto(original);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "Sunset");
+
+		assertEquals("Sunset.png", renamed.getName());
+		assertEquals(List.of("Sunset.png"), List.of(dir.toFile().list()));
+		assertEquals(renamed, VoxelCamIO.getSelectedPhoto());
+	}
+
+	@Test
 	void renameWithNothingSelectedDoesNothing() {
 		assertNull(VoxelCamIO.rename(dir.toFile(), "whatever"));
+	}
+
+	/**
+	 * The failure the popup has to report. {@code renameTo} answers a source that another
+	 * program moved or deleted with a bare false and no exception, so null is the only
+	 * signal there is — and it has to be distinguishable from a rename that happened, or
+	 * the player is told nothing while the old name stays on screen.
+	 */
+	@Test
+	void renameOfAFileThatIsGoneFails() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		VoxelCamIO.selectPhoto(original);
+		Files.delete(original.toPath());
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dawn"));
+		// Nothing was created under the new name either: there is no half-done rename to
+		// leave the selection pointing at.
+		assertFalse(dir.resolve("dawn.png").toFile().exists());
+		assertEquals(original, VoxelCamIO.getSelectedPhoto());
+	}
+
+	/**
+	 * The manager holds its own copy of the selection and rebuilds itself whenever a popup
+	 * closes, so by the time it re-lists the directory its copy names the file the rename
+	 * moved away from. The newer file here is what makes that visible: the head of the list
+	 * is a screenshot the player never touched, and that is what the next Delete would aim
+	 * at.
+	 */
+	@Test
+	void selectionFollowsARenameTheScreenHasNotSeen() throws IOException {
+		File stale = shot("sunset.png", 1_000L);
+		File newest = shot("newest.png", 2_000L);
+		VoxelCamIO.selectPhoto(stale);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "dawn");
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		List<File> files = VoxelCamIO.getScreenShotFiles();
+
+		assertEquals(newest, files.get(0));
+		assertEquals(renamed, VoxelCamIO.selectionFor(files, stale));
+	}
+
+	/**
+	 * The case-only rename 995e05f enabled, re-listed. {@code File.equals} folds case on
+	 * Windows and does not elsewhere, so which of the two branches answers depends on the
+	 * filesystem — the assertion is that the recapitalised file is found either way rather
+	 * than falling through to the head of the list, and it compares Files, not names, for
+	 * the same reason.
+	 */
+	@Test
+	void selectionSurvivesACaseOnlyRename() throws IOException {
+		File original = shot("sunset.png", 1_000L);
+		shot("newest.png", 2_000L);
+		VoxelCamIO.selectPhoto(original);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "Sunset");
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(renamed, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), original));
+	}
+
+	/**
+	 * A selection that is still listed wins over the one here, which is what keeps a failed
+	 * delete's message pinned to the file it is about: that file is still on disk, and the
+	 * rebuild the popup's return triggers must not move off it.
+	 */
+	@Test
+	void aListedSelectionIsKeptOverTheOneInIO() throws IOException {
+		File shown = shot("shown.png", 1_000L);
+		File other = shot("other.png", 2_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(other);
+
+		assertEquals(shown, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), shown));
+	}
+
+	@Test
+	void withBothSelectionsGoneTheHeadOfTheListIsTaken() throws IOException {
+		File newest = shot("newest.png", 2_000L);
+		shot("oldest.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(dir.resolve("deleted-elsewhere.png").toFile());
+
+		assertEquals(newest,
+				VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), dir.resolve("also-gone.png").toFile()));
+	}
+
+	@Test
+	void anEmptyListSelectsNothing() {
+		VoxelCamIO.selectPhoto(dir.resolve("filtered-out.png").toFile());
+
+		assertNull(VoxelCamIO.selectionFor(List.of(), null));
 	}
 
 	@Test

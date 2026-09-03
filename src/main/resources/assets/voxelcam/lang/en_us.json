@@ -70,6 +70,7 @@
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
+	"voxelcam.rename.failed": "Could not rename this screenshot — try another name",
 
 	"voxelcam.bigshot.current": "Big screenshot size is %s. Shift+F2 to take one.",
 	"voxelcam.bigshot.set": "Big screenshot size set to %s",
