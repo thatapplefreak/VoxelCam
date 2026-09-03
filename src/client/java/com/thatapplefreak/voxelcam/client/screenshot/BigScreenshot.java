@@ -43,10 +43,13 @@ public final class BigScreenshot {
 	}
 
 	/**
-	 * Frames a capture may sit unfinished before the window size is put back by force.
-	 * Neither injection fires while the window is minimised, and another mod setting
+	 * Frames a resized capture may sit waiting for its blit before the window size is put back by
+	 * force. Neither injection fires while the window is minimised, and another mod setting
 	 * {@code skipGameRender} would skip the blit too — without this the window would stay
 	 * oversized for the rest of the session.
+	 *
+	 * <p>Both of those leave the capture in {@code CAPTURING}, where no readback has been issued
+	 * and a restore is safe. It deliberately does not apply to {@code AWAITING_READBACK}.
 	 */
 	private static final int STALE_FRAMES = 8;
 
@@ -59,6 +62,12 @@ public final class BigScreenshot {
 	private static int savedWidth;
 	private static int savedHeight;
 	private static int framesInState;
+
+	// Identifies the readback a consumer belongs to. Consumers arrive from a fenced task and
+	// carry no other way of telling whether the capture they were issued for is still the one
+	// in flight, so finishing on the strength of the state alone would let a late one end
+	// somebody else's capture.
+	private static int readback;
 
 	private BigScreenshot() {
 	}
@@ -113,11 +122,19 @@ public final class BigScreenshot {
 			}
 			case REQUESTED -> beginCapture();
 			case RESTORE_PENDING -> finish();
-			case CAPTURING, AWAITING_READBACK -> {
+			case CAPTURING -> {
 				if (++framesInState > STALE_FRAMES) {
-					VoxelCamClient.LOGGER.warn("Big screenshot stalled in {}, restoring window size", state);
+					VoxelCamClient.LOGGER.warn("Big screenshot stalled before its blit, restoring window size");
 					finish();
 				}
+			}
+			// A readback in flight is waited out however long it takes, at no frame budget at all:
+			// finish() resizes the main render target, which closes the colour texture the
+			// outstanding copyTextureToBuffer is still sourcing from — the same hazard the restore
+			// is deferred into the consumer to avoid. An imax capture moves ~280 MB across the bus
+			// and can outlast any count worth picking, and only the consumer knows the GPU is done,
+			// so an oversized window for a few more frames is the cheaper of the two failures.
+			case AWAITING_READBACK -> {
 			}
 		}
 	}
@@ -127,12 +144,12 @@ public final class BigScreenshot {
 		if (state != State.CAPTURING) {
 			return;
 		}
-		state = State.AWAITING_READBACK;
-		framesInState = 0;
+		int issued = beginReadback();
 
 		Minecraft client = Minecraft.getInstance();
 		try {
-			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), BigScreenshot::onImageReady);
+			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(),
+					image -> onImageReady(issued, image));
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
@@ -153,6 +170,27 @@ public final class BigScreenshot {
 	static void deferRestore() {
 		state = State.RESTORE_PENDING;
 		framesInState = 0;
+	}
+
+	/** Hands the frame to a readback, returning the tag its consumer has to come back with. */
+	static int beginReadback() {
+		state = State.AWAITING_READBACK;
+		framesInState = 0;
+		return ++readback;
+	}
+
+	/**
+	 * Ends the capture the given readback was issued for, if it is still the one in flight.
+	 *
+	 * <p>The tag is what makes a late consumer harmless. Nothing abandons an outstanding readback
+	 * any more, but a consumer that arrives after its own capture ended some other way would
+	 * otherwise reset the state mid-capture and restore the window to a size a newer capture has
+	 * not saved yet, silently swallowing that newer shot.
+	 */
+	static void completeReadback(int issued) {
+		if (issued == readback && state == State.AWAITING_READBACK) {
+			finish();
+		}
 	}
 
 	private static void beginCapture() {
@@ -191,10 +229,11 @@ public final class BigScreenshot {
 		}
 	}
 
-	private static void onImageReady(NativeImage image) {
+	private static void onImageReady(int issued, NativeImage image) {
 		// Restore before anything else: the fenced task that built this image is done with the
-		// oversized texture only now, and finish() deletes it.
-		finish();
+		// oversized texture only now, and finish() deletes it. The image is saved either way —
+		// it is a finished capture even if the state machine has moved past it.
+		completeReadback(issued);
 		ScreenshotHandler.saveCapturedImage(image);
 	}
 
