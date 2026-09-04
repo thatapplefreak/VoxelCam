@@ -11,14 +11,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * File facts shown alongside screenshots. The reads that open the file — dimensions from the
- * PNG header, the embedded capture context, the starred flag — are cached until
- * {@link #forgetAll()}. {@link #fileSize(File)} and {@link #displayName(File)} are not: both
- * stat the file on every call, once per visible row per frame.
+ * File facts shown alongside screenshots. Every one of them is cached per file — the reads
+ * that open the file (dimensions from the PNG header, the embedded capture context, the
+ * starred flag) and the two that only stat it ({@link #fileSize(File)},
+ * {@link #displayName(File)}). All five are asked for once per visible row per extracted
+ * frame, so none of them may touch the disk twice for the same file.
+ *
+ * <p>Entries live until the manager closes and calls {@link #forgetAll()}; the one thing that
+ * rewrites a listed screenshot in place while it is open is the star toggle, which calls
+ * {@link #forget(File)} afterwards. Renaming or capturing produces a different {@code File}
+ * key, so a rebuilt list reads those afresh without any eviction.
  */
 public final class ScreenshotMetadata {
 
@@ -28,6 +35,8 @@ public final class ScreenshotMetadata {
 	private static final Map<File, Dimensions> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
+	private static final Map<File, String> NAMES = new HashMap<>();
+	private static final Map<File, String> SIZES = new HashMap<>();
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
 
@@ -97,11 +106,20 @@ public final class ScreenshotMetadata {
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
 		STARRED.clear();
+		NAMES.clear();
+		SIZES.clear();
 	}
 
-	/** Drops one file's cached starred flag after {@code Favorite.setStarred} rewrites it. */
+	/**
+	 * Drops one file's cached facts after {@code Favorite.setStarred} rewrites it. The star is
+	 * a tEXt chunk written into the PNG itself, so the rewrite also changes the file's length
+	 * and its modification time — the cached size and display name have to go with the flag or
+	 * the caption keeps quoting the pre-toggle bytes.
+	 */
 	public static void forget(File file) {
 		STARRED.remove(file);
+		NAMES.remove(file);
+		SIZES.remove(file);
 	}
 
 	/**
@@ -109,16 +127,30 @@ public final class ScreenshotMetadata {
 	 * to be trimmed to uselessness in a list row, and the raw timestamp is noise
 	 * anyway. Those get shown as a friendly time; anything the user renamed is shown
 	 * verbatim, since they chose it.
+	 *
+	 * <p>Cached the same way {@link #dimensions(File)} is: a capture name routes to
+	 * {@link #relativeTime(File)}, which stats the file, and this is asked for every visible
+	 * row every frame. The cost of that is a label that still reads "Today" if the manager is
+	 * left open across midnight, which lasts until the manager closes.
 	 */
 	public static String displayName(File file) {
-		String name = file.getName().replaceFirst("(?i)\\.png$", "");
-		if (name.matches("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?")) {
-			return relativeTime(file);
+		String cached = NAMES.get(file);
+		if (cached != null) {
+			return cached;
 		}
-		return name;
+		String name = file.getName().replaceFirst("(?i)\\.png$", "");
+		String display = name.matches("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?")
+				? relativeTime(file)
+				: name;
+		NAMES.put(file, display);
+		return display;
 	}
 
-	/** "Today 14:32", "Yesterday 14:32", otherwise "17 Aug, 14:32". */
+	/**
+	 * "Today 14:32", "Yesterday 14:32", otherwise "17 Aug, 14:32". Deliberately left as an
+	 * uncached formatting primitive — {@link #displayName(File)} is the per-frame caller and
+	 * caches its own result, so a caller that wants a freshly stat'd label still has one.
+	 */
 	public static String relativeTime(File file) {
 		LocalDateTime when = modifiedAt(file);
 		LocalDate today = LocalDate.now();
@@ -135,14 +167,27 @@ public final class ScreenshotMetadata {
 		return LocalDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.systemDefault());
 	}
 
+	/**
+	 * Cached the same way {@link #dimensions(File)} is, for the same reason: the list row and
+	 * the preview caption both ask for this on every extracted frame, and {@code File} caches
+	 * nothing, so each call is a fresh stat. {@code Locale.ROOT} because the caption sits next
+	 * to the "1920×1080" the PNG header gives, which has no locale either.
+	 */
 	public static String fileSize(File file) {
+		String cached = SIZES.get(file);
+		if (cached != null) {
+			return cached;
+		}
 		long bytes = file.length();
+		String size;
 		if (bytes < 1024) {
-			return bytes + " B";
+			size = bytes + " B";
+		} else if (bytes < 1024 * 1024) {
+			size = String.format(Locale.ROOT, "%.0f KB", bytes / 1024.0);
+		} else {
+			size = String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
 		}
-		if (bytes < 1024 * 1024) {
-			return String.format("%.0f KB", bytes / 1024.0);
-		}
-		return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
+		SIZES.put(file, size);
+		return size;
 	}
 }

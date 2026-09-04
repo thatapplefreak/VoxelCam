@@ -33,8 +33,35 @@ class ScreenshotMetadataTest {
 
 	@BeforeEach
 	void reset() {
-		// Dimensions are cached per File for the life of the process.
+		// Every fact here is cached per File for the life of the process.
 		ScreenshotMetadata.forgetAll();
+	}
+
+	/**
+	 * The point of the caches is that the render thread stops stat'ing files it already
+	 * measured, so the tests below count the stat rather than time it. {@code File} is not
+	 * final and neither are these two methods, which is the cheapest honest counter available.
+	 */
+	private static final class CountingFile extends File {
+
+		int lengths;
+		int modifiedTimes;
+
+		CountingFile(File of) {
+			super(of.getPath());
+		}
+
+		@Override
+		public long length() {
+			lengths++;
+			return super.length();
+		}
+
+		@Override
+		public long lastModified() {
+			modifiedTimes++;
+			return super.lastModified();
+		}
 	}
 
 	/** A real PNG header: signature, then an IHDR chunk carrying width and height. */
@@ -109,6 +136,56 @@ class ScreenshotMetadataTest {
 		assertEquals("1 KB", ScreenshotMetadata.fileSize(sized("c.png", 1024)));
 		assertEquals("100 KB", ScreenshotMetadata.fileSize(sized("d.png", 1024 * 100)));
 		assertEquals("1.0 MB", ScreenshotMetadata.fileSize(sized("e.png", 1024 * 1024)));
+	}
+
+	/** A row's size and a row's name are asked for once per frame; neither may re-stat. */
+	@Test
+	void repeatedLookupsStatTheFileOnlyOnce() throws IOException {
+		CountingFile file = new CountingFile(sized("2026-08-27_10.00.00.png", 4096));
+
+		String size = ScreenshotMetadata.fileSize(file);
+		String name = ScreenshotMetadata.displayName(file);
+		for (int frame = 0; frame < 10; frame++) {
+			assertEquals(size, ScreenshotMetadata.fileSize(file));
+			assertEquals(name, ScreenshotMetadata.displayName(file));
+		}
+
+		assertEquals(1, file.lengths);
+		assertEquals(1, file.modifiedTimes);
+	}
+
+	/** A renamed file is shown verbatim, so it should never have been stat'd at all. */
+	@Test
+	void aRenamedFileIsNamedWithoutStattingIt() throws IOException {
+		CountingFile file = new CountingFile(sized("sunset over base.png", 1));
+
+		assertEquals("sunset over base", ScreenshotMetadata.displayName(file));
+
+		assertEquals(0, file.modifiedTimes);
+	}
+
+	/**
+	 * Starring rewrites the PNG in place, which changes both its length and its modification
+	 * time. {@code forget} is what the manager calls afterwards, so it has to drop the size
+	 * and the name along with the flag or the caption keeps quoting the pre-toggle bytes.
+	 */
+	@Test
+	void forgetDropsTheCachedSizeAndNameSoARewriteIsPickedUp() throws IOException {
+		File file = sized("2026-08-27_10.00.00.png", 512);
+		assertEquals("512 B", ScreenshotMetadata.fileSize(file));
+		String before = ScreenshotMetadata.displayName(file);
+
+		Files.write(file.toPath(), new byte[2048]);
+		assertTrue(file.setLastModified(LocalDateTime.now().minusDays(40)
+				.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+		assertEquals("512 B", ScreenshotMetadata.fileSize(file));
+		assertEquals(before, ScreenshotMetadata.displayName(file));
+
+		ScreenshotMetadata.forget(file);
+
+		assertEquals("2 KB", ScreenshotMetadata.fileSize(file));
+		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(file));
 	}
 
 	/**
