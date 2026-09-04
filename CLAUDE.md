@@ -226,6 +226,16 @@ and `CatboxUploader` (catbox.moe, no key; it signals refusals with HTTP 200 plus
 response is validated by checking for a `https://` prefix). `MultipartBody` exists because
 `java.net.http` ships no multipart publisher.
 
+The image is never read into the heap: `MultipartBody.streamFile` hands back only the framing either
+side of the file part, and `CatboxUploader` splices the file in with
+`BodyPublishers.concat(ofByteArray, ofFile, ofByteArray)` so the read happens on the HTTP client's
+executor rather than on the thread that pressed the button. That leaves `MultipartBody.addFile`
+without a production caller — it stays deliberately, as the oracle
+`MultipartBodyTest.streamedFramingSplicesBackIntoTheBufferedBody` compares the streamed halves
+against, which is what keeps one set of byte-for-byte framing tests covering the shipped path.
+`ofFile` checks existence eagerly, so a missing file still fails the future before any request is
+sent.
+
 **Title-screen button** — `VoxelCamClient` registers `ScreenEvents.AFTER_INIT` and appends a
 `PhotoButton` via `Screens.getWidgets(screen).add(...)`. It goes in vanilla's row of square icon
 buttons (friends, language, accessibility), found **by shape at runtime** — square and
