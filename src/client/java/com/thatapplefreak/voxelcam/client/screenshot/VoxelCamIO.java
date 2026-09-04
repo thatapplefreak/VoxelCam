@@ -28,21 +28,32 @@ public final class VoxelCamIO {
 		return selected;
 	}
 
-	/** Lists .png files in the directory, ordered by {@link SortMode#current()}, filtered by a case-insensitive name match. */
+	/**
+	 * Lists .png files in the directory, ordered by {@link SortMode#current()}, filtered by a
+	 * case-insensitive name match.
+	 *
+	 * This runs on the render thread from {@code GuiScreenShotManager.init()}, which is re-run
+	 * for every search keystroke and every window-resize event, so what it does per entry is
+	 * paid tens of times during a window drag. That is why the name is lowercased once rather
+	 * than per predicate, why the sort is {@link SortMode#sort} rather than a comparator, and
+	 * why the extension test is not backed up by an {@code isFile()} guard: that would stat
+	 * every entry — including under the name modes, which otherwise touch the disk not at all
+	 * — to exclude a directory someone named {@code something.png}. Such a directory is listed
+	 * and refuses to be deleted, which {@code VoxelCamIOTest} relies on.
+	 */
 	public static void updateScreenShotFilesList(File screenshotsDir, String filter) {
 		File[] filesInDir = screenshotsDir.listFiles();
 		String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
 		List<File> files = new ArrayList<>();
 		if (filesInDir != null) {
 			for (File file : filesInDir) {
-				String name = file.getName();
-				if (name.toLowerCase(Locale.ROOT).endsWith(".png")
-						&& name.toLowerCase(Locale.ROOT).contains(needle)) {
+				String name = file.getName().toLowerCase(Locale.ROOT);
+				if (name.endsWith(".png") && name.contains(needle)) {
 					files.add(file);
 				}
 			}
 		}
-		files.sort(SortMode.current().comparator());
+		SortMode.current().sort(files);
 		screenShotFiles = files;
 	}
 
