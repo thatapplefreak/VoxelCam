@@ -6,7 +6,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -38,23 +37,28 @@ public final class CatboxUploader {
 	 * including catbox's habit of refusing with a 200.
 	 */
 	static CompletableFuture<String> upload(File image, URI endpoint) {
-		byte[] body;
-		String contentType;
+		MultipartBody multipart = new MultipartBody().addField("reqtype", "fileupload");
+		MultipartBody.Streamed framing = multipart.streamFile("fileToUpload", image.getName(), "image/png");
+
+		// The image is published straight from disk rather than read here: an oversized
+		// capture is tens of megabytes, and this runs on the thread that pressed the
+		// button. ofFile leaves the read to the client's own executor, so the only
+		// blocking work left on the caller is its existence check.
+		HttpRequest.BodyPublisher body;
 		try {
-			MultipartBody multipart = new MultipartBody()
-					.addField("reqtype", "fileupload")
-					.addFile("fileToUpload", image.getName(), "image/png", Files.readAllBytes(image.toPath()));
-			body = multipart.build();
-			contentType = multipart.contentType();
+			body = HttpRequest.BodyPublishers.concat(
+					HttpRequest.BodyPublishers.ofByteArray(framing.prologue()),
+					HttpRequest.BodyPublishers.ofFile(image.toPath()),
+					HttpRequest.BodyPublishers.ofByteArray(framing.epilogue()));
 		} catch (IOException e) {
 			return CompletableFuture.failedFuture(e);
 		}
 
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(endpoint)
-				.header("Content-Type", contentType)
+				.header("Content-Type", multipart.contentType())
 				.timeout(TIMEOUT)
-				.POST(HttpRequest.BodyPublishers.ofByteArray(body))
+				.POST(body)
 				.build();
 
 		return CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
