@@ -139,6 +139,34 @@ class ScreenshotMetadataTest {
 		assertNull(ScreenshotMetadata.dimensions(null));
 	}
 
+	/**
+	 * A failed header read has to be remembered too, or the one file that can never answer is
+	 * the one reopened per row per extracted frame. Counting the opens is not available here:
+	 * the read goes through {@code FileInputStream}, whose only seam on {@code File} is
+	 * {@code getPath}, and the cache's own map lookup hashes through that as well. Repairing
+	 * the bytes on disk and still reading "unknown" pins the same thing behaviourally — only a
+	 * remembered failure can explain a valid PNG answering as unknown.
+	 */
+	@Test
+	void aFailedHeaderReadIsNotRetried() throws IOException {
+		Files.write(dir.resolve("broken.png"), new byte[0]);
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		png("broken.png", 640, 360);
+
+		// A fresh File, so this pins an entry keyed by path rather than by identity.
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		// The star toggle's eviction leaves it alone: starring cannot repair an IHDR.
+		ScreenshotMetadata.forget(dir.resolve("broken.png").toFile());
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		// Nothing is poisoned for good, though — closing the manager clears it and it reads.
+		ScreenshotMetadata.forgetAll();
+		assertEquals(new ScreenshotMetadata.Dimensions(640, 360),
+				ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+	}
+
 	@Test
 	void fileSizeSwitchesUnitsAtTheThresholds() throws IOException {
 		assertEquals("512 B", ScreenshotMetadata.fileSize(sized("a.png", 512)));

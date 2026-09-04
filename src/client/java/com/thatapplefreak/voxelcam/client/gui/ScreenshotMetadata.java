@@ -25,6 +25,10 @@ import java.util.Optional;
  * the same frame — dimensions, size and context for the preview caption,
  * {@link #isStarred(File)} for the favorite button's tint.
  *
+ * <p>A read that failed is cached as well, as an absent answer — the file that cannot be read
+ * is the one whose retry costs the most, and a half-finished save is exactly what leaves one
+ * in the folder. {@code ScreenshotImageCache.FAILED} takes the same line with a decode.
+ *
  * <p>Entries live until the manager closes and calls {@link #forgetAll()}; the one thing that
  * rewrites a listed screenshot in place while it is open is the star toggle, which calls
  * {@link #forget(File)} afterwards. Renaming or capturing produces a different {@code File}
@@ -35,7 +39,7 @@ public final class ScreenshotMetadata {
 	public record Dimensions(int width, int height) {
 	}
 
-	private static final Map<File, Dimensions> DIMENSIONS = new HashMap<>();
+	private static final Map<File, Optional<Dimensions>> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final Map<File, String> NAMES = new HashMap<>();
@@ -49,31 +53,35 @@ public final class ScreenshotMetadata {
 	/**
 	 * Reads width/height from the PNG IHDR chunk. Decoding the whole image just to
 	 * learn its size would be far more expensive, and this runs for every visible row.
+	 *
+	 * <p>A header that would not read is remembered as absent rather than left uncached. A
+	 * 0-byte or truncated {@code .png} throws out of the header read every time, so retrying
+	 * costs an open, an {@code EOFException} built with its stack trace, and a close — per
+	 * visible row per extracted frame, on the render thread, for the one file that is
+	 * guaranteed never to answer.
 	 */
 	public static Dimensions dimensions(File file) {
 		if (file == null) {
 			return null;
 		}
-		Dimensions cached = DIMENSIONS.get(file);
+		Optional<Dimensions> cached = DIMENSIONS.get(file);
 		if (cached != null) {
-			return cached;
+			return cached.orElse(null);
 		}
 		PngDimensions.Dimensions read = PngDimensions.read(file);
-		if (read == null) {
-			return null;
-		}
-		Dimensions dimensions = new Dimensions(read.width(), read.height());
-		DIMENSIONS.put(file, dimensions);
+		Dimensions dimensions = read == null ? null : new Dimensions(read.width(), read.height());
+		DIMENSIONS.put(file, Optional.ofNullable(dimensions));
 		return dimensions;
 	}
 
 	/**
 	 * Reads back the tags {@code CaptureContext.toTags()} writes at capture time, cached the
-	 * same way {@link #dimensions(File)} is — including the negative case, since unlike
-	 * dimensions() this reads the whole file. Files captured before this feature shipped, or
-	 * by vanilla F2, or by another mod sharing the folder, simply have no tags — this returns
-	 * null for those rather than a half-built context, and caches that so the preview pane
-	 * doesn't re-read the whole file every frame it stays selected.
+	 * same way {@link #dimensions(File)} is, absent answers included — and this one reads the
+	 * whole file to produce them. The absence here is the ordinary answer rather than a fault:
+	 * files captured before this feature shipped, or by vanilla F2, or by another mod sharing
+	 * the folder, simply have no tags — this returns null for those rather than a half-built
+	 * context, and caches that so the preview pane doesn't re-read the whole file every frame
+	 * it stays selected.
 	 */
 	public static CaptureContext captureContext(File file) {
 		if (file == null) {
@@ -118,9 +126,14 @@ public final class ScreenshotMetadata {
 
 	/**
 	 * Drops one file's cached facts after {@code Favorite.setStarred} rewrites it. The star is
-	 * a tEXt chunk written into the PNG itself, so the rewrite also changes the file's length
-	 * and its modification time — the cached size and display name have to go with the flag or
-	 * the caption keeps quoting the pre-toggle bytes.
+	 * an {@code iTXt} chunk written into the PNG itself, so the rewrite also changes the file's
+	 * length and its modification time — the cached size and display name have to go with the
+	 * flag or the caption keeps quoting the pre-toggle bytes.
+	 *
+	 * <p>Dimensions and capture context deliberately stay, a cached failure included: the
+	 * toggle splices its chunk in after the IHDR without touching either the IHDR or the
+	 * capture tags, and it cannot turn a file whose header would not read into one that will.
+	 * {@link #forgetAll()} on manager close is what gives a failed read another chance.
 	 */
 	public static void forget(File file) {
 		STARRED.remove(file);
