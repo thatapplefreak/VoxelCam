@@ -64,9 +64,19 @@ public final class ScreenshotImageCache {
 	 * them. Thumbnails need no such cap: the list only asks for the rows the viewport shows,
 	 * and at 128px wide they are ~1/400th of the pixels each.
 	 *
-	 * <p>Three rather than one because selection moves a row at a time: keeping the
-	 * neighbours makes arrowing back and forth between two shots free, and three 4K previews
-	 * are still under 100 MiB of each. Anything older is cheap to decode again.
+	 * <p>Three rather than one because selection moves a row at a time, so keeping the
+	 * neighbours makes arrowing back and forth between two shots free. Three is also one
+	 * more than the loader pool's two threads: the entry being drawn plus every decode that
+	 * can be in flight behind it, so a frame draining several landings at once cannot evict
+	 * the preview {@link #get} is about to be asked for. Anything older is cheap to decode
+	 * again.
+	 *
+	 * <p>What this bounds is growth, not peak, because it counts entries rather than bytes:
+	 * three 4K previews are under 100 MiB of each, but the mod's own oversized captures are
+	 * an order of magnitude heavier — an 8192x8192 one is ~268 MiB of each, so a folder of
+	 * those still reaches ~1.6 GiB at the cap. A byte budget was not chosen over a count
+	 * because at that size it degenerates to holding one preview and none of its
+	 * neighbours, which is the arrowing case this cap exists to keep free.
 	 */
 	static final int MAX_FULL_SIZE = 3;
 

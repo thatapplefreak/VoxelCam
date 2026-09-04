@@ -24,7 +24,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The full-size cap is the other decision the upload path hangs off, and it is checked here
  * the same way: which files fall out of the budget is worked out apart from the releasing, so
- * the order can be driven without a texture manager to release into.
+ * the order can be driven without a texture manager to release into. Its transitions are
+ * checked one at a time and then once over a whole folder walk, since the failure the cap
+ * exists to prevent is cumulative and a per-step check cannot see it.
  *
  * <p>{@link ScreenshotImageCache#releaseAll()} and {@link ScreenshotImageCache#release(File)}
  * touch no Minecraft state while nothing is loaded, which is why they can be called from here
@@ -180,6 +182,36 @@ class ScreenshotImageCacheTest {
 		ScreenshotImageCache.release(files.get(0));
 
 		assertEquals(List.of(), ScreenshotImageCache.retainFullSize(files.get(ScreenshotImageCache.MAX_FULL_SIZE)));
+	}
+
+	/**
+	 * The manager's own scenario, which the single-step tests above do not cover between
+	 * them: arrowing the selection down a long folder, one full-size request per row. What
+	 * used to happen is that every row ever highlighted kept its texture until the manager
+	 * closed, so the walk is checked in aggregate rather than a step at a time.
+	 *
+	 * <p>Residency is derived from what the walk reported rather than read out of the cache,
+	 * because the reported list is all the caller has to release with: an entry dropped from
+	 * the cap without being named would leave the derived count climbing past the cap while
+	 * its texture sat in {@code TextureManager} for the session, which is the leak this whole
+	 * cap exists to stop. Naming one twice is the mirror failure — a double release.
+	 */
+	@Test
+	void walkingAWholeFolderNamesEachPassedFileExactlyOnce() {
+		ScreenshotImageCache.releaseAll();
+		int rows = ScreenshotImageCache.MAX_FULL_SIZE * 4;
+		List<File> files = files(rows);
+
+		List<File> evicted = new ArrayList<>();
+		for (int i = 0; i < rows; i++) {
+			evicted.addAll(ScreenshotImageCache.retainFullSize(files.get(i)));
+			assertTrue(i + 1 - evicted.size() <= ScreenshotImageCache.MAX_FULL_SIZE,
+					"after " + (i + 1) + " selections the cap held " + (i + 1 - evicted.size()));
+		}
+
+		// Least recently used first means the walk sheds its rows in the order it visited
+		// them, and the last MAX_FULL_SIZE are the ones still resident at the end.
+		assertEquals(files.subList(0, rows - ScreenshotImageCache.MAX_FULL_SIZE), evicted);
 	}
 
 	/** The files need not exist: nothing here reads them. */
