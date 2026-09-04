@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * File facts shown alongside screenshots. Every one of them is cached per file — the reads
@@ -46,6 +47,15 @@ public final class ScreenshotMetadata {
 	private static final Map<File, String> SIZES = new HashMap<>();
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
+	// String.replaceFirst and String.matches compile a fresh Pattern on every call. The
+	// NAMES cache means that is a compile per file rather than per frame, but the fill path
+	// still runs for every file whose row is scrolled into view, once per manager session —
+	// a large folder browsed end to end is a thousand throwaway compiles for two constants.
+	private static final Pattern PNG_SUFFIX = Pattern.compile("(?i)\\.png$");
+	// Deliberately no UNICODE_CHARACTER_CLASS: ScreenshotNamer stamps its timestamp with
+	// Locale.ROOT precisely because this is an ASCII-only \d test, and widening it here
+	// would quietly start matching names ScreenshotNamer can never produce.
+	private static final Pattern CAPTURE_NAME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?");
 
 	private ScreenshotMetadata() {
 	}
@@ -157,8 +167,8 @@ public final class ScreenshotMetadata {
 		if (cached != null) {
 			return cached;
 		}
-		String name = file.getName().replaceFirst("(?i)\\.png$", "");
-		String display = name.matches("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?")
+		String name = PNG_SUFFIX.matcher(file.getName()).replaceFirst("");
+		String display = CAPTURE_NAME.matcher(name).matches()
 				? relativeTime(file)
 				: name;
 		NAMES.put(file, display);

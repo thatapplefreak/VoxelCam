@@ -249,6 +249,22 @@ class ScreenshotMetadataTest {
 		assertEquals("holiday", ScreenshotMetadata.displayName(sized("holiday.PNG", 1)));
 	}
 
+	/**
+	 * The only case that runs both patterns in order: the extension has to come off
+	 * case-insensitively before the timestamp is matched, or the timestamp test sees a
+	 * trailing ".PNG" and the row falls back to showing the raw stamp. Tolerant about
+	 * which friendly label comes out, like the capture-name test above — the point is
+	 * only that it is not the filename.
+	 */
+	@Test
+	void anUppercaseExtensionStillLeavesACaptureNameRecognisable() throws IOException {
+		File capture = sized("2026-08-27_10.00.00.PNG", 1);
+
+		assertTrue(ScreenshotMetadata.displayName(capture)
+						.matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(capture));
+	}
+
 	@Test
 	void relativeTimeLabelsTodayAndYesterday() throws IOException {
 		File file = sized("x.png", 1);
