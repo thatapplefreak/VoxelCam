@@ -40,12 +40,16 @@ class ScreenshotMetadataTest {
 	/**
 	 * The point of the caches is that the render thread stops stat'ing files it already
 	 * measured, so the tests below count the stat rather than time it. {@code File} is not
-	 * final and neither are these two methods, which is the cheapest honest counter available.
+	 * final and neither are these three methods, which is the cheapest honest counter
+	 * available. {@code toPath} stands in for the whole-file reads: {@code PngTextChunk.read}
+	 * reaches the bytes through {@code Files.readAllBytes(file.toPath())}, so one call there
+	 * is one full read of the PNG.
 	 */
 	private static final class CountingFile extends File {
 
 		int lengths;
 		int modifiedTimes;
+		int contentReads;
 
 		CountingFile(File of) {
 			super(of.getPath());
@@ -61,6 +65,12 @@ class ScreenshotMetadataTest {
 		public long lastModified() {
 			modifiedTimes++;
 			return super.lastModified();
+		}
+
+		@Override
+		public Path toPath() {
+			contentReads++;
+			return super.toPath();
 		}
 	}
 
@@ -272,6 +282,37 @@ class ScreenshotMetadataTest {
 		Favorite.setStarred(file, true);
 
 		assertTrue(ScreenshotMetadata.isStarred(file));
+	}
+
+	/**
+	 * The favorite button's tint and every row's badge ask this once per extracted frame,
+	 * and the flag lives in a PNG chunk, so an uncached answer is a full read of the file
+	 * per frame. One read per file, however many times it is asked.
+	 */
+	@Test
+	void repeatedStarLookupsReadTheFileOnlyOnce() throws IOException {
+		CountingFile file = new CountingFile(png("shot.png", 100, 100));
+		Favorite.setStarred(file, true);
+		file.contentReads = 0;
+
+		for (int frame = 0; frame < 10; frame++) {
+			assertTrue(ScreenshotMetadata.isStarred(file));
+		}
+
+		assertEquals(1, file.contentReads);
+	}
+
+	/** The re-read after a toggle is the one thing that has to cost a read. */
+	@Test
+	void forgetIsWhatMakesTheStarredFlagReadAgain() throws IOException {
+		CountingFile file = new CountingFile(png("shot.png", 100, 100));
+		assertFalse(ScreenshotMetadata.isStarred(file));
+		file.contentReads = 0;
+
+		ScreenshotMetadata.forget(file);
+		assertFalse(ScreenshotMetadata.isStarred(file));
+
+		assertEquals(1, file.contentReads);
 	}
 
 	/** A toggle rewrites the file in place; the stale cached value must not stick around. */

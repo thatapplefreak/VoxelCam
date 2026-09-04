@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
-import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
@@ -114,8 +113,14 @@ public class GuiScreenShotManager extends Screen {
 
 		// The favorite toggle is a square icon button at the start of the row; rename/delete/
 		// share then divide whatever's left three ways, same as before the toggle existed.
+		// It asks the metadata cache rather than VoxelCamIO.isSelectedFavorite: the tint is
+		// re-read on every extracted frame, and the flag lives in an iTXt chunk, so the
+		// uncached answer costs a full read of the selected PNG per frame on the render
+		// thread. Still VoxelCamIO's selection rather than this screen's field, so the two
+		// paths cannot drift apart.
 		favoriteButton = addRenderableWidget(new StarToggleButton(previewX, actionsY,
-				BUTTON_HEIGHT, VoxelCamIO::isSelectedFavorite, b -> toggleFavoriteSelected(),
+				BUTTON_HEIGHT, () -> ScreenshotMetadata.isStarred(VoxelCamIO.getSelectedPhoto()),
+				b -> toggleFavoriteSelected(),
 				Component.translatable("voxelcam.tooltip.favorite")));
 
 		int actionsX = previewX + BUTTON_HEIGHT + GAP;
@@ -187,15 +192,17 @@ public class GuiScreenShotManager extends Screen {
 
 	/**
 	 * The name filter already lives in {@code VoxelCamIO}; favorites-only stays here instead,
-	 * since it is opt-in and would otherwise cost a full-file read per screenshot on every
-	 * keystroke for users who never star anything.
+	 * since it is opt-in and a filter nobody turned on should not read a whole folder of PNGs.
+	 * It goes through {@link ScreenshotMetadata} rather than {@code Favorite} directly so the
+	 * one full-file read per screenshot is shared with the row badges and the toggle button
+	 * instead of being repeated on every keystroke.
 	 */
 	private List<File> filteredFiles() {
 		List<File> files = VoxelCamIO.getScreenShotFiles();
 		if (!favoritesOnly) {
 			return files;
 		}
-		return files.stream().filter(Favorite::isStarred).toList();
+		return files.stream().filter(ScreenshotMetadata::isStarred).toList();
 	}
 
 	private void toggleFavoritesOnly() {
@@ -208,10 +215,13 @@ public class GuiScreenShotManager extends Screen {
 			return;
 		}
 		VoxelCamIO.toggleSelectedFavorite();
+		// This forget() is what makes the toggle visible at all: the row badge, this
+		// button's tint and the favorites-only filter all read the cached flag now, so
+		// nothing would repaint without dropping the entry the toggle just invalidated.
 		ScreenshotMetadata.forget(selected);
 		// Only the favorites-only view can change list membership on a toggle; a plain
-		// star/unstar leaves order and membership alone; the row picks up the new icon
-		// on its own next frame since its cache entry was just dropped.
+		// star/unstar leaves order and membership alone; the row and the button both pick
+		// up the new icon on their own next frame, from the re-read that forget() forces.
 		if (favoritesOnly) {
 			refreshFiles();
 		}

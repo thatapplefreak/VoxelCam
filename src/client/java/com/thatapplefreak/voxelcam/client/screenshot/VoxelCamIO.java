@@ -126,6 +126,12 @@ public final class VoxelCamIO {
 		return target;
 	}
 
+	/**
+	 * Reads the flag back off the disk every time, deliberately. The GUI asks
+	 * {@code ScreenshotMetadata.isStarred} instead, since it asks once per frame; what is
+	 * left here is the ground-truth check the game test uses to prove a toggle actually
+	 * reached the file rather than only the cache in front of it.
+	 */
 	public static boolean isSelectedFavorite() {
 		return selected != null && Favorite.isStarred(selected);
 	}

@@ -19,8 +19,11 @@ import java.util.Optional;
  * File facts shown alongside screenshots. Every one of them is cached per file — the reads
  * that open the file (dimensions from the PNG header, the embedded capture context, the
  * starred flag) and the two that only stat it ({@link #fileSize(File)},
- * {@link #displayName(File)}). All five are asked for once per visible row per extracted
- * frame, so none of them may touch the disk twice for the same file.
+ * {@link #displayName(File)}). Every one of them is asked for on every extracted frame and
+ * so may not touch the disk twice for the same file: a list row wants all but
+ * {@link #captureContext(File)}, once per visible row, and the selection is asked again on
+ * the same frame — dimensions, size and context for the preview caption,
+ * {@link #isStarred(File)} for the favorite button's tint.
  *
  * <p>Entries live until the manager closes and calls {@link #forgetAll()}; the one thing that
  * rewrites a listed screenshot in place while it is open is the star toggle, which calls
@@ -86,8 +89,11 @@ public final class ScreenshotMetadata {
 	}
 
 	/**
-	 * Cached the same way {@link #dimensions(File)} is, since this is now checked for every
-	 * visible row's thumbnail badge rather than just the selected file.
+	 * Cached the same way {@link #dimensions(File)} is, and the one here that most needs it:
+	 * the flag is an {@code iTXt} chunk, so {@code Favorite.isStarred} reads the whole PNG,
+	 * and this is asked for by every visible row's thumbnail badge, by the favorite button's
+	 * tint for the selection, and by the favorites-only filter — the first two once per
+	 * extracted frame each.
 	 */
 	public static boolean isStarred(File file) {
 		if (file == null) {
