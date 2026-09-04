@@ -194,7 +194,10 @@ at the call site, and its chat feedback is bounced back through `client.execute`
 
 **Manager UI** — `GuiScreenShotManager` is the hub: `ScreenshotListWidget` (rows) on the left,
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
-rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display names.
+rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display names, the
+embedded capture context, and the starred flag. Everything the extract pass shows goes through it —
+nothing else in the GUI calls `Favorite` or `PngDimensions` itself, and `VoxelCamIO.isSelectedFavorite`
+stays uncached only because the game test wants the flag from the file rather than from the cache.
 
 Five invariants that are easy to break:
 

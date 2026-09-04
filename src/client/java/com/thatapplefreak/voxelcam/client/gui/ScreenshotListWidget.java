@@ -5,6 +5,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import java.io.File;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -26,6 +27,12 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 	private static final int BADGE_SIZE = 10;
 	private static final int BADGE_TEXTURE_SIZE = 16;
 	private static final int BADGE_GOLD = 0xFFFFD700;
+	// Compiled once rather than per String.replaceFirst call: an entry is built for every
+	// file in the folder, and rebuildWidgets() rebuilds the lot on resize and on every
+	// popup return. Case-sensitive, unlike ScreenshotMetadata's (?i) version — narration
+	// has always read a "shot.PNG" out with its extension and this is not the change that
+	// should alter that.
+	private static final Pattern PNG_SUFFIX = Pattern.compile("\\.png$");
 
 	private final Consumer<File> onSelected;
 
@@ -67,7 +74,7 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 
 		ScreenshotEntry(File file) {
 			this.file = file;
-			this.displayName = file.getName().replaceFirst("\\.png$", "");
+			this.displayName = PNG_SUFFIX.matcher(file.getName()).replaceFirst("");
 		}
 
 		@Override

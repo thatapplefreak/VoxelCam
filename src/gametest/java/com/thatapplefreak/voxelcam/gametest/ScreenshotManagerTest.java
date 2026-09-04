@@ -99,6 +99,11 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 			// Mirrors what the manager's own toggle button does after a real click, so the
 			// list row picks up the change on its very next render rather than a stale miss.
 			ScreenshotMetadata.forget(file);
+			// The row badge and the button's tint are both painted from the cached flag, so
+			// the screenshot below only proves anything if the cache agrees with the file.
+			if (ScreenshotMetadata.isStarred(file) != VoxelCamIO.isSelectedFavorite()) {
+				throw new AssertionError("the cached starred flag disagrees with the file");
+			}
 		});
 
 		// Renders the star badge on the row and the gold-tinted favorite button.
@@ -112,6 +117,9 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 				throw new AssertionError("toggling back off did not clear the flag");
 			}
 			ScreenshotMetadata.forget(file);
+			if (ScreenshotMetadata.isStarred(file)) {
+				throw new AssertionError("the cached starred flag survived the un-star");
+			}
 			VoxelCamIO.selectPhoto(null);
 		});
 	}
