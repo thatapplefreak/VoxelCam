@@ -1,9 +1,13 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,8 +33,45 @@ class ScreenshotMetadataTest {
 
 	@BeforeEach
 	void reset() {
-		// Dimensions are cached per File for the life of the process.
+		// Every fact here is cached per File for the life of the process.
 		ScreenshotMetadata.forgetAll();
+	}
+
+	/**
+	 * The point of the caches is that the render thread stops stat'ing files it already
+	 * measured, so the tests below count the stat rather than time it. {@code File} is not
+	 * final and neither are these three methods, which is the cheapest honest counter
+	 * available. {@code toPath} stands in for the whole-file reads: {@code PngTextChunk.read}
+	 * reaches the bytes through {@code Files.readAllBytes(file.toPath())}, so one call there
+	 * is one full read of the PNG.
+	 */
+	private static final class CountingFile extends File {
+
+		int lengths;
+		int modifiedTimes;
+		int contentReads;
+
+		CountingFile(File of) {
+			super(of.getPath());
+		}
+
+		@Override
+		public long length() {
+			lengths++;
+			return super.length();
+		}
+
+		@Override
+		public long lastModified() {
+			modifiedTimes++;
+			return super.lastModified();
+		}
+
+		@Override
+		public Path toPath() {
+			contentReads++;
+			return super.toPath();
+		}
 	}
 
 	/** A real PNG header: signature, then an IHDR chunk carrying width and height. */
@@ -97,6 +139,34 @@ class ScreenshotMetadataTest {
 		assertNull(ScreenshotMetadata.dimensions(null));
 	}
 
+	/**
+	 * A failed header read has to be remembered too, or the one file that can never answer is
+	 * the one reopened per row per extracted frame. Counting the opens is not available here:
+	 * the read goes through {@code FileInputStream}, whose only seam on {@code File} is
+	 * {@code getPath}, and the cache's own map lookup hashes through that as well. Repairing
+	 * the bytes on disk and still reading "unknown" pins the same thing behaviourally — only a
+	 * remembered failure can explain a valid PNG answering as unknown.
+	 */
+	@Test
+	void aFailedHeaderReadIsNotRetried() throws IOException {
+		Files.write(dir.resolve("broken.png"), new byte[0]);
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		png("broken.png", 640, 360);
+
+		// A fresh File, so this pins an entry keyed by path rather than by identity.
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		// The star toggle's eviction leaves it alone: starring cannot repair an IHDR.
+		ScreenshotMetadata.forget(dir.resolve("broken.png").toFile());
+		assertNull(ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+
+		// Nothing is poisoned for good, though — closing the manager clears it and it reads.
+		ScreenshotMetadata.forgetAll();
+		assertEquals(new ScreenshotMetadata.Dimensions(640, 360),
+				ScreenshotMetadata.dimensions(dir.resolve("broken.png").toFile()));
+	}
+
 	@Test
 	void fileSizeSwitchesUnitsAtTheThresholds() throws IOException {
 		assertEquals("512 B", ScreenshotMetadata.fileSize(sized("a.png", 512)));
@@ -104,6 +174,56 @@ class ScreenshotMetadataTest {
 		assertEquals("1 KB", ScreenshotMetadata.fileSize(sized("c.png", 1024)));
 		assertEquals("100 KB", ScreenshotMetadata.fileSize(sized("d.png", 1024 * 100)));
 		assertEquals("1.0 MB", ScreenshotMetadata.fileSize(sized("e.png", 1024 * 1024)));
+	}
+
+	/** A row's size and a row's name are asked for once per frame; neither may re-stat. */
+	@Test
+	void repeatedLookupsStatTheFileOnlyOnce() throws IOException {
+		CountingFile file = new CountingFile(sized("2026-08-27_10.00.00.png", 4096));
+
+		String size = ScreenshotMetadata.fileSize(file);
+		String name = ScreenshotMetadata.displayName(file);
+		for (int frame = 0; frame < 10; frame++) {
+			assertEquals(size, ScreenshotMetadata.fileSize(file));
+			assertEquals(name, ScreenshotMetadata.displayName(file));
+		}
+
+		assertEquals(1, file.lengths);
+		assertEquals(1, file.modifiedTimes);
+	}
+
+	/** A renamed file is shown verbatim, so it should never have been stat'd at all. */
+	@Test
+	void aRenamedFileIsNamedWithoutStattingIt() throws IOException {
+		CountingFile file = new CountingFile(sized("sunset over base.png", 1));
+
+		assertEquals("sunset over base", ScreenshotMetadata.displayName(file));
+
+		assertEquals(0, file.modifiedTimes);
+	}
+
+	/**
+	 * Starring rewrites the PNG in place, which changes both its length and its modification
+	 * time. {@code forget} is what the manager calls afterwards, so it has to drop the size
+	 * and the name along with the flag or the caption keeps quoting the pre-toggle bytes.
+	 */
+	@Test
+	void forgetDropsTheCachedSizeAndNameSoARewriteIsPickedUp() throws IOException {
+		File file = sized("2026-08-27_10.00.00.png", 512);
+		assertEquals("512 B", ScreenshotMetadata.fileSize(file));
+		String before = ScreenshotMetadata.displayName(file);
+
+		Files.write(file.toPath(), new byte[2048]);
+		assertTrue(file.setLastModified(LocalDateTime.now().minusDays(40)
+				.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+		assertEquals("512 B", ScreenshotMetadata.fileSize(file));
+		assertEquals(before, ScreenshotMetadata.displayName(file));
+
+		ScreenshotMetadata.forget(file);
+
+		assertEquals("2 KB", ScreenshotMetadata.fileSize(file));
+		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(file));
 	}
 
 	/**
@@ -129,6 +249,22 @@ class ScreenshotMetadataTest {
 		assertEquals("holiday", ScreenshotMetadata.displayName(sized("holiday.PNG", 1)));
 	}
 
+	/**
+	 * The only case that runs both patterns in order: the extension has to come off
+	 * case-insensitively before the timestamp is matched, or the timestamp test sees a
+	 * trailing ".PNG" and the row falls back to showing the raw stamp. Tolerant about
+	 * which friendly label comes out, like the capture-name test above — the point is
+	 * only that it is not the filename.
+	 */
+	@Test
+	void anUppercaseExtensionStillLeavesACaptureNameRecognisable() throws IOException {
+		File capture = sized("2026-08-27_10.00.00.PNG", 1);
+
+		assertTrue(ScreenshotMetadata.displayName(capture)
+						.matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(capture));
+	}
+
 	@Test
 	void relativeTimeLabelsTodayAndYesterday() throws IOException {
 		File file = sized("x.png", 1);
@@ -152,6 +288,87 @@ class ScreenshotMetadataTest {
 
 		String label = ScreenshotMetadata.relativeTime(file);
 		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}"), label);
+	}
+
+	@Test
+	void readsCaptureContextEmbeddedByPngTextChunk() throws IOException {
+		File file = png("shot.png", 640, 480);
+		CaptureContext embedded = new CaptureContext("minecraft:the_nether", 12, 70, -45, "New World");
+		PngTextChunk.embed(file, embedded.toTags());
+
+		assertEquals(embedded, ScreenshotMetadata.captureContext(file));
+	}
+
+	/** Every screenshot taken before this feature shipped has no tags at all. */
+	@Test
+	void captureContextIsNullWhenThereAreNoTags() throws IOException {
+		assertNull(ScreenshotMetadata.captureContext(png("untagged.png", 100, 100)));
+		assertNull(ScreenshotMetadata.captureContext(null));
+	}
+
+	@Test
+	void captureContextSurvivesACorruptOrUnrelatedTag() throws IOException {
+		File file = png("partial.png", 100, 100);
+		PngTextChunk.embed(file, Map.of("voxelcam:dimension", "minecraft:overworld", "some:other:tag", "x"));
+
+		assertNull(ScreenshotMetadata.captureContext(file));
+	}
+
+	@Test
+	void isStarredIsFalseForAFreshScreenshot() throws IOException {
+		assertFalse(ScreenshotMetadata.isStarred(png("shot.png", 100, 100)));
+		assertFalse(ScreenshotMetadata.isStarred(null));
+	}
+
+	@Test
+	void isStarredReflectsAnEmbeddedFlag() throws IOException {
+		File file = png("shot.png", 100, 100);
+		Favorite.setStarred(file, true);
+
+		assertTrue(ScreenshotMetadata.isStarred(file));
+	}
+
+	/**
+	 * The favorite button's tint and every row's badge ask this once per extracted frame,
+	 * and the flag lives in a PNG chunk, so an uncached answer is a full read of the file
+	 * per frame. One read per file, however many times it is asked.
+	 */
+	@Test
+	void repeatedStarLookupsReadTheFileOnlyOnce() throws IOException {
+		CountingFile file = new CountingFile(png("shot.png", 100, 100));
+		Favorite.setStarred(file, true);
+		file.contentReads = 0;
+
+		for (int frame = 0; frame < 10; frame++) {
+			assertTrue(ScreenshotMetadata.isStarred(file));
+		}
+
+		assertEquals(1, file.contentReads);
+	}
+
+	/** The re-read after a toggle is the one thing that has to cost a read. */
+	@Test
+	void forgetIsWhatMakesTheStarredFlagReadAgain() throws IOException {
+		CountingFile file = new CountingFile(png("shot.png", 100, 100));
+		assertFalse(ScreenshotMetadata.isStarred(file));
+		file.contentReads = 0;
+
+		ScreenshotMetadata.forget(file);
+		assertFalse(ScreenshotMetadata.isStarred(file));
+
+		assertEquals(1, file.contentReads);
+	}
+
+	/** A toggle rewrites the file in place; the stale cached value must not stick around. */
+	@Test
+	void forgetDropsTheCachedStarredFlagSoAToggleIsPickedUpImmediately() throws IOException {
+		File file = png("shot.png", 100, 100);
+		assertFalse(ScreenshotMetadata.isStarred(file));
+
+		Favorite.setStarred(file, true);
+		ScreenshotMetadata.forget(file);
+
+		assertTrue(ScreenshotMetadata.isStarred(file));
 	}
 
 	/** Nothing here should depend on the platform default charset. */

@@ -2,18 +2,22 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 
 /**
@@ -41,11 +45,13 @@ public class CaptureTest implements FabricClientGameTest {
 			assertOrdinaryCaptureWritesAFile(context, dir);
 			assertOversizedCaptureMatchesTheRequest(context, dir);
 			assertWindowIsRestored(context);
+			assertArmedCaptureIsDroppedWhenAScreenOpensFirst(context, dir);
 		}
 	}
 
 	private static void assertOrdinaryCaptureWritesAFile(ClientGameTestContext context, File dir) {
 		Set<String> before = listing(dir);
+		Location expected = playerLocation(context);
 
 		context.runOnClient(client ->
 				Screenshot.grab(client.gameDirectory, client.gameRenderer.mainRenderTarget(), message -> { }));
@@ -58,6 +64,54 @@ public class CaptureTest implements FabricClientGameTest {
 		if (!size.equals(window)) {
 			throw new AssertionError("ordinary capture should match the window " + window + ", was " + size);
 		}
+
+		assertCaptureContextMatches(written, expected);
+		assertModProvenanceExcludesInfrastructure(written);
+	}
+
+	/**
+	 * The only mods loaded in this environment are Fabric API's own split, the loader's
+	 * built-ins, and VoxelCam's own two ids — every one of them infrastructure the curation
+	 * in {@code ModProvenance} is supposed to filter out, so the tag should end up absent
+	 * entirely rather than leaking any of them through.
+	 */
+	private static void assertModProvenanceExcludesInfrastructure(File written) {
+		Map<String, String> tags = PngTextChunk.read(written);
+		if (tags.containsKey("voxelcam:mods")) {
+			throw new AssertionError("mod tag should be empty in a fabric-api-only install, was "
+					+ tags.get("voxelcam:mods"));
+		}
+		if (tags.containsKey("voxelcam:shaderpack")) {
+			throw new AssertionError("shaderpack tag should be absent without Iris loaded, was "
+					+ tags.get("voxelcam:shaderpack"));
+		}
+	}
+
+	/**
+	 * The context is read on the render thread inside {@code ScreenshotHandler.saveCapturedImage},
+	 * before the frame is handed to the IO worker for encoding, so it should match wherever the
+	 * player actually was at capture time.
+	 */
+	private static void assertCaptureContextMatches(File written, Location expected) {
+		CaptureContext embedded = CaptureContext.fromTags(PngTextChunk.read(written));
+		if (embedded == null) {
+			throw new AssertionError("capture should have embedded a capture context, had none");
+		}
+		if (!embedded.dimension().equals(expected.dimension())
+				|| embedded.x() != expected.x() || embedded.y() != expected.y() || embedded.z() != expected.z()) {
+			throw new AssertionError("embedded capture context should be " + expected + ", was " + embedded);
+		}
+	}
+
+	private static Location playerLocation(ClientGameTestContext context) {
+		return context.computeOnClient(client -> {
+			var pos = client.player.blockPosition();
+			return new Location(client.player.level().dimension().identifier().toString(),
+					pos.getX(), pos.getY(), pos.getZ());
+		});
+	}
+
+	private record Location(String dimension, int x, int y, int z) {
 	}
 
 	/**
@@ -68,6 +122,7 @@ public class CaptureTest implements FabricClientGameTest {
 	private static void assertOversizedCaptureMatchesTheRequest(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
+		Location expectedLocation = playerLocation(context);
 
 		context.runOnClient(client -> {
 			BigScreenshot.setSize(BigScreenshotSize.parse("2x"));
@@ -85,6 +140,8 @@ public class CaptureTest implements FabricClientGameTest {
 			throw new AssertionError("2x capture of a " + window + " window should be "
 					+ expected + ", was " + size);
 		}
+
+		assertCaptureContextMatches(written, expectedLocation);
 	}
 
 	/**
@@ -104,6 +161,39 @@ public class CaptureTest implements FabricClientGameTest {
 		if (BigScreenshot.isBusy()) {
 			throw new AssertionError("capture never returned to idle");
 		}
+	}
+
+	/**
+	 * A whole client tick separates the gate in {@code request()} from the resize in the render
+	 * frame — long enough for the world to go away or a screen to open — so the state the gate
+	 * refuses has to be refused again when the resize actually runs. Arming and opening the screen
+	 * in one client-thread task is what makes that ordering deterministic here.
+	 *
+	 * <p>The written file is the discriminator rather than the window size: a capture that goes
+	 * ahead anyway puts the window back by itself a frame later, but it cannot un-write its png.
+	 */
+	private static void assertArmedCaptureIsDroppedWhenAScreenOpensFirst(
+			ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+
+		context.runOnClient(client -> {
+			BigScreenshot.request();
+			client.gui.setScreen(new PauseScreen(false));
+		});
+		context.waitTicks(40);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> !name.endsWith(".png"));
+		if (!after.isEmpty()) {
+			throw new AssertionError("a request overtaken by a screen should have been dropped, wrote " + after);
+		}
+		if (BigScreenshot.isBusy()) {
+			throw new AssertionError("a dropped request should leave the state machine idle");
+		}
+
+		context.setScreen(() -> null);
+		context.waitForScreen(null);
 	}
 
 	private record Dimensions(int width, int height) {

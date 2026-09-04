@@ -10,6 +10,16 @@
 
 	"voxelcam.screenshots": "Screenshots",
 	"voxelcam.search": "Search",
+
+	"voxelcam.sort.date.desc": "Date ↓",
+	"voxelcam.sort.date.asc": "Date ↑",
+	"voxelcam.sort.name.asc": "Name ↑",
+	"voxelcam.sort.name.desc": "Name ↓",
+	"voxelcam.sort.size.desc": "Size ↓",
+	"voxelcam.sort.size.asc": "Size ↑",
+	"voxelcam.sort.dimensions.desc": "Dims ↓",
+	"voxelcam.sort.dimensions.asc": "Dims ↑",
+
 	"voxelcam.done": "Done",
 	"voxelcam.rename": "Rename",
 	"voxelcam.delete": "Delete",
@@ -17,6 +27,7 @@
 	"voxelcam.share": "Share…",
 	"voxelcam.ok": "Ok",
 	"voxelcam.noscreenshots": "No screenshots yet",
+	"voxelcam.nofavorites": "No starred screenshots",
 	"voxelcam.loading": "Loading…",
 	"voxelcam.loadfailed": "Could not load this image",
 	"voxelcam.count.one": "%s screenshot",
@@ -32,6 +43,8 @@
 	"voxelcam.share.saved": "Saved as %s",
 	"voxelcam.share.savefailed": "Could not save a copy",
 	"voxelcam.share.revealed": "Opened your file manager",
+	"voxelcam.share.revealed.folder": "Opened the containing folder",
+	"voxelcam.share.revealfailed": "Could not open your file manager",
 	"voxelcam.share.pathcopied": "Path copied to clipboard",
 	"voxelcam.share.uploading.link": "Uploading…",
 	"voxelcam.share.linkfailed": "Could not get a share link",
@@ -45,14 +58,19 @@
 	"voxelcam.tooltip.link": "Upload to catbox.moe and copy the link — no account needed",
 	"voxelcam.tooltip.copypath": "Copy this screenshot's full path to the clipboard",
 	"voxelcam.tooltip.openfolder": "Open the screenshots folder on your computer",
+	"voxelcam.tooltip.sort": "Change sort order",
+	"voxelcam.tooltip.favorite": "Star this screenshot",
+	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
 
 	"voxelcam.delete.title": "Delete screenshot?",
 	"voxelcam.delete.confirm": "%s will be permanently deleted.",
 	"voxelcam.delete.confirm.generic": "This screenshot will be permanently deleted.",
+	"voxelcam.delete.failed": "Could not delete %s",
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
+	"voxelcam.rename.failed": "Could not rename this screenshot — try another name",
 
 	"voxelcam.bigshot.current": "Big screenshot size is %s. Shift+F2 to take one.",
 	"voxelcam.bigshot.set": "Big screenshot size set to %s",

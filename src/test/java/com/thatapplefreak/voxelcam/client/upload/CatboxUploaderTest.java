@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.upload;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,6 +45,8 @@ class CatboxUploaderTest {
 	private final AtomicReference<byte[]> lastBody = new AtomicReference<>();
 	private final AtomicReference<String> lastContentType = new AtomicReference<>();
 	private final AtomicReference<String> lastMethod = new AtomicReference<>();
+	private final AtomicReference<String> lastContentLength = new AtomicReference<>();
+	private final AtomicReference<String> lastTransferEncoding = new AtomicReference<>();
 
 	@BeforeEach
 	void startStub() throws IOException {
@@ -64,6 +67,8 @@ class CatboxUploaderTest {
 	private void handle(HttpExchange exchange) throws IOException {
 		lastMethod.set(exchange.getRequestMethod());
 		lastContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+		lastContentLength.set(exchange.getRequestHeaders().getFirst("Content-Length"));
+		lastTransferEncoding.set(exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
 		try (var in = exchange.getRequestBody()) {
 			lastBody.set(in.readAllBytes());
 		}
@@ -124,6 +129,22 @@ class CatboxUploaderTest {
 		String sent = new String(lastBody.get(), StandardCharsets.ISO_8859_1);
 		String expected = new String(content, StandardCharsets.ISO_8859_1);
 		assertTrue(sent.contains(expected), "file bytes should reach the wire untouched");
+	}
+
+	/**
+	 * The image is streamed from disk rather than buffered, and a publisher that
+	 * cannot state its length makes the client fall back to chunked encoding — which
+	 * the stub here accepts silently but catbox does not. Pinning the declared length
+	 * keeps the streamed body framed the way the buffered one was.
+	 */
+	@Test
+	void bodyIsSentWithADeclaredLengthRatherThanChunked() throws Exception {
+		byte[] content = new byte[4096];
+		CatboxUploader.upload(screenshot("big.png", content), endpoint).get();
+
+		assertNull(lastTransferEncoding.get(), "the body must not be chunked");
+		assertEquals(String.valueOf(lastBody.get().length), lastContentLength.get());
+		assertTrue(lastBody.get().length > content.length, "the whole file should be in the body");
 	}
 
 	/**

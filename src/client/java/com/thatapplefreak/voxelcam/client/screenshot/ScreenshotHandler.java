@@ -11,6 +11,8 @@ import net.minecraft.util.Util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Replaces VoxelCommon/LiteLoader's ScreenshotListener callback. Invoked from
@@ -67,22 +69,77 @@ public final class ScreenshotHandler {
 			screenshotsDir.mkdirs();
 		}
 		File target = ScreenshotNamer.getScreenshotName(screenshotsDir);
+		// Read while still on the render thread: by the time write() runs on the IO pool,
+		// the player may have moved on to a different frame's state entirely.
+		CaptureContext context = CaptureContext.capture();
 
 		// This runs on the render thread, where encoding an oversized PNG would stall the game
 		// for seconds. The saving flag stays up until the write is actually finished.
-		Util.ioPool().execute(() -> write(image, target));
+		Util.ioPool().execute(() -> write(image, target, context));
 	}
 
-	private static void write(NativeImage image, File target) {
+	private static void write(NativeImage image, File target, CaptureContext context) {
 		Minecraft client = Minecraft.getInstance();
 		try (image) {
-			image.writeToFile(target);
+			writeOrDiscard(target, image::writeToFile);
+			embedMetadata(target, context);
 			client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			client.execute(() -> ChatMessages.send("voxelcam.savefailed"));
 		} finally {
 			saving = false;
+		}
+	}
+
+	/**
+	 * {@code NativeImage.writeToFile} opens the target WRITE|CREATE|TRUNCATE_EXISTING and only
+	 * then throws if the stb encode fails, so a failed save would otherwise leave an empty or
+	 * half-written .png behind: the manager lists it forever, never decodes it, and re-reads its
+	 * header every frame it is on screen. A file that was already there is left alone — this
+	 * undoes what the failed write itself created, nothing else.
+	 *
+	 * <p>Split out from {@link #write} so it can be tested; encoding a real NativeImage needs a
+	 * GL context.
+	 */
+	static void writeOrDiscard(File target, PngWriter writer) throws IOException {
+		boolean existed = target.exists();
+		try {
+			writer.writeTo(target);
+		} catch (IOException e) {
+			if (!existed) {
+				target.delete();
+			}
+			throw e;
+		}
+	}
+
+	/** The encode step of a save, as a seam. */
+	@FunctionalInterface
+	interface PngWriter {
+		void writeTo(File target) throws IOException;
+	}
+
+	/**
+	 * The screenshot itself is already saved and good at this point; losing a tag is a
+	 * shame, not a failure worth surfacing to the player the way a failed save is. Mod
+	 * provenance is captured here rather than on the render thread with the capture
+	 * context: the mod list is fixed for the session and the shader pack reads fresh
+	 * either way, so neither needs a snapshot before the frame moves on.
+	 */
+	private static void embedMetadata(File target, CaptureContext context) {
+		Map<String, String> tags = new LinkedHashMap<>();
+		if (context != null) {
+			tags.putAll(context.toTags());
+		}
+		tags.putAll(ModProvenance.capture().toTags());
+		if (tags.isEmpty()) {
+			return;
+		}
+		try {
+			PngTextChunk.embed(target, tags);
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to embed metadata into {}", target, e);
 		}
 	}
 }

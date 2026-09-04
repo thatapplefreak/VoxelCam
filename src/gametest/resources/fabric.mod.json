@@ -7,9 +7,13 @@
 	"entrypoints": {
 		"fabric-client-gametest": [
 			"com.thatapplefreak.voxelcam.gametest.TitleScreenButtonTest",
+			"com.thatapplefreak.voxelcam.gametest.PauseScreenButtonTest",
 			"com.thatapplefreak.voxelcam.gametest.ScreenshotManagerTest",
 			"com.thatapplefreak.voxelcam.gametest.CaptureTest",
-			"com.thatapplefreak.voxelcam.gametest.SharePopupTest"
+			"com.thatapplefreak.voxelcam.gametest.SharePopupTest",
+			"com.thatapplefreak.voxelcam.gametest.RenamePopupFocusTest",
+			"com.thatapplefreak.voxelcam.gametest.RenamePopupFailureTest",
+			"com.thatapplefreak.voxelcam.gametest.RenameSelectionTest"
 		]
 	},
 	"depends": {

@@ -18,15 +18,18 @@ public class RenamePopup extends Screen {
 
 	private final GuiScreenShotManager parent;
 	private final File screenshotsDir;
+	private final File currentFile;
 	private final String originalName;
 
 	private EditBox nameField;
 	private Button confirmButton;
+	private boolean renameFailed;
 
 	public RenamePopup(GuiScreenShotManager parent, File screenshotsDir, File currentFile) {
 		super(Component.translatable("voxelcam.rename"));
 		this.parent = parent;
 		this.screenshotsDir = screenshotsDir;
+		this.currentFile = currentFile;
 		this.originalName = currentFile.getName().replaceFirst("(?i)\\.png$", "");
 	}
 
@@ -38,9 +41,13 @@ public class RenamePopup extends Screen {
 		nameField = new EditBox(font, fieldX, fieldY, FIELD_WIDTH, 20, Component.translatable("voxelcam.rename"));
 		nameField.setMaxLength(128);
 		nameField.setValue(originalName);
-		nameField.setResponder(text -> updateConfirmState());
+		nameField.setResponder(text -> {
+			// Typing is the retry, so a "could not rename" must not outlive the name it
+			// was about. A rebuild is not: init() runs again on every resize.
+			renameFailed = false;
+			updateConfirmState();
+		});
 		addRenderableWidget(nameField);
-		setInitialFocus(nameField);
 
 		int buttonWidth = (FIELD_WIDTH - 6) / 2;
 		confirmButton = addRenderableWidget(Button.builder(Component.translatable("voxelcam.ok"), b -> confirm())
@@ -49,6 +56,20 @@ public class RenamePopup extends Screen {
 				.bounds(fieldX + buttonWidth + 6, fieldY + 28, buttonWidth, 20).build());
 
 		updateConfirmState();
+	}
+
+	/**
+	 * Vanilla's idiom (DirectJoinServerScreen, AnvilScreen) for a screen whose text field
+	 * should start focused. Both {@code Screen.init(int,int)} and {@code rebuildWidgets()}
+	 * call this hook <em>after</em> {@code init()} returns, so calling
+	 * {@code setInitialFocus(nameField)} from {@code init()} instead is undone: when the last
+	 * input was a keyboard one the hook's forward tab navigation starts past the already
+	 * focused field, skips the still-inactive OK button and lands on Cancel — leaving the
+	 * dialog inert, since typing then goes to a button and Enter confirms nothing.
+	 */
+	@Override
+	protected void setInitialFocus() {
+		setInitialFocus(nameField);
 	}
 
 	/** Blocks names that are empty, unchanged, or would collide with an existing file. */
@@ -67,7 +88,10 @@ public class RenamePopup extends Screen {
 		if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0) {
 			return "voxelcam.rename.invalid";
 		}
-		if (new File(screenshotsDir, name + ".png").exists()) {
+		// Not a bare exists() probe: on a case-insensitive filesystem the candidate for a
+		// case-only rename is the file being renamed, and reporting that as a collision
+		// leaves the player unable to ever recapitalise a name.
+		if (VoxelCamIO.nameCollides(screenshotsDir, name, currentFile)) {
 			return "voxelcam.rename.exists";
 		}
 		return null;
@@ -82,7 +106,14 @@ public class RenamePopup extends Screen {
 		if (!canConfirm()) {
 			return;
 		}
-		VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim());
+		if (VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim()) == null) {
+			// The file kept its old name and the manager would re-list it with nothing to
+			// say why, so the dialog stays up instead — holding the typed name for a retry,
+			// which is all a Windows-forbidden character or a moved file needs. The reason
+			// is only in the log: renameTo has none to give.
+			renameFailed = true;
+			return;
+		}
 		onClose();
 	}
 
@@ -101,7 +132,9 @@ public class RenamePopup extends Screen {
 		int fieldY = height / 2 - 10;
 		context.centeredText(font, title, width / 2, fieldY - 28, 0xFFFFFFFF);
 
-		String error = validationError();
+		// A rename the filesystem refused outranks the validation line: the name in the
+		// field passed every check this screen can make, so there is nothing else to say.
+		String error = renameFailed ? "voxelcam.rename.failed" : validationError();
 		if (error != null) {
 			context.centeredText(font,
 					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);

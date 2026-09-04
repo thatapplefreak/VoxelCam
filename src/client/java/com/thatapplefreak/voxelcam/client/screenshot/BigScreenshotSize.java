@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,7 +16,7 @@ import java.util.regex.Pattern;
  */
 public final class BigScreenshotSize {
 
-	/** Nothing useful renders below this, and {@code Framebuffer.initFbo} dislikes tiny sizes. */
+	/** Nothing useful renders below this, and {@code RenderTarget.createBuffers} dislikes tiny sizes. */
 	private static final int MIN_EDGE = 16;
 
 	private static final Pattern ABSOLUTE = Pattern.compile("(\\d{1,6})[x*](\\d{1,6})");
@@ -64,7 +65,9 @@ public final class BigScreenshotSize {
 
 	/** @return the parsed size, or null if the token is not a preset, a multiple or WxH. */
 	public static BigScreenshotSize parse(String input) {
-		String token = input.trim().toLowerCase();
+		// ROOT, not the default locale: the preset keys are ASCII literals, and under tr/az
+		// 'I' folds to a dotless one, so "IMAX" would stop being a preset on a Turkish system.
+		String token = input.trim().toLowerCase(Locale.ROOT);
 
 		BigScreenshotSize preset = PRESETS.get(token);
 		if (preset != null) {
@@ -97,8 +100,8 @@ public final class BigScreenshotSize {
 
 	/**
 	 * Turns the setting into the dimensions to render at, clamped to what the GPU
-	 * will actually allocate. The clamp is ours to apply: {@code Framebuffer.initFbo}
-	 * throws above {@code getMaxTextureSize()}, and {@code WindowFramebuffer} does not
+	 * will actually allocate. The clamp is ours to apply: {@code RenderTarget.createBuffers}
+	 * throws above the device's {@code maxTextureSize}, and {@code MainTarget} does not
 	 * override {@code resize}, so its forgiving size search never runs on this path.
 	 */
 	public Resolved resolve(Window window) {

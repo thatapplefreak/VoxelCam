@@ -1,6 +1,8 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
+import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -16,6 +18,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Screenshot browser: searchable list on the left, large preview and details
@@ -27,6 +30,10 @@ public class GuiScreenShotManager extends Screen {
 	private static final int GAP = 6;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int CONTENT_TOP = 52;
+	/** Wide enough for the longest label ("Name ↓") at the default GUI scale. */
+	private static final int SORT_BUTTON_WIDTH = 54;
+	/** Matches the search bar and sort button's own height. */
+	private static final int FILTER_BUTTON_SIZE = 18;
 	/** Preview : list width ratio. */
 	private static final float GOLDEN_RATIO = 1.618034F;
 	/** Below this a row cannot fit its thumbnail and a usable slice of the name. */
@@ -36,12 +43,20 @@ public class GuiScreenShotManager extends Screen {
 
 	private ScreenshotListWidget list;
 	private EditBox searchBar;
+	private Button sortButton;
+	private StarToggleButton favoriteButton;
 	private Button renameButton;
 	private Button deleteButton;
 	private Button shareButton;
 
 	private String searchText = "";
+	private boolean favoritesOnly = false;
 	private File selected;
+	/** A failed file action, shown in place of the details line until the selection moves. */
+	private Component actionError;
+	/** The list after the name filter and, if active, the favorites-only filter — what the
+	 * row count and the list widget both have to agree on. */
+	private List<File> visibleFiles = List.of();
 
 	private int previewX;
 	private int previewY;
@@ -56,10 +71,11 @@ public class GuiScreenShotManager extends Screen {
 	@Override
 	protected void init() {
 		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
-		List<File> files = VoxelCamIO.getScreenShotFiles();
-		if (selected == null || !files.contains(selected)) {
-			selected = files.isEmpty() ? null : files.get(0);
-		}
+		List<File> files = filteredFiles();
+		// Not just "keep it if it is still listed": init() runs again on the way back from
+		// every popup, and after a rename this field still names the file that was renamed
+		// away, so VoxelCamIO's selection is the only one that followed it.
+		selected = VoxelCamIO.selectionFor(files, selected);
 
 		// Split the content area so preview : list == phi : 1, which holds the two
 		// panes in proportion at every GUI scale instead of the preview swallowing
@@ -69,11 +85,21 @@ public class GuiScreenShotManager extends Screen {
 		int actionsY = height - MARGIN - BUTTON_HEIGHT;
 		int listBottom = actionsY - GAP;
 
-		searchBar = new EditBox(font, MARGIN, 26, listWidth, 18, Component.translatable("voxelcam.search"));
+		int searchWidth = listWidth - SORT_BUTTON_WIDTH - GAP - FILTER_BUTTON_SIZE - GAP;
+		searchBar = new EditBox(font, MARGIN, 26, searchWidth, 18, Component.translatable("voxelcam.search"));
 		searchBar.setHint(Component.translatable("voxelcam.search").withStyle(ChatFormatting.DARK_GRAY));
 		searchBar.setValue(searchText);
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
+
+		addRenderableWidget(new StarToggleButton(MARGIN + searchWidth + GAP, 26,
+				FILTER_BUTTON_SIZE, () -> favoritesOnly, b -> toggleFavoritesOnly(),
+				Component.translatable("voxelcam.tooltip.favoritesonly")));
+
+		sortButton = addRenderableWidget(Button.builder(Component.translatable(SortMode.current().labelKey()),
+						b -> cycleSort())
+				.bounds(MARGIN + searchWidth + GAP + FILTER_BUTTON_SIZE + GAP, 26, SORT_BUTTON_WIDTH, 18).build());
+		sortButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.sort")));
 
 		list = new ScreenshotListWidget(minecraft, listWidth, listBottom - CONTENT_TOP, CONTENT_TOP, this::onSelected);
 		list.setX(MARGIN);
@@ -85,16 +111,29 @@ public class GuiScreenShotManager extends Screen {
 		// Leave a line under the preview for the resolution/size/date details.
 		previewHeight = listBottom - CONTENT_TOP - 14;
 
+		// The favorite toggle is a square icon button at the start of the row; rename/delete/
+		// share then divide whatever's left three ways, same as before the toggle existed.
+		// It asks the metadata cache rather than VoxelCamIO.isSelectedFavorite: the tint is
+		// re-read on every extracted frame, and the flag lives in an iTXt chunk, so the
+		// uncached answer costs a full read of the selected PNG per frame on the render
+		// thread. Still VoxelCamIO's selection rather than this screen's field, so the two
+		// paths cannot drift apart.
+		favoriteButton = addRenderableWidget(new StarToggleButton(previewX, actionsY,
+				BUTTON_HEIGHT, () -> ScreenshotMetadata.isStarred(VoxelCamIO.getSelectedPhoto()),
+				b -> toggleFavoriteSelected(),
+				Component.translatable("voxelcam.tooltip.favorite")));
+
+		int actionsX = previewX + BUTTON_HEIGHT + GAP;
 		// Item actions sit under the preview they act on; folder/close are global and
 		// sit under the list, so destructive per-file actions are not next to "Done".
 		// Widths divide the preview column rather than taking a floor, so a narrow
 		// preview shrinks these buttons instead of pushing them over the list's.
-		int actionWidth = (previewWidth - GAP * 2) / 3;
-		int deleteX = previewX + actionWidth + GAP;
-		int postX = previewX + (actionWidth + GAP) * 2;
+		int actionWidth = (previewX + previewWidth - actionsX - GAP * 2) / 3;
+		int deleteX = actionsX + actionWidth + GAP;
+		int postX = actionsX + (actionWidth + GAP) * 2;
 
 		renameButton = addRenderableWidget(button("voxelcam.rename", "voxelcam.tooltip.rename",
-				b -> renameSelected(), previewX, actionsY, actionWidth));
+				b -> renameSelected(), actionsX, actionsY, actionWidth));
 		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
 				b -> minecraft.setScreenAndShow(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
 		// Absorbs the rounding remainder so the row ends flush with the preview.
@@ -109,6 +148,7 @@ public class GuiScreenShotManager extends Screen {
 
 		// Populated only once the action buttons exist, since selecting an entry
 		// immediately calls back into updateButtonStates().
+		visibleFiles = files;
 		list.setScreenshots(files, selected);
 		updateButtonStates();
 	}
@@ -128,21 +168,84 @@ public class GuiScreenShotManager extends Screen {
 			return;
 		}
 		searchText = text;
-		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, text);
-		List<File> files = VoxelCamIO.getScreenShotFiles();
-		if (selected == null || !files.contains(selected)) {
-			selected = files.isEmpty() ? null : files.get(0);
-		}
 		// Only the list contents change while typing, so the search field itself is
 		// left alone and keeps focus and cursor position.
+		refreshFiles();
+	}
+
+	private void cycleSort() {
+		SortMode.setCurrent(SortMode.current().next());
+		sortButton.setMessage(Component.translatable(SortMode.current().labelKey()));
+		refreshFiles();
+	}
+
+	private void refreshFiles() {
+		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
+		List<File> files = filteredFiles();
+		// Same resolution as init(), so a filter that empties the list and is then cleared
+		// comes back to the file it was on rather than to the head of the list.
+		selected = VoxelCamIO.selectionFor(files, selected);
+		visibleFiles = files;
 		list.setScreenshots(files, selected);
 		updateButtonStates();
 	}
 
+	/**
+	 * The name filter already lives in {@code VoxelCamIO}; favorites-only stays here instead,
+	 * since it is opt-in and a filter nobody turned on should not read a whole folder of PNGs.
+	 * It goes through {@link ScreenshotMetadata} rather than {@code Favorite} directly so the
+	 * one full-file read per screenshot is shared with the row badges and the toggle button
+	 * instead of being repeated on every keystroke.
+	 */
+	private List<File> filteredFiles() {
+		List<File> files = VoxelCamIO.getScreenShotFiles();
+		if (!favoritesOnly) {
+			return files;
+		}
+		return files.stream().filter(ScreenshotMetadata::isStarred).toList();
+	}
+
+	private void toggleFavoritesOnly() {
+		favoritesOnly = !favoritesOnly;
+		refreshFiles();
+	}
+
+	private void toggleFavoriteSelected() {
+		if (selected == null) {
+			return;
+		}
+		VoxelCamIO.toggleSelectedFavorite();
+		// This forget() is what makes the toggle visible at all: the row badge, this
+		// button's tint and the favorites-only filter all read the cached flag now, so
+		// nothing would repaint without dropping the entry the toggle just invalidated.
+		ScreenshotMetadata.forget(selected);
+		// Only the favorites-only view can change list membership on a toggle; a plain
+		// star/unstar leaves order and membership alone; the row and the button both pick
+		// up the new icon on their own next frame, from the re-read that forget() forces.
+		if (favoritesOnly) {
+			refreshFiles();
+		}
+	}
+
 	private void onSelected(File file) {
+		// Only a move to a different file clears the message. init() re-reports the
+		// current selection through setScreenshots, and that rebuild is exactly what
+		// returning from a popup triggers, so clearing unconditionally would wipe a
+		// failure before its first frame.
+		if (!Objects.equals(selected, file)) {
+			actionError = null;
+		}
 		selected = file;
 		VoxelCamIO.selectPhoto(file);
 		updateButtonStates();
+	}
+
+	/**
+	 * Set by {@link DeletePopup} on its way out, since the popup itself is gone by the
+	 * time anyone could read it.
+	 */
+	void reportDeleteResult(File file, boolean deleted) {
+		actionError = deleted ? null : Component.translatable("voxelcam.delete.failed", file.getName());
 	}
 
 	private void updateButtonStates() {
@@ -154,6 +257,7 @@ public class GuiScreenShotManager extends Screen {
 		renameButton.active = hasSelection;
 		deleteButton.active = hasSelection;
 		shareButton.active = hasSelection;
+		favoriteButton.active = hasSelection;
 	}
 
 	private void renameSelected() {
@@ -201,7 +305,7 @@ public class GuiScreenShotManager extends Screen {
 
 		context.centeredText(font, title, width / 2, 14, 0xFFFFFFFF);
 
-		int count = VoxelCamIO.getScreenShotFiles().size();
+		int count = visibleFiles.size();
 		Component countText = Component.translatable(count == 1 ? "voxelcam.count.one" : "voxelcam.count.many", count);
 		context.text(font, countText.copy().withStyle(ChatFormatting.GRAY),
 				width - MARGIN - font.width(countText), 31, 0xFFA0A0A0);
@@ -216,7 +320,10 @@ public class GuiScreenShotManager extends Screen {
 		context.fill(previewX, previewY, previewX + previewWidth, previewY + previewHeight, 0x66000000);
 
 		if (selected == null) {
-			context.centeredText(font, Component.translatable("voxelcam.noscreenshots"),
+			// "No screenshots yet" would be misleading here: the favorites filter can empty
+			// the list out of a folder that has plenty, just none of them starred.
+			String emptyKey = favoritesOnly ? "voxelcam.nofavorites" : "voxelcam.noscreenshots";
+			context.centeredText(font, Component.translatable(emptyKey),
 					previewX + previewWidth / 2, previewY + previewHeight / 2 - 4, 0xFF808080);
 			return;
 		}
@@ -238,6 +345,14 @@ public class GuiScreenShotManager extends Screen {
 					0F, 0F, drawWidth, drawHeight, image.width(), image.height(), image.width(), image.height());
 		}
 
+		if (actionError != null) {
+			// The details line is the only row free at every GUI scale, and it sits under
+			// the preview of the file the failure is about.
+			context.centeredText(font, actionError.copy().withStyle(ChatFormatting.RED),
+					previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFFF5555);
+			return;
+		}
+
 		// The list row already carries the capture time, so this line stays short
 		// enough not to be trimmed: the filename (which the row may show as a
 		// friendly time instead) plus the facts the row has no space for.
@@ -247,6 +362,10 @@ public class GuiScreenShotManager extends Screen {
 			details.append("  ·  ").append(size.width()).append('×').append(size.height());
 		}
 		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
+		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
+		if (captureContext != null) {
+			details.append("  ·  ").append(captureContext.describeLocation());
+		}
 		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);

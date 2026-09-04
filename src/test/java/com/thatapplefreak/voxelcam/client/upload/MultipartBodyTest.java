@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.upload;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,6 +71,38 @@ class MultipartBodyTest {
 		assertTrue(at >= 0, "raw file bytes should appear in the body verbatim");
 	}
 
+	/**
+	 * RenamePopup rejects only / \ and :, so a quote reaches the uploader intact and
+	 * would otherwise close the quoted-string early, filing the part under a truncated
+	 * name — reported to the player as nothing more than the generic 'link failed'.
+	 */
+	@Test
+	void quotesAndBackslashesInTheFilenameAreEscaped() {
+		String body = bodyOf(new MultipartBody()
+				.addFile("fileToUpload", "my \"best\" c:\\shot.png", "image/png", new byte[] { 1 }));
+
+		assertTrue(body.contains(
+				"filename=\"my \\\"best\\\" c:\\\\shot.png\"\r\n"),
+				body);
+	}
+
+	/**
+	 * CR and LF have no escape inside a quoted-string, so they have to be dropped
+	 * outright: left in, they end the header line and the part's header block is
+	 * framed as something else entirely.
+	 */
+	@Test
+	void newlinesInTheFilenameCannotSplitTheHeaderBlock() {
+		String body = bodyOf(new MultipartBody()
+				.addFile("fileToUpload", "sh\r\not\nX-Injected: 1.png", "image/png", new byte[] { 1 }));
+
+		int disposition = body.indexOf("Content-Disposition: form-data;");
+		String headers = body.substring(disposition, body.indexOf("\r\n\r\n", disposition));
+
+		assertEquals(2, headers.split("\r\n", -1).length, headers);
+		assertTrue(headers.endsWith("\r\nContent-Type: image/png"), headers);
+	}
+
 	@Test
 	void fieldsAndFilesAccumulateInOrder() {
 		String body = bodyOf(new MultipartBody()
@@ -79,10 +112,47 @@ class MultipartBodyTest {
 		assertTrue(body.indexOf("name=\"reqtype\"") < body.indexOf("name=\"fileToUpload\""), body);
 	}
 
+	/**
+	 * The uploader streams the image from disk, so the framing tests above only keep
+	 * covering the shipped path for as long as the streamed halves splice back into
+	 * exactly what the buffering form produces — the escaping in particular is
+	 * asserted against build() and nowhere else.
+	 */
+	@Test
+	void streamedFramingSplicesBackIntoTheBufferedBody() {
+		byte[] content = { (byte) 0x89, 'P', 'N', 'G', (byte) 0xFF, 0x00, (byte) 0xC3 };
+		String fileName = "my \"best\" c:\\shot.png";
+
+		MultipartBody streaming = new MultipartBody().addField("reqtype", "fileupload");
+		MultipartBody.Streamed framing = streaming.streamFile("fileToUpload", fileName, "image/png");
+
+		byte[] spliced = concat(framing.prologue(), content, framing.epilogue());
+
+		// Same instance: the boundary is per-body, so building a second one would
+		// differ for a reason that has nothing to do with the framing.
+		byte[] buffered = streaming.addFile("fileToUpload", fileName, "image/png", content).build();
+
+		assertArrayEquals(buffered, spliced, new String(spliced, StandardCharsets.UTF_8));
+	}
+
 	/** A fresh boundary per body keeps one upload's delimiter out of another's payload. */
 	@Test
 	void eachBodyGetsItsOwnBoundary() {
 		assertNotEquals(new MultipartBody().contentType(), new MultipartBody().contentType());
+	}
+
+	private static byte[] concat(byte[]... chunks) {
+		int total = 0;
+		for (byte[] chunk : chunks) {
+			total += chunk.length;
+		}
+		byte[] joined = new byte[total];
+		int at = 0;
+		for (byte[] chunk : chunks) {
+			System.arraycopy(chunk, 0, joined, at, chunk.length);
+			at += chunk.length;
+		}
+		return joined;
 	}
 
 	private static int indexOf(byte[] haystack, byte[] needle) {

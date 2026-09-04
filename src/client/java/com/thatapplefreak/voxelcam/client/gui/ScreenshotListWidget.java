@@ -1,15 +1,18 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import java.io.File;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 /**
  * Scrolling screenshot list. Extends the vanilla entry list so scrollbar,
@@ -20,7 +23,16 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 
 	public static final int ROW_HEIGHT = 32;
 	private static final int THUMBNAIL_WIDTH = 44;
-	private static final int PADDING = 4;
+	private static final Identifier STAR_TEXTURE = Identifier.fromNamespaceAndPath(VoxelCamClient.MOD_ID, "textures/star.png");
+	private static final int BADGE_SIZE = 10;
+	private static final int BADGE_TEXTURE_SIZE = 16;
+	private static final int BADGE_GOLD = 0xFFFFD700;
+	// Compiled once rather than per String.replaceFirst call: an entry is built for every
+	// file in the folder, and rebuildWidgets() rebuilds the lot on resize and on every
+	// popup return. Case-sensitive, unlike ScreenshotMetadata's (?i) version — narration
+	// has always read a "shot.PNG" out with its extension and this is not the change that
+	// should alter that.
+	private static final Pattern PNG_SUFFIX = Pattern.compile("\\.png$");
 
 	private final Consumer<File> onSelected;
 
@@ -62,7 +74,7 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 
 		ScreenshotEntry(File file) {
 			this.file = file;
-			this.displayName = file.getName().replaceFirst("\\.png$", "");
+			this.displayName = PNG_SUFFIX.matcher(file.getName()).replaceFirst("");
 		}
 
 		@Override
@@ -97,6 +109,17 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 				context.blit(RenderPipelines.GUI_TEXTURED, thumb.id(),
 						thumbX + (THUMBNAIL_WIDTH - drawWidth) / 2, thumbY + (thumbHeight - drawHeight) / 2,
 						0F, 0F, drawWidth, drawHeight, thumb.width(), thumb.height(), thumb.width(), thumb.height());
+			}
+			// Badge only appears when starred — an empty corner already reads as "not
+			// starred" without a dim placeholder cluttering every other row.
+			if (ScreenshotMetadata.isStarred(file)) {
+				// blit's params are (u, v, width, height, srcWidth, srcHeight, texW, texH):
+				// the draw size comes before the sampled region size, not after — swapping
+				// them samples a corner of the icon and stretches it, not the whole star.
+				context.blit(RenderPipelines.GUI_TEXTURED, STAR_TEXTURE,
+						thumbX + THUMBNAIL_WIDTH - BADGE_SIZE - 1, thumbY + 1,
+						0F, 0F, BADGE_SIZE, BADGE_SIZE, BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE,
+						BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_GOLD);
 			}
 
 			int textX = thumbX + THUMBNAIL_WIDTH + 6;
