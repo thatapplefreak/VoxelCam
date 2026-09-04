@@ -5,8 +5,12 @@ import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -24,6 +28,9 @@ import net.minecraft.resources.Identifier;
  * would stutter if it decoded thumbnails inline while scrolling. Files are read
  * and (for thumbnails) downscaled on a background thread; only the GL upload
  * happens on the render thread, via {@link #uploadPending()}.
+ *
+ * <p>Full-size entries are capped at {@link #MAX_FULL_SIZE} and evicted least recently
+ * used first; thumbnails are not, because the list only asks for the rows on screen.
  */
 public final class ScreenshotImageCache {
 
@@ -47,7 +54,29 @@ public final class ScreenshotImageCache {
 	/** Wide enough to stay sharp at high GUI scales; still ~1/400th of a full screenshot's pixels. */
 	private static final int THUMBNAIL_WIDTH = 128;
 
+	/**
+	 * How many full-size previews may stay resident at once.
+	 *
+	 * <p>A full-size entry is expensive in a way a thumbnail is not: {@code DynamicTexture}
+	 * keeps the decoded {@link NativeImage} alive for the texture's lifetime as well as the
+	 * RGBA8 texture itself, so one 4K preview costs about 32 MiB of native heap and another
+	 * 32 MiB of VRAM — neither of them on the Java heap, so no amount of GC pressure reclaims
+	 * them. Thumbnails need no such cap: the list only asks for the rows the viewport shows,
+	 * and at 128px wide they are ~1/400th of the pixels each.
+	 *
+	 * <p>Three rather than one because selection moves a row at a time: keeping the
+	 * neighbours makes arrowing back and forth between two shots free, and three 4K previews
+	 * are still under 100 MiB of each. Anything older is cheap to decode again.
+	 */
+	static final int MAX_FULL_SIZE = 3;
+
 	private static final Map<Key, Loaded> LOADED = new HashMap<>();
+	/**
+	 * The files with a resident full-size preview, least recently used first. Touched only
+	 * from the render thread, like {@link #IN_FLIGHT} — a loader thread never sees it, since
+	 * an entry is only born once a decode has landed and been uploaded.
+	 */
+	private static final Set<File> FULL_SIZE_LRU = new LinkedHashSet<>();
 	/**
 	 * The claim number of the decode currently running for each key. A number rather than
 	 * bare membership because {@link #release(File)} can drop a claim while its decode is
@@ -84,6 +113,13 @@ public final class ScreenshotImageCache {
 		Key key = new Key(file, thumbnail);
 		Loaded ready = LOADED.get(key);
 		if (ready != null) {
+			if (!thumbnail) {
+				// Recency has to follow what is actually being drawn, not what was uploaded
+				// last: decodes can land out of the order they were asked for, so without
+				// this the preview on screen could be the eldest entry and get evicted by a
+				// late arrival, only to be decoded again next frame.
+				touchFullSize(file);
+			}
 			return ready;
 		}
 		if (!isLoading(file, thumbnail) && !FAILED.contains(key)) {
@@ -92,6 +128,35 @@ public final class ScreenshotImageCache {
 			submit(key, claim);
 		}
 		return null;
+	}
+
+	/**
+	 * Marks this file's full-size preview the most recently used one.
+	 *
+	 * <p>The remove is load-bearing: {@code LinkedHashSet.add} leaves an element that is
+	 * already present where it was, so without it the set would stay in first-upload order
+	 * and "least recently used" would mean "oldest", which is a different thing.
+	 */
+	static void touchFullSize(File file) {
+		FULL_SIZE_LRU.remove(file);
+		FULL_SIZE_LRU.add(file);
+	}
+
+	/**
+	 * Makes this file the most recently used full-size preview and returns the ones that no
+	 * longer fit under {@link #MAX_FULL_SIZE}, least recently used first, for the caller to
+	 * release. Returning them rather than releasing them here is what keeps this method free
+	 * of {@code Minecraft} and so testable outside the game.
+	 */
+	static List<File> retainFullSize(File file) {
+		touchFullSize(file);
+		List<File> evicted = new ArrayList<>();
+		Iterator<File> leastRecent = FULL_SIZE_LRU.iterator();
+		while (FULL_SIZE_LRU.size() > MAX_FULL_SIZE) {
+			evicted.add(leastRecent.next());
+			leastRecent.remove();
+		}
+		return evicted;
 	}
 
 	/** Whether a decode is already running for this file at this size. */
@@ -242,6 +307,16 @@ public final class ScreenshotImageCache {
 			if (previous != null) {
 				Minecraft.getInstance().getTextureManager().release(previous.id());
 			}
+			if (!decoded.key().thumbnail()) {
+				// After the register, not before: a register that threw left no texture to
+				// account for, and claiming a slot for it would evict a live one for nothing.
+				for (File stale : retainFullSize(decoded.key().file())) {
+					Loaded dropped = LOADED.remove(new Key(stale, false));
+					if (dropped != null) {
+						Minecraft.getInstance().getTextureManager().release(dropped.id());
+					}
+				}
+			}
 		}
 	}
 
@@ -265,6 +340,7 @@ public final class ScreenshotImageCache {
 			FAILED.remove(key);
 			IN_FLIGHT.remove(key);
 		}
+		FULL_SIZE_LRU.remove(file);
 	}
 
 	public static void releaseAll() {
@@ -274,6 +350,7 @@ public final class ScreenshotImageCache {
 		LOADED.clear();
 		FAILED.clear();
 		IN_FLIGHT.clear();
+		FULL_SIZE_LRU.clear();
 		// Decodes still running on a loader thread outlive this call. Bumping the
 		// generation under the handover lock is what makes each of them free its own
 		// result; draining covers the ones that finished before the bump landed.

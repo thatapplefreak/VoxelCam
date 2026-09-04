@@ -196,8 +196,14 @@ at the call site, and its chat feedback is bounced back through `client.execute`
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
 rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display names.
 
-Four invariants that are easy to break:
+Five invariants that are easy to break:
 
+- **Full-size previews are capped in the cache, not at the call site.** `MAX_FULL_SIZE` of them stay
+  resident, evicted least recently used first as a new one is registered; `get` on a hit is what
+  marks recency, so what the preview is drawing is never the entry that falls out. Thumbnails are
+  deliberately uncapped — the list only asks for the rows the viewport shows. The bound belongs here
+  because `LOADED` is the only handle on a registered id: a caller that dropped its own reference
+  would strand the texture rather than free it.
 - **`ScreenshotImageCache` decodes off-thread but GPU uploads must happen on the render thread.**
   `GuiScreenShotManager.render()` calls `ScreenshotImageCache.uploadPending()` first for that reason.
   Its `extractRenderState()` must **not** call `extractBackground()` —
