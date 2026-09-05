@@ -4,9 +4,13 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
+import com.thatapplefreak.voxelcam.client.mixin.KeyMappingAccessor;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenuHud;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
@@ -41,6 +45,45 @@ public class VoxelCamClient implements ClientModInitializer {
 
 	private static KeyMapping openScreenshotManagerKey;
 
+	/**
+	 * Bound to F2 by default, same as vanilla's own {@code keyScreenshot} — Minecraft lets
+	 * multiple {@code KeyMapping}s share one physical key, each independently tracking its own
+	 * down/up state from GLFW, so this reads hold duration without a raw keyboard mixin. Vanilla's
+	 * own binding still fires its usual callback at key-down; {@code ScreenshotHandler} just
+	 * always cancels it now and lets {@link CaptureMenu} decide what actually happens.
+	 */
+	private static KeyMapping captureMenuKey;
+
+	/**
+	 * Whether the capture-menu key is physically down right now. Vanilla's own screenshot key
+	 * fires its callback while this is true, and that callback has to keep its hands off — see
+	 * {@code ScreenshotHandler.onScreenshotKeyPressed}.
+	 *
+	 * <p>GLFW is asked for the raw key state rather than the mapping's own {@code isDown()}.
+	 * Vanilla handles the screenshot key from {@code RenderSystem.pollEvents()}, i.e. inside the
+	 * key callback itself, and whether {@code KeyMapping} has had its down-state updated by that
+	 * point is vanilla's internal ordering — not something to bet a double screenshot on every
+	 * press against. The raw state is already true when the callback runs, whatever that ordering
+	 * is. The key is resolved from the binding rather than hardcoded, so rebinding the menu off F2
+	 * leaves vanilla's F2 taking an ordinary screenshot instead of being swallowed.
+	 */
+	/** The capture-menu binding itself. Exposed so the gametest can report its state on failure. */
+	public static KeyMapping captureMenuKey() {
+		return captureMenuKey;
+	}
+
+	public static boolean isCaptureMenuKeyDown() {
+		if (captureMenuKey == null) {
+			return false;
+		}
+		InputConstants.Key bound = ((KeyMappingAccessor) captureMenuKey).getKey();
+		if (bound == null || bound.equals(InputConstants.UNKNOWN)
+				|| bound.getType() != InputConstants.Type.KEYSYM) {
+			return false;
+		}
+		return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), bound.getValue());
+	}
+
 	@Override
 	public void onInitializeClient() {
 		openScreenshotManagerKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -49,9 +92,20 @@ public class VoxelCamClient implements ClientModInitializer {
 				InputConstants.KEY_H,
 				CATEGORY));
 
+		captureMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+				"key.voxelcam.capturemenu",
+				InputConstants.Type.KEYSYM,
+				InputConstants.KEY_F2,
+				CATEGORY));
+
 		BigScreenshotCommand.register();
 
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
+
+		// Last, so the menu draws over the hotbar and bars rather than under them.
+		HudElementRegistry.addLast(
+				Identifier.fromNamespaceAndPath(MOD_ID, "capture_menu"),
+				CaptureMenuHud::extractRenderState);
 
 		ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
 			if (screen instanceof TitleScreen || screen instanceof PauseScreen) {
@@ -157,6 +211,39 @@ public class VoxelCamClient implements ClientModInitializer {
 			if (client.gui.screen() == null) {
 				client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
 			}
+		}
+
+		// The press can arrive by any of three routes and the binding has no say in which: this
+		// mapping and vanilla's screenshot key both want F2, and vanilla's key map gives the key
+		// to exactly one of them. When it goes to vanilla, this mapping never sees a click or a
+		// down-state at all and the press arrives at ScreenshotHandler instead; when it goes here,
+		// vanilla's grab never fires. Reading all of them, and arming idempotently, is what makes
+		// the menu work either way — and asking GLFW directly also catches a hold whose press was
+		// consumed elsewhere.
+		while (captureMenuKey.consumeClick()) {
+			CaptureMenu.onKeyDown();
+		}
+
+		boolean down = isCaptureMenuKeyDown() || captureMenuKey.isDown();
+		if (down) {
+			// Not while a screen is up: the menu cannot open there anyway, and re-arming under one
+			// would leave a release after Escape asking for a screenshot nobody wanted.
+			if (client.gui.screen() == null) {
+				CaptureMenu.onKeyDown();
+			}
+		} else {
+			// The key is not held: a release if anything was armed, whoever armed it, and the
+			// point a cancelled menu stops being suppressed. Idle otherwise.
+			CaptureMenu.onKeyUp();
+		}
+
+		if (CaptureMenu.isArmed()) {
+			CaptureMenu.tick();
+		}
+		// A screen can appear while the menu is open (Escape, disconnect, inventory…) without the
+		// key itself ever going up; catch that here rather than leaving the cursor stuck freed.
+		if (CaptureMenu.isOpen() && client.gui.screen() != null) {
+			CaptureMenu.abort();
 		}
 	}
 }

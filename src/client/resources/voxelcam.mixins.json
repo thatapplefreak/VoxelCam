@@ -4,6 +4,8 @@
 	"package": "com.thatapplefreak.voxelcam.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"KeyMappingAccessor",
+		"KeyboardHandlerMixin",
 		"MinecraftClientMixin",
 		"ScreenshotRecorderMixin"
 	],

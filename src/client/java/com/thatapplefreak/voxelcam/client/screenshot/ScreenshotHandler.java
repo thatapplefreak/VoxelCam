@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
@@ -25,25 +24,57 @@ public final class ScreenshotHandler {
 	private ScreenshotHandler() {
 	}
 
-	/** @return true if VoxelCam handled the screenshot and vanilla's save should be cancelled. */
+	/**
+	 * Always cancels vanilla's own save: letting it through would write a file under its own
+	 * naming scheme, bypassing {@link ScreenshotNamer} entirely.
+	 *
+	 * <p>Whether it captures is a different question. Vanilla's screenshot key fires this once at
+	 * key-down and cannot tell a tap from a hold, so while VoxelCam's own binding on that key is
+	 * involved the decision belongs to {@link CaptureMenu}, which makes it on release — capturing
+	 * here as well would take a second, unwanted screenshot on every hold.
+	 *
+	 * <p>Everything else still captures on the spot. {@code Screenshot.grab} is public API that
+	 * other mods and code paths call, and a press brief enough that the tick-based edge detector
+	 * never sees the key down never reaches {@link CaptureMenu} at all — swallowing those would
+	 * lose screenshots VoxelCam used to take.
+	 *
+	 * @return true, always, so vanilla's own save is cancelled.
+	 */
 	public static boolean onScreenshotKeyPressed(RenderTarget framebuffer) {
+		if (CaptureMenu.isArmed()) {
+			return true;
+		}
+		if (VoxelCamClient.isCaptureMenuKeyDown() && Minecraft.getInstance().gui.screen() == null) {
+			// This call *is* the press, and it is the only signal that reliably arrives: both
+			// bindings want F2, vanilla's key map hands the key to exactly one of them, and if
+			// that one is vanilla's then nothing on the tick side ever sees the key at all.
+			//
+			// With a screen open the menu has nowhere to go, so that press falls through and takes
+			// an ordinary screenshot the way the key always did over a GUI.
+			CaptureMenu.onKeyDown();
+			return true;
+		}
+
+		captureNow(framebuffer);
+		return true;
+	}
+
+	static boolean isSaving() {
+		return saving;
+	}
+
+	/** Takes a plain screenshot right now, resolving its own framebuffer. */
+	static void captureNow() {
+		captureNow(Minecraft.getInstance().gameRenderer.mainRenderTarget());
+	}
+
+	/** Takes a plain screenshot of the given frame, refusing while another save is in flight. */
+	static void captureNow(RenderTarget framebuffer) {
 		if (saving || BigScreenshot.isBusy()) {
 			ChatMessages.send("voxelcam.savingpleasewait");
-			return true;
+			return;
 		}
-
-		Minecraft client = Minecraft.getInstance();
-		boolean shiftHeld = InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_LSHIFT)
-				|| InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_RSHIFT);
-		if (shiftHeld) {
-			BigScreenshot.request();
-			// Always cancel vanilla, refusals included: letting it through would write a file
-			// under its own naming scheme, bypassing ScreenshotNamer entirely.
-			return true;
-		}
-
 		capture(framebuffer);
-		return true;
 	}
 
 	private static void capture(RenderTarget framebuffer) {

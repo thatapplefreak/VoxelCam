@@ -14,9 +14,10 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 
 /**
- * {@code /bigscreenshot} (or {@code /bs}) sets the size an oversized capture will use; the
- * screenshot key with shift held is what actually takes one. Feedback goes through the command
- * source rather than {@code ChatMessages} because a client command only ever runs with a player.
+ * {@code /bigscreenshot} (or {@code /bs}) sets the size an oversized capture will use; holding the
+ * capture-menu key and aiming at the big-screenshot wedge is what actually takes one. Feedback
+ * goes through the command source rather than {@code ChatMessages} because a client command only
+ * ever runs with a player.
  */
 public final class BigScreenshotCommand {
 

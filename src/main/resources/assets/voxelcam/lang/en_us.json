@@ -1,6 +1,7 @@
 {
 	"key.category.voxelcam.voxelcam": "VoxelCam",
 	"key.voxelcam.openscreenshotmanager": "Screenshot Manager",
+	"key.voxelcam.capturemenu": "Screenshot / Capture Menu",
 
 	"voxelcam.chat.prefix": "[VoxelCam]",
 
@@ -72,7 +73,10 @@
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
 	"voxelcam.rename.failed": "Could not rename this screenshot — try another name",
 
-	"voxelcam.bigshot.current": "Big screenshot size is %s. Shift+F2 to take one.",
+	"voxelcam.capturemenu.screenshot": "Screenshot",
+	"voxelcam.capturemenu.bigscreenshot": "Big Screenshot",
+
+	"voxelcam.bigshot.current": "Big screenshot size is %s. Hold F2 and aim to pick it.",
 	"voxelcam.bigshot.set": "Big screenshot size set to %s",
 	"voxelcam.bigshot.clamped": "Clamped to this GPU's maximum texture size of %s",
 	"voxelcam.bigshot.invalid": "Don't know the size '%s'. Try WIDTHxHEIGHT, or one of: %s",
