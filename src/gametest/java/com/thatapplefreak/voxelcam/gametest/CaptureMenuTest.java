@@ -44,12 +44,22 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Released well under the hold threshold: a tap, not a hold, same as today's instant capture. */
+	/**
+	 * Released well under the hold threshold: a tap, not a hold, same as the instant capture the
+	 * screenshot key always did.
+	 *
+	 * <p>Both transitions go in one client-thread task on purpose. Split across two, real ticks
+	 * elapse in between and {@code VoxelCamClient}'s end-tick hook advances the hold far enough to
+	 * open the menu — the test would then be exercising the hold path while still looking like it
+	 * passed, since a centred release fires a plain screenshot too.
+	 */
 	private static void assertATapTakesAPlainScreenshot(ClientGameTestContext context, File dir) {
 		Set<String> before = listing(dir);
 
-		context.runOnClient(client -> CaptureMenu.onKeyDown());
-		context.runOnClient(client -> CaptureMenu.onKeyUp());
+		context.runOnClient(client -> {
+			CaptureMenu.onKeyDown();
+			CaptureMenu.onKeyUp();
+		});
 		// PNG encoding runs on the IO worker, so the file appears a little after the frame.
 		context.waitTicks(40);
 

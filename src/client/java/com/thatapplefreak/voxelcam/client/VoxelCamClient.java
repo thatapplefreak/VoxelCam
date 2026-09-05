@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
+import com.thatapplefreak.voxelcam.client.mixin.KeyMappingAccessor;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenuHud;
 import net.fabricmc.api.ClientModInitializer;
@@ -54,6 +55,31 @@ public class VoxelCamClient implements ClientModInitializer {
 	private static KeyMapping captureMenuKey;
 
 	private static boolean wasCaptureMenuKeyDown = false;
+
+	/**
+	 * Whether the capture-menu key is physically down right now. Vanilla's own screenshot key
+	 * fires its callback while this is true, and that callback has to keep its hands off — see
+	 * {@code ScreenshotHandler.onScreenshotKeyPressed}.
+	 *
+	 * <p>GLFW is asked for the raw key state rather than the mapping's own {@code isDown()}.
+	 * Vanilla handles the screenshot key from {@code RenderSystem.pollEvents()}, i.e. inside the
+	 * key callback itself, and whether {@code KeyMapping} has had its down-state updated by that
+	 * point is vanilla's internal ordering — not something to bet a double screenshot on every
+	 * press against. The raw state is already true when the callback runs, whatever that ordering
+	 * is. The key is resolved from the binding rather than hardcoded, so rebinding the menu off F2
+	 * leaves vanilla's F2 taking an ordinary screenshot instead of being swallowed.
+	 */
+	public static boolean isCaptureMenuKeyDown() {
+		if (captureMenuKey == null) {
+			return false;
+		}
+		InputConstants.Key bound = ((KeyMappingAccessor) captureMenuKey).getKey();
+		if (bound == null || bound.equals(InputConstants.UNKNOWN)
+				|| bound.getType() != InputConstants.Type.KEYSYM) {
+			return false;
+		}
+		return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), bound.getValue());
+	}
 
 	@Override
 	public void onInitializeClient() {

@@ -26,14 +26,26 @@ public final class ScreenshotHandler {
 
 	/**
 	 * Always cancels vanilla's own save: letting it through would write a file under its own
-	 * naming scheme, bypassing {@link ScreenshotNamer} entirely. What used to decide here — take
-	 * a plain screenshot, or a big one if shift was held — is {@link CaptureMenu}'s job now, since
-	 * vanilla's callback fires once at key-down with no way to tell a tap from a hold at that
-	 * instant.
+	 * naming scheme, bypassing {@link ScreenshotNamer} entirely.
+	 *
+	 * <p>Whether it captures is a different question. Vanilla's screenshot key fires this once at
+	 * key-down and cannot tell a tap from a hold, so while VoxelCam's own binding on that key is
+	 * involved the decision belongs to {@link CaptureMenu}, which makes it on release — capturing
+	 * here as well would take a second, unwanted screenshot on every hold.
+	 *
+	 * <p>Everything else still captures on the spot. {@code Screenshot.grab} is public API that
+	 * other mods and code paths call, and a press brief enough that the tick-based edge detector
+	 * never sees the key down never reaches {@link CaptureMenu} at all — swallowing those would
+	 * lose screenshots VoxelCam used to take.
 	 *
 	 * @return true, always, so vanilla's own save is cancelled.
 	 */
 	public static boolean onScreenshotKeyPressed(RenderTarget framebuffer) {
+		if (VoxelCamClient.isCaptureMenuKeyDown() || CaptureMenu.isArmed()) {
+			return true;
+		}
+
+		captureNow(framebuffer);
 		return true;
 	}
 
@@ -43,11 +55,16 @@ public final class ScreenshotHandler {
 
 	/** Takes a plain screenshot right now, resolving its own framebuffer. */
 	static void captureNow() {
+		captureNow(Minecraft.getInstance().gameRenderer.mainRenderTarget());
+	}
+
+	/** Takes a plain screenshot of the given frame, refusing while another save is in flight. */
+	static void captureNow(RenderTarget framebuffer) {
 		if (saving || BigScreenshot.isBusy()) {
 			ChatMessages.send("voxelcam.savingpleasewait");
 			return;
 		}
-		capture(Minecraft.getInstance().gameRenderer.mainRenderTarget());
+		capture(framebuffer);
 	}
 
 	private static void capture(RenderTarget framebuffer) {
