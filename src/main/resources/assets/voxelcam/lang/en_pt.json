@@ -1,6 +1,7 @@
 {
 	"key.category.voxelcam.voxelcam": "VoxelCam",
 	"key.voxelcam.openscreenshotmanager": "Open th' Map Chest",
+	"key.voxelcam.capturemenu": "Chart a Map / Chartin' Wheel",
 
 	"voxelcam.chat.prefix": "[VoxelCam]",
 
@@ -72,7 +73,10 @@
 	"voxelcam.rename.invalid": "That name's got scallywag characters that ain't allowed",
 	"voxelcam.rename.failed": "Couldn't re-christen this map — try another name",
 
-	"voxelcam.bigshot.current": "Yer big map size be %s. Shift+F2 t' chart one.",
+	"voxelcam.capturemenu.screenshot": "Chart a Map",
+	"voxelcam.capturemenu.bigscreenshot": "Big Map",
+
+	"voxelcam.bigshot.current": "Yer big map size be %s. Hold F2 an' aim t' pick it.",
 	"voxelcam.bigshot.set": "Big map size set t' %s",
 	"voxelcam.bigshot.clamped": "Clamped t' this here GPU's max canvas size o' %s",
 	"voxelcam.bigshot.invalid": "Don't know th' size '%s'. Try WIDTHxHEIGHT, or one o': %s",

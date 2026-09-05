@@ -4,9 +4,12 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenuHud;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
@@ -41,6 +44,17 @@ public class VoxelCamClient implements ClientModInitializer {
 
 	private static KeyMapping openScreenshotManagerKey;
 
+	/**
+	 * Bound to F2 by default, same as vanilla's own {@code keyScreenshot} — Minecraft lets
+	 * multiple {@code KeyMapping}s share one physical key, each independently tracking its own
+	 * down/up state from GLFW, so this reads hold duration without a raw keyboard mixin. Vanilla's
+	 * own binding still fires its usual callback at key-down; {@code ScreenshotHandler} just
+	 * always cancels it now and lets {@link CaptureMenu} decide what actually happens.
+	 */
+	private static KeyMapping captureMenuKey;
+
+	private static boolean wasCaptureMenuKeyDown = false;
+
 	@Override
 	public void onInitializeClient() {
 		openScreenshotManagerKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -49,9 +63,17 @@ public class VoxelCamClient implements ClientModInitializer {
 				InputConstants.KEY_H,
 				CATEGORY));
 
+		captureMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+				"key.voxelcam.capturemenu",
+				InputConstants.Type.KEYSYM,
+				InputConstants.KEY_F2,
+				CATEGORY));
+
 		BigScreenshotCommand.register();
 
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
+
+		HudRenderCallback.EVENT.register(CaptureMenuHud::render);
 
 		ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
 			if (screen instanceof TitleScreen || screen instanceof PauseScreen) {
@@ -157,6 +179,24 @@ public class VoxelCamClient implements ClientModInitializer {
 			if (client.gui.screen() == null) {
 				client.setScreenAndShow(new GuiScreenShotManager(screenshotsDir(client)));
 			}
+		}
+
+		// isDown(), not consumeClick(): the menu needs continuous hold state, not a discrete pulse.
+		boolean down = captureMenuKey.isDown();
+		if (down && !wasCaptureMenuKeyDown) {
+			CaptureMenu.onKeyDown();
+		} else if (!down && wasCaptureMenuKeyDown) {
+			CaptureMenu.onKeyUp();
+		}
+		wasCaptureMenuKeyDown = down;
+
+		if (CaptureMenu.isArmed()) {
+			CaptureMenu.tick();
+		}
+		// A screen can appear while the menu is open (Escape, disconnect, inventory…) without the
+		// key itself ever going up; catch that here rather than leaving the cursor stuck freed.
+		if (CaptureMenu.isOpen() && client.gui.screen() != null) {
+			CaptureMenu.abort();
 		}
 	}
 }

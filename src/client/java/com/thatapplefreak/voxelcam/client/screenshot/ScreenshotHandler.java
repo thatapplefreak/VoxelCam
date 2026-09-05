@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
@@ -25,25 +24,30 @@ public final class ScreenshotHandler {
 	private ScreenshotHandler() {
 	}
 
-	/** @return true if VoxelCam handled the screenshot and vanilla's save should be cancelled. */
+	/**
+	 * Always cancels vanilla's own save: letting it through would write a file under its own
+	 * naming scheme, bypassing {@link ScreenshotNamer} entirely. What used to decide here — take
+	 * a plain screenshot, or a big one if shift was held — is {@link CaptureMenu}'s job now, since
+	 * vanilla's callback fires once at key-down with no way to tell a tap from a hold at that
+	 * instant.
+	 *
+	 * @return true, always, so vanilla's own save is cancelled.
+	 */
 	public static boolean onScreenshotKeyPressed(RenderTarget framebuffer) {
+		return true;
+	}
+
+	static boolean isSaving() {
+		return saving;
+	}
+
+	/** Takes a plain screenshot right now, resolving its own framebuffer. */
+	static void captureNow() {
 		if (saving || BigScreenshot.isBusy()) {
 			ChatMessages.send("voxelcam.savingpleasewait");
-			return true;
+			return;
 		}
-
-		Minecraft client = Minecraft.getInstance();
-		boolean shiftHeld = InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_LSHIFT)
-				|| InputConstants.isKeyDown(client.getWindow(), InputConstants.KEY_RSHIFT);
-		if (shiftHeld) {
-			BigScreenshot.request();
-			// Always cancel vanilla, refusals included: letting it through would write a file
-			// under its own naming scheme, bypassing ScreenshotNamer entirely.
-			return true;
-		}
-
-		capture(framebuffer);
-		return true;
+		capture(Minecraft.getInstance().gameRenderer.mainRenderTarget());
 	}
 
 	private static void capture(RenderTarget framebuffer) {
