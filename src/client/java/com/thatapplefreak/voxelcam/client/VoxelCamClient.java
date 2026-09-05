@@ -231,8 +231,9 @@ public class VoxelCamClient implements ClientModInitializer {
 			if (client.gui.screen() == null) {
 				CaptureMenu.onKeyDown();
 			}
-		} else if (CaptureMenu.isArmed()) {
-			// Armed but the key is no longer held, whoever armed it: that is the release.
+		} else {
+			// The key is not held: a release if anything was armed, whoever armed it, and the
+			// point a cancelled menu stops being suppressed. Idle otherwise.
 			CaptureMenu.onKeyUp();
 		}
 

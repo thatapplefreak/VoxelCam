@@ -44,6 +44,7 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyTapTakesAPlainScreenshot(context, dir);
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
+			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
 		}
 	}
@@ -120,27 +121,29 @@ public class CaptureMenuTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * The aim is set and the key released inside a single client-thread task, atomically: the HUD
-	 * render callback also calls {@code CaptureMenu.setAimOffset} every frame from the real cursor
-	 * position, and a frame boundary between setting the aim and releasing would let it be
-	 * overwritten before {@code onKeyUp()} ever reads it.
+	 * Held, aimed with the mouse and released, all through real input — which is the only way the
+	 * aim can be trusted here. Setting it directly does not survive: the HUD recomputes the offset
+	 * from the live cursor on every frame, so anything written by hand is gone by the next one.
+	 * Moving the cursor for real and waiting for the selection to follow also covers the wiring
+	 * between the two, which is where an aimed release actually gets its mode from.
 	 */
 	private static void assertAHeldAndAimedReleaseTakesTheAimedMode(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
 
-		context.runOnClient(client -> {
-			BigScreenshot.setSize(BigScreenshotSize.parse("2x"));
-			CaptureMenu.onKeyDown();
-		});
-		context.waitFor(client -> CaptureMenu.isOpen(), 200);
+		context.runOnClient(client -> BigScreenshot.setSize(BigScreenshotSize.parse("2x")));
 
-		context.runOnClient(client -> {
-			// Straight down from the anchor: unambiguously the second wedge (BIG_SCREENSHOT),
-			// far from wedge 0's dead-centre default.
-			CaptureMenu.setAimOffset(0, 1000);
-			CaptureMenu.onKeyUp();
-		});
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+			// Straight down from the centre the cursor was released at, well clear of the dead
+			// zone: unambiguously the second wedge, BIG_SCREENSHOT.
+			context.getInput().moveCursor(0, 150);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT, 100);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
 
 		// The selection is queued first and only reaches BigScreenshot on a menu-free frame, so
 		// waiting on isBusy() alone would sail straight through before the request even happened.
@@ -157,6 +160,48 @@ public class CaptureMenuTest implements FabricClientGameTest {
 	}
 
 	/**
+	 * Escape backs out: no screenshot, and no pause screen either — cancelling out of the picker
+	 * should leave the player exactly where they were.
+	 *
+	 * <p>The key is still held at that point, which is the whole difficulty: the tick after the
+	 * cancel sees it down, and without the menu staying suppressed until release it simply reopens
+	 * and there is no way to back out at all.
+	 */
+	private static void assertEscapeCancelsWithoutCapturingOrPausing(ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+
+			if (CaptureMenu.isOpen()) {
+				throw new AssertionError("escape should have closed the picker");
+			}
+			if (context.computeOnClient(client -> client.gui.screen() != null)) {
+				throw new AssertionError("escape out of the picker should not have paused the game");
+			}
+			// Still held: the picker must stay shut rather than springing back open.
+			context.waitTicks(20);
+			if (CaptureMenu.isOpen()) {
+				throw new AssertionError("the picker reopened while the key was still held");
+			}
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+
+		context.waitTicks(40);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> !name.endsWith(".png"));
+		if (!after.isEmpty()) {
+			throw new AssertionError("a cancelled picker should not have captured anything, wrote " + after);
+		}
+	}
+
+	/**
 	 * A screen can appear while the menu is open without the key itself ever going up (Escape,
 	 * disconnect, inventory…); {@code VoxelCamClient}'s end-tick guard is what has to catch that.
 	 */
@@ -164,15 +209,23 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			ClientGameTestContext context, File dir) {
 		Set<String> before = listing(dir);
 
-		context.runOnClient(client -> CaptureMenu.onKeyDown());
-		context.waitFor(client -> CaptureMenu.isOpen(), 200);
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
 
-		context.runOnClient(client -> client.gui.setScreen(new PauseScreen(false)));
-		context.waitTicks(5);
+			// Opened directly rather than by pressing Escape, which the picker now swallows: this
+			// is the other way a screen can arrive, and the end-tick guard is what has to see it.
+			context.runOnClient(client -> client.gui.setScreen(new PauseScreen(false)));
+			context.waitTicks(10);
 
-		if (CaptureMenu.isArmed()) {
-			throw new AssertionError("a screen opening while the menu is open should abort it");
+			if (CaptureMenu.isArmed()) {
+				throw new AssertionError("a screen opening while the menu is open should abort it");
+			}
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
 		}
+		context.waitTicks(40);
+
 		Set<String> after = listing(dir);
 		after.removeAll(before);
 		after.removeIf(name -> !name.endsWith(".png"));

@@ -64,6 +64,10 @@ public final class CaptureMenu {
 
 	private static boolean cursorWasGrabbed;
 
+	// Set when a menu is cancelled with the key still held. Without it the very next tick sees the
+	// key down and opens the menu straight back up, and cancelling would be impossible to do.
+	private static boolean suppressUntilRelease;
+
 	// A fired mode waits here for a frame that no longer has the menu in it — see beforeBlit().
 	private static Mode pendingCapture;
 	private static boolean pendingFrameStarted;
@@ -99,6 +103,9 @@ public final class CaptureMenu {
 
 	/** Called once when the capture-menu key transitions from up to down. */
 	public static void onKeyDown() {
+		if (suppressUntilRelease) {
+			return;
+		}
 		if (state != State.IDLE) {
 			// A duplicate down without an intervening up shouldn't happen, but must not reset
 			// ticksHeld and re-arm a menu that is already open.
@@ -137,8 +144,12 @@ public final class CaptureMenu {
 		freeCursor(client);
 	}
 
-	/** Called once when the capture-menu key transitions from down to up. */
+	/**
+	 * Called whenever the capture-menu key is not held. Idle most of the time; this is also where
+	 * a cancelled menu stops being suppressed, since letting go is what ends that interaction.
+	 */
 	public static void onKeyUp() {
+		suppressUntilRelease = false;
 		switch (state) {
 			case ARMED -> {
 				state = State.IDLE;
@@ -201,17 +212,23 @@ public final class CaptureMenu {
 	static void discardPendingCapture() {
 		pendingCapture = null;
 		pendingFrameStarted = false;
+		suppressUntilRelease = false;
 	}
 
 	/**
-	 * Drops back to idle without firing anything, restoring the cursor if it had been freed.
-	 * Used when a screen opens (Escape, disconnect, inventory…) while the menu is open.
+	 * Drops back to idle without firing anything, restoring the cursor if it had been freed — the
+	 * cancel, whether it came from Escape or from a screen opening underneath the menu.
+	 *
+	 * <p>Nothing is captured, and nothing will be until the key is let go: the player is still
+	 * holding it at this point, and re-opening on the next tick would make the menu impossible to
+	 * back out of.
 	 */
 	public static void abort() {
 		if (state == State.OPEN) {
 			restoreCursor(Minecraft.getInstance());
 		}
 		state = State.IDLE;
+		suppressUntilRelease = true;
 	}
 
 	private static void fire(Mode mode) {
