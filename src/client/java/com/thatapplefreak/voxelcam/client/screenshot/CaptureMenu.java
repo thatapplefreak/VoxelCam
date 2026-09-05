@@ -18,10 +18,9 @@ import net.minecraft.client.Minecraft;
  * <p>Freeing the mouse to aim the menu without opening a full {@code Screen} (a {@code Screen}
  * would rebuild widgets and reposition things — the wrong tool here) rides on
  * {@code MouseHandler.releaseMouse()}/{@code grabMouse()}, the same pair vanilla's own
- * {@code Screen} open/close path uses internally. That pairing could not be confirmed against the
- * 26.2 client jar from this environment (no network access to fetch one) — verify with
- * {@code javap -p net.minecraft.client.MouseHandler} before relying on it, per this repo's own
- * documented practice for exactly this situation.
+ * {@code Screen} open/close path uses internally. Restoring is deliberately skipped while a screen
+ * is open: vanilla re-grabs on its own when that screen closes, and grabbing underneath it would
+ * capture the cursor on a menu the player is still using.
  */
 public final class CaptureMenu {
 
@@ -170,7 +169,9 @@ public final class CaptureMenu {
 	}
 
 	private static void restoreCursor(Minecraft client) {
-		if (cursorWasGrabbed) {
+		// A screen opening is what aborted the menu in the first place on that path; vanilla
+		// re-grabs when it closes, so grabbing here would capture the cursor out from under it.
+		if (cursorWasGrabbed && client.gui.screen() == null) {
 			client.mouseHandler.grabMouse();
 		}
 		cursorWasGrabbed = false;

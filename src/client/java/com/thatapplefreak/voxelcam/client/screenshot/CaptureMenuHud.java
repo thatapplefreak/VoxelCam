@@ -1,24 +1,19 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
-import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
 /**
  * Draws the radial capture menu while {@link CaptureMenu#isOpen()}. Kept separate from the state
  * machine so that one stays renderer-free and unit-testable without a GL context.
  *
- * <p>This is the first use of Fabric API's {@code HudRenderCallback} in this codebase — everything
- * else here draws through the retained-mode {@code Screen}/{@code AbstractWidget} extraction API
- * (see {@code GuiScreenShotManager} and friends), which only runs while a {@code Screen} is open.
- * Whether 26.x's HUD layer still hands out a plain {@code GuiGraphics} for immediate drawing the
- * way it always has, or has moved onto an extraction surface of its own the way {@code Screen}
- * rendering has, could not be confirmed from this environment — no network access to fetch the
- * Fabric API jar. Check the real {@code HudRenderCallback} interface signature first if this does
- * not compile as written.
+ * <p>This is the first thing in VoxelCam to draw during gameplay rather than inside a {@code
+ * Screen}. It registers as a Fabric {@code HudElement} (see {@code VoxelCamClient}), which fits the
+ * same retained-mode extraction model the rest of the GUI uses — the HUD hands out the very same
+ * {@code GuiGraphicsExtractor} the manager's screens extract into, so {@code fill}/{@code
+ * centeredText} work here exactly as they do there.
  */
 public final class CaptureMenuHud {
 
@@ -31,41 +26,40 @@ public final class CaptureMenuHud {
 	private CaptureMenuHud() {
 	}
 
-	public static void render(GuiGraphics guiGraphics, DeltaTracker tickCounter) {
+	public static void extractRenderState(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
 		if (!CaptureMenu.isOpen()) {
 			return;
 		}
 
 		Minecraft client = Minecraft.getInstance();
-		Window window = client.getWindow();
-		int centerX = guiGraphics.guiWidth() / 2;
-		int centerY = guiGraphics.guiHeight() / 2;
+		int centerX = graphics.guiWidth() / 2;
+		int centerY = graphics.guiHeight() / 2;
 
-		// mouseHandler positions are in screen-pixel space; guiWidth/guiHeight are GUI-scaled, so
-		// the offset has to be brought into the same space before it means anything as an angle.
-		double scale = window.getGuiScale();
-		double dx = client.mouseHandler.xpos() / scale - centerX;
-		double dy = client.mouseHandler.ypos() / scale - centerY;
-		CaptureMenu.setAimOffset(dx, dy);
+		// Scaled positions, so the aim offset lands in the same space the wedges are laid out in.
+		double mouseX = client.mouseHandler.getScaledXPos(client.getWindow());
+		double mouseY = client.mouseHandler.getScaledYPos(client.getWindow());
+		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY);
 
 		CaptureMenu.Mode aimed = CaptureMenu.aimedMode();
 		CaptureMenu.Mode[] modes = CaptureMenu.Mode.values();
 		double wedgeWidth = Math.PI * 2 / modes.length;
-		Font font = client.font;
 
 		for (int i = 0; i < modes.length; i++) {
+			// Wedge 0 sits straight up and the rest run clockwise, matching
+			// CaptureMenu.wedgeForAngle's convention — the two have to agree or the highlight
+			// lands on a different mode than the release fires.
 			double midAngle = i * wedgeWidth;
 			int color = modes[i] == aimed ? WEDGE_COLOR_HIGHLIGHT : WEDGE_COLOR;
 			int x = centerX + (int) Math.round(Math.sin(midAngle) * RADIUS);
 			int y = centerY - (int) Math.round(Math.cos(midAngle) * RADIUS);
 
-			// A small filled square at the wedge's mid-angle rather than a true pie slice —
-			// GuiGraphics has no polygon fill, and a real wedge would need a hand-rolled triangle
-			// fan. Good enough to show which mode is aimed at; a nicer shape is a cosmetic
-			// follow-up, not something this feature depends on.
-			guiGraphics.fill(x - MARKER_HALF_SIZE, y - MARKER_HALF_SIZE,
+			// A filled square at the wedge's mid-angle rather than a true pie slice: the extractor
+			// fills rectangles, and a real wedge would need a hand-rolled triangle fan. Enough to
+			// show which mode is aimed at; a nicer shape is cosmetic follow-up.
+			graphics.fill(x - MARKER_HALF_SIZE, y - MARKER_HALF_SIZE,
 					x + MARKER_HALF_SIZE, y + MARKER_HALF_SIZE, color);
-			guiGraphics.drawCenteredString(font, Component.translatable(labelKey(modes[i])), x, y - 4, LABEL_COLOR);
+			graphics.centeredText(client.font, Component.translatable(labelKey(modes[i])),
+					x, y - 4, LABEL_COLOR);
 		}
 	}
 
