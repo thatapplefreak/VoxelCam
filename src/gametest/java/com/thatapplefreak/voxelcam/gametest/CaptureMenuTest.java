@@ -60,6 +60,10 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			CaptureMenu.onKeyDown();
 			CaptureMenu.onKeyUp();
 		});
+
+		// The capture is owed, not taken: it waits for a frame that started after the menu closed,
+		// so that what lands in the png is a clean frame rather than one with the menu drawn on it.
+		context.waitFor(client -> !CaptureMenu.isCapturePending(), 200);
 		// PNG encoding runs on the IO worker, so the file appears a little after the frame.
 		context.waitTicks(40);
 
@@ -89,8 +93,9 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			CaptureMenu.onKeyUp();
 		});
 
-		// Two frames to resize and read back, then the IO worker to encode.
-		context.waitFor(client -> !BigScreenshot.isBusy(), 200);
+		// The selection is queued first and only reaches BigScreenshot on a menu-free frame, so
+		// waiting on isBusy() alone would sail straight through before the request even happened.
+		context.waitFor(client -> !CaptureMenu.isCapturePending() && !BigScreenshot.isBusy(), 200);
 		context.waitTicks(40);
 
 		File written = theNewFile(dir, before, "a held, aimed release");

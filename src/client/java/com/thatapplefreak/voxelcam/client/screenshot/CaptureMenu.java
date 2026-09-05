@@ -43,6 +43,14 @@ public final class CaptureMenu {
 	 */
 	private static final int HOLD_THRESHOLD_TICKS = 4;
 
+	/**
+	 * Radius, in GUI pixels, within which no wedge is aimed at and the first mode wins. Freeing the
+	 * cursor leaves it wherever it happens to sit, and with the wedges meeting at the centre a
+	 * pixel of drift would otherwise pick a neighbour — so a hold the player never aimed takes an
+	 * ordinary screenshot rather than whatever the cursor was nearest.
+	 */
+	private static final int DEAD_ZONE = 18;
+
 	// Tick-thread state only: onKeyDown/onKeyUp/tick all run from VoxelCamClient's end-tick hook.
 	private static State state = State.IDLE;
 	private static int ticksHeld;
@@ -54,6 +62,10 @@ public final class CaptureMenu {
 	private static double aimDy;
 
 	private static boolean cursorWasGrabbed;
+
+	// A fired mode waits here for a frame that no longer has the menu in it — see beforeBlit().
+	private static Mode pendingCapture;
+	private static boolean pendingFrameStarted;
 
 	private CaptureMenu() {
 	}
@@ -129,18 +141,65 @@ public final class CaptureMenu {
 		switch (state) {
 			case ARMED -> {
 				state = State.IDLE;
-				ScreenshotHandler.captureNow();
+				queue(Mode.SCREENSHOT);
 			}
 			case OPEN -> {
 				Mode mode = aimedMode();
 				restoreCursor(Minecraft.getInstance());
 				state = State.IDLE;
-				fire(mode);
+				queue(mode);
 			}
 			case IDLE -> {
 				// Defensive: a stray key-up with nothing armed must not throw.
 			}
 		}
+	}
+
+	/** True from a release until the capture it asked for has actually been taken. */
+	public static boolean isCapturePending() {
+		return pendingCapture != null;
+	}
+
+	/**
+	 * Head of {@code Minecraft.renderFrame}: marks that a frame has begun with the menu already
+	 * closed, so what {@link #beforeBlit()} finds in the framebuffer cannot still have it in it.
+	 */
+	public static void beforeFrame() {
+		if (pendingCapture != null) {
+			pendingFrameStarted = true;
+		}
+	}
+
+	/**
+	 * Just before the frame is presented, the same point the oversized path reads back from.
+	 *
+	 * <p>The capture is deferred to here rather than taken when the key comes up because at that
+	 * moment the framebuffer still holds the last frame drawn — the one with the menu on top of it.
+	 * Waiting for a frame that started after the menu closed is what makes the screenshot the first
+	 * clean frame instead of a picture of the menu.
+	 */
+	public static void beforeBlit() {
+		if (pendingCapture == null || !pendingFrameStarted) {
+			return;
+		}
+		Mode mode = pendingCapture;
+		pendingCapture = null;
+		pendingFrameStarted = false;
+		fire(mode);
+	}
+
+	private static void queue(Mode mode) {
+		pendingCapture = mode;
+		pendingFrameStarted = false;
+	}
+
+	/**
+	 * Drops a queued capture without taking it. Only the unit tests need this: they release the
+	 * key without a client to render the frame that would consume it, and this state is static.
+	 */
+	static void discardPendingCapture() {
+		pendingCapture = null;
+		pendingFrameStarted = false;
 	}
 
 	/**
@@ -195,13 +254,14 @@ public final class CaptureMenu {
 	}
 
 	/**
-	 * The mode a given offset from the menu's anchor selects. Dead centre (both zero, e.g. the
-	 * mouse never moved) resolves to the first mode rather than throwing — releasing at the
-	 * anchor should degrade to "just take a normal screenshot," never to doing nothing.
+	 * The mode a given offset from the menu's anchor selects. Anything inside {@link #DEAD_ZONE}
+	 * resolves to the first mode rather than to whichever wedge the cursor happens to lean into —
+	 * releasing without having aimed should degrade to "just take a normal screenshot," never to
+	 * doing nothing and never to a mode the player did not choose.
 	 */
 	static Mode modeForOffset(double dx, double dy) {
 		Mode[] modes = Mode.values();
-		if (dx == 0 && dy == 0) {
+		if (dx * dx + dy * dy < (double) DEAD_ZONE * DEAD_ZONE) {
 			return modes[0];
 		}
 		// atan2(dx, -dy): 0 when the offset points straight up (dy negative), clockwise positive.

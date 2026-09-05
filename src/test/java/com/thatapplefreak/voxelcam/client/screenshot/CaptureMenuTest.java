@@ -22,6 +22,7 @@ class CaptureMenuTest {
 	@AfterEach
 	void settle() {
 		CaptureMenu.abort();
+		CaptureMenu.discardPendingCapture();
 	}
 
 	// --- wedgeForAngle -------------------------------------------------------------------------
@@ -69,6 +70,18 @@ class CaptureMenuTest {
 		assertEquals(CaptureMenu.Mode.BIG_SCREENSHOT, CaptureMenu.modeForOffset(0, 50));
 	}
 
+	/**
+	 * Freeing the cursor leaves it wherever it happens to sit. Without a dead zone a pixel of
+	 * drift below the anchor already selects the wedge below, so a hold the player never aimed
+	 * would fire whichever mode the cursor was nearest instead of an ordinary screenshot.
+	 */
+	@Test
+	void aCursorThatBarelyDriftedOffCentreStillSelectsTheFirstMode() {
+		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, 1));
+		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, 12));
+		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(-8, 8));
+	}
+
 	// --- state machine, no Minecraft ------------------------------------------------------------
 
 	@Test
@@ -101,6 +114,36 @@ class CaptureMenuTest {
 
 		assertTrue(CaptureMenu.isArmed(), "still holding, under the threshold");
 		assertFalse(CaptureMenu.isOpen(), "3 ticks must stay under the 4-tick hold threshold");
+	}
+
+	/**
+	 * A tap has to reach the capture path at all: sampling the key's down-state once a tick misses
+	 * a press that began and ended between two ticks, and since the binding shares F2 with
+	 * vanilla's screenshot key, nothing else picks that press up either — it took the key.
+	 */
+	@Test
+	void aTapOwesACaptureRatherThanTakingNone() {
+		CaptureMenu.onKeyDown();
+		CaptureMenu.onKeyUp();
+
+		assertFalse(CaptureMenu.isArmed(), "the tap is over");
+		assertTrue(CaptureMenu.isCapturePending(), "and it should have asked for a screenshot");
+	}
+
+	/**
+	 * The frame still in the framebuffer when the key comes up is the one the menu was drawn on.
+	 * Capturing it is how the menu ends up in the screenshot, so a queued capture has to sit out
+	 * every blit until a frame has begun with the menu already gone.
+	 */
+	@Test
+	void aQueuedCaptureSitsOutTheFrameTheMenuWasStillIn() {
+		CaptureMenu.onKeyDown();
+		CaptureMenu.onKeyUp();
+
+		CaptureMenu.beforeBlit();
+
+		assertTrue(CaptureMenu.isCapturePending(),
+				"the blit of the frame the menu was drawn on must not be the one captured");
 	}
 
 	@Test

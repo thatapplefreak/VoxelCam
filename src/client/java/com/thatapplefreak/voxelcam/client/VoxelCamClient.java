@@ -210,11 +210,21 @@ public class VoxelCamClient implements ClientModInitializer {
 			}
 		}
 
-		// isDown(), not consumeClick(): the menu needs continuous hold state, not a discrete pulse.
+		// isDown() carries the hold, but on its own it misses a tap entirely: pressed and released
+		// between two ticks it is never sampled as down, and since this binding shares F2 with
+		// vanilla's own screenshot key it is this mapping that receives the press, so nothing else
+		// would notice it either. consumeClick() counts presses however brief they were.
 		boolean down = captureMenuKey.isDown();
-		if (down && !wasCaptureMenuKeyDown) {
+		boolean clicked = false;
+		while (captureMenuKey.consumeClick()) {
+			clicked = true;
+		}
+
+		if ((clicked || down) && !wasCaptureMenuKeyDown) {
 			CaptureMenu.onKeyDown();
-		} else if (!down && wasCaptureMenuKeyDown) {
+		}
+		if (!down && (wasCaptureMenuKeyDown || clicked)) {
+			// Either a release we watched, or a press that began and ended inside this one tick.
 			CaptureMenu.onKeyUp();
 		}
 		wasCaptureMenuKeyDown = down;
