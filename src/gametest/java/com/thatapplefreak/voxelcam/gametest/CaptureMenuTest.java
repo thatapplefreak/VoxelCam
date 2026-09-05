@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
@@ -39,6 +40,8 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			context.waitTicks(20);
 
 			assertATapTakesAPlainScreenshot(context, dir);
+			assertARealKeyTapTakesAPlainScreenshot(context, dir);
+			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
 		}
@@ -68,6 +71,45 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		context.waitTicks(40);
 
 		theNewFile(dir, before, "a tap");
+	}
+
+	/**
+	 * The same tap, but pressed for real rather than by calling the state machine — which is the
+	 * only way to catch the press never arriving in the first place. {@code pressKey} holds and
+	 * releases without a tick in between, so this is the shortest tap there is: exactly the case a
+	 * per-tick sample of the key's down-state cannot see.
+	 *
+	 * <p>Driving the physical key also covers the half of this that lives outside VoxelCam — the
+	 * binding shares F2 with vanilla's screenshot key, and which of the two the press reaches is
+	 * decided by vanilla's own key map, not by anything here.
+	 */
+	private static void assertARealKeyTapTakesAPlainScreenshot(ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+
+		context.getInput().pressKey(InputConstants.KEY_F2);
+
+		context.waitFor(client -> !CaptureMenu.isCapturePending(), 200);
+		context.waitTicks(40);
+
+		theNewFile(dir, before, "a real F2 tap");
+	}
+
+	/** The other half of the same path: held long enough, the real key has to open the menu. */
+	private static void assertARealKeyHoldOpensTheMenu(ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+
+		context.waitFor(client -> !CaptureMenu.isCapturePending(), 200);
+		context.waitTicks(40);
+
+		// Released without aiming, so the dead zone should have kept it on a plain screenshot.
+		theNewFile(dir, before, "a real F2 hold released without aiming");
 	}
 
 	/**

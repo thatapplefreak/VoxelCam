@@ -14,26 +14,28 @@ import net.minecraft.network.chat.Component;
  * same retained-mode extraction model the rest of the GUI uses — the HUD hands out the very same
  * {@code GuiGraphicsExtractor} the manager's screens extract into.
  *
- * <p>The extractor fills axis-aligned rectangles and nothing else, so the ring and its dividers are
- * plotted a pixel at a time and the disc is filled a row at a time. That is not a workaround for a
- * missing rounded-shape call: stepping in whole pixels is what gives the menu the chunky edge the
- * rest of the game's UI has, and it is only ever drawn while the key is held.
+ * <p>The dial is rasterised on a {@link #CELL}-pixel grid rather than drawn as smooth geometry: the
+ * extractor fills axis-aligned rectangles and nothing else, and stepping in visible chunks is what
+ * makes it read as part of the game rather than as an overlay drawn on top of it. Each row emits
+ * one fill per run of like-coloured cells, so a whole dial costs a couple of hundred rectangles.
  */
 public final class CaptureMenuHud {
 
-	private static final int RADIUS = 54;
-	/** Matches {@code CaptureMenu.DEAD_ZONE} closely enough to read as the same circle. */
-	private static final int HUB_RADIUS = 18;
+	private static final int RADIUS = 58;
+	/** Grid step. Larger reads chunkier; the dial is quantised to this in both axes. */
+	private static final int CELL = 3;
+	private static final int RING_THICKNESS = 4;
 	private static final int LABEL_GAP = 12;
-	private static final int PIXEL = 2;
 	/** Vanilla's font is 9px tall; kept as a constant so the plate does not depend on a field. */
 	private static final int LINE_HEIGHT = 9;
 
-	private static final int BACKDROP = 0x99101010;
-	private static final int RING = 0xFFE0E0E0;
-	private static final int DIVIDER = 0xAAE0E0E0;
+	private static final int TRANSPARENT = 0;
+	private static final int SECTOR = 0x88101010;
+	private static final int SECTOR_AIMED = 0xAA4A90E2;
+	private static final int RING = 0xFFE8E8E8;
+	private static final int DIVIDER = 0xBB000000;
 	private static final int LABEL_PLATE = 0xCC101010;
-	private static final int LABEL_PLATE_AIMED = 0xEE3A6FF0;
+	private static final int LABEL_PLATE_AIMED = 0xEE4A90E2;
 	private static final int LABEL_TEXT = 0xFFBBBBBB;
 	private static final int LABEL_TEXT_AIMED = 0xFFFFFFFF;
 
@@ -54,24 +56,70 @@ public final class CaptureMenuHud {
 		double mouseY = client.mouseHandler.getScaledYPos(client.getWindow());
 		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY);
 
-		CaptureMenu.Mode aimed = CaptureMenu.aimedMode();
 		CaptureMenu.Mode[] modes = CaptureMenu.Mode.values();
+		int aimed = CaptureMenu.aimedMode().ordinal();
+
+		extractDial(graphics, centerX, centerY, modes.length, aimed);
+
 		double wedge = Math.PI * 2 / modes.length;
-
-		fillDisc(graphics, centerX, centerY, RADIUS, BACKDROP);
-		strokeCircle(graphics, centerX, centerY, RADIUS, RING);
-		strokeCircle(graphics, centerX, centerY, HUB_RADIUS, RING);
-
-		for (int i = 0; i < modes.length; i++) {
-			// Boundaries sit halfway between neighbouring mid-angles, since wedge 0 is centred on
-			// straight up rather than starting there — the same convention CaptureMenu resolves by.
-			strokeSpoke(graphics, centerX, centerY, i * wedge + wedge / 2, HUB_RADIUS, RADIUS);
-		}
-
 		for (int i = 0; i < modes.length; i++) {
 			extractLabel(graphics, client, centerX, centerY, i * wedge,
-					Component.translatable(labelKey(modes[i])), modes[i] == aimed);
+					Component.translatable(labelKey(modes[i])), i == aimed);
 		}
+	}
+
+	/**
+	 * The dial itself: sector fills, the aimed sector picked out, the outer ring and the dividers
+	 * between wedges, all decided per cell and emitted as runs. There is deliberately no marker on
+	 * the dead zone — the selection is already shown by which sector is lit, and a hub circle in
+	 * the middle of a two-wedge dial just reads as a button.
+	 */
+	private static void extractDial(GuiGraphicsExtractor graphics, int centerX, int centerY,
+			int wedges, int aimed) {
+		for (int top = -RADIUS; top <= RADIUS; top += CELL) {
+			int runStart = 0;
+			int runColor = TRANSPARENT;
+
+			for (int left = -RADIUS; left <= RADIUS; left += CELL) {
+				int color = cellColor(left + CELL / 2.0, top + CELL / 2.0, wedges, aimed);
+				if (color != runColor) {
+					emitRun(graphics, centerX, centerY, runStart, left, top, runColor);
+					runStart = left;
+					runColor = color;
+				}
+			}
+			emitRun(graphics, centerX, centerY, runStart, RADIUS + CELL, top, runColor);
+		}
+	}
+
+	private static void emitRun(GuiGraphicsExtractor graphics, int centerX, int centerY,
+			int from, int to, int top, int color) {
+		if (color != TRANSPARENT && to > from) {
+			graphics.fill(centerX + from, centerY + top, centerX + to, centerY + top + CELL, color);
+		}
+	}
+
+	private static int cellColor(double dx, double dy, int wedges, int aimed) {
+		double distance = Math.sqrt(dx * dx + dy * dy);
+		if (distance > RADIUS) {
+			return TRANSPARENT;
+		}
+		if (distance > RADIUS - RING_THICKNESS) {
+			return RING;
+		}
+
+		double wedge = Math.PI * 2 / wedges;
+		// Same convention CaptureMenu resolves by: 0 points up and wedge 0 is centred on it.
+		double angle = Math.atan2(dx, -dy);
+
+		// Boundaries sit half a wedge off the mid-angles. Scaling the angular gap by the radius
+		// keeps a divider the same width all the way out instead of fanning open.
+		double past = (((angle + wedge / 2) % wedge) + wedge) % wedge;
+		if (distance * Math.min(past, wedge - past) < CELL) {
+			return DIVIDER;
+		}
+
+		return CaptureMenu.wedgeForAngle(angle, wedges) == aimed ? SECTOR_AIMED : SECTOR;
 	}
 
 	/**
@@ -92,38 +140,6 @@ public final class CaptureMenuHud {
 		graphics.fill(x - half, y - 3, x + half, y + LINE_HEIGHT + 1,
 				aimed ? LABEL_PLATE_AIMED : LABEL_PLATE);
 		graphics.centeredText(client.font, label, x, y, aimed ? LABEL_TEXT_AIMED : LABEL_TEXT);
-	}
-
-	/** One filled row per scanline, which is how a circle gets filled out of rectangles. */
-	private static void fillDisc(GuiGraphicsExtractor graphics, int cx, int cy, int radius, int color) {
-		for (int dy = -radius; dy <= radius; dy++) {
-			int half = (int) Math.round(Math.sqrt((double) radius * radius - (double) dy * dy));
-			if (half > 0) {
-				graphics.fill(cx - half, cy + dy, cx + half, cy + dy + 1, color);
-			}
-		}
-	}
-
-	/** Steps around the circumference in roughly whole pixels, plotting a square at each point. */
-	private static void strokeCircle(GuiGraphicsExtractor graphics, int cx, int cy, int radius, int color) {
-		int steps = Math.max(48, (int) Math.round(Math.PI * 2 * radius));
-		for (int i = 0; i < steps; i++) {
-			double angle = (Math.PI * 2 * i) / steps;
-			plot(graphics, cx, cy, angle, radius, color);
-		}
-	}
-
-	private static void strokeSpoke(GuiGraphicsExtractor graphics, int cx, int cy, double angle,
-			int from, int to) {
-		for (int radius = from; radius <= to; radius++) {
-			plot(graphics, cx, cy, angle, radius, DIVIDER);
-		}
-	}
-
-	private static void plot(GuiGraphicsExtractor graphics, int cx, int cy, double angle, int radius, int color) {
-		int x = cx + (int) Math.round(Math.sin(angle) * radius);
-		int y = cy - (int) Math.round(Math.cos(angle) * radius);
-		graphics.fill(x, y, x + PIXEL, y + PIXEL, color);
 	}
 
 	private static String labelKey(CaptureMenu.Mode mode) {
