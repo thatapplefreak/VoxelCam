@@ -54,8 +54,6 @@ public class VoxelCamClient implements ClientModInitializer {
 	 */
 	private static KeyMapping captureMenuKey;
 
-	private static boolean wasCaptureMenuKeyDown = false;
-
 	/**
 	 * Whether the capture-menu key is physically down right now. Vanilla's own screenshot key
 	 * fires its callback while this is true, and that callback has to keep its hands off — see
@@ -69,6 +67,11 @@ public class VoxelCamClient implements ClientModInitializer {
 	 * is. The key is resolved from the binding rather than hardcoded, so rebinding the menu off F2
 	 * leaves vanilla's F2 taking an ordinary screenshot instead of being swallowed.
 	 */
+	/** The capture-menu binding itself. Exposed so the gametest can report its state on failure. */
+	public static KeyMapping captureMenuKey() {
+		return captureMenuKey;
+	}
+
 	public static boolean isCaptureMenuKeyDown() {
 		if (captureMenuKey == null) {
 			return false;
@@ -210,24 +213,28 @@ public class VoxelCamClient implements ClientModInitializer {
 			}
 		}
 
-		// isDown() carries the hold, but on its own it misses a tap entirely: pressed and released
-		// between two ticks it is never sampled as down, and since this binding shares F2 with
-		// vanilla's own screenshot key it is this mapping that receives the press, so nothing else
-		// would notice it either. consumeClick() counts presses however brief they were.
-		boolean down = captureMenuKey.isDown();
-		boolean clicked = false;
+		// The press can arrive by any of three routes and the binding has no say in which: this
+		// mapping and vanilla's screenshot key both want F2, and vanilla's key map gives the key
+		// to exactly one of them. When it goes to vanilla, this mapping never sees a click or a
+		// down-state at all and the press arrives at ScreenshotHandler instead; when it goes here,
+		// vanilla's grab never fires. Reading all of them, and arming idempotently, is what makes
+		// the menu work either way — and asking GLFW directly also catches a hold whose press was
+		// consumed elsewhere.
 		while (captureMenuKey.consumeClick()) {
-			clicked = true;
-		}
-
-		if ((clicked || down) && !wasCaptureMenuKeyDown) {
 			CaptureMenu.onKeyDown();
 		}
-		if (!down && (wasCaptureMenuKeyDown || clicked)) {
-			// Either a release we watched, or a press that began and ended inside this one tick.
+
+		boolean down = isCaptureMenuKeyDown() || captureMenuKey.isDown();
+		if (down) {
+			// Not while a screen is up: the menu cannot open there anyway, and re-arming under one
+			// would leave a release after Escape asking for a screenshot nobody wanted.
+			if (client.gui.screen() == null) {
+				CaptureMenu.onKeyDown();
+			}
+		} else if (CaptureMenu.isArmed()) {
+			// Armed but the key is no longer held, whoever armed it: that is the release.
 			CaptureMenu.onKeyUp();
 		}
-		wasCaptureMenuKeyDown = down;
 
 		if (CaptureMenu.isArmed()) {
 			CaptureMenu.tick();

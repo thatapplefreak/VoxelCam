@@ -41,7 +41,17 @@ public final class ScreenshotHandler {
 	 * @return true, always, so vanilla's own save is cancelled.
 	 */
 	public static boolean onScreenshotKeyPressed(RenderTarget framebuffer) {
-		if (VoxelCamClient.isCaptureMenuKeyDown() || CaptureMenu.isArmed()) {
+		if (CaptureMenu.isArmed()) {
+			return true;
+		}
+		if (VoxelCamClient.isCaptureMenuKeyDown() && Minecraft.getInstance().gui.screen() == null) {
+			// This call *is* the press, and it is the only signal that reliably arrives: both
+			// bindings want F2, vanilla's key map hands the key to exactly one of them, and if
+			// that one is vanilla's then nothing on the tick side ever sees the key at all.
+			//
+			// With a screen open the menu has nowhere to go, so that press falls through and takes
+			// an ordinary screenshot the way the key always did over a GUI.
+			CaptureMenu.onKeyDown();
 			return true;
 		}
 

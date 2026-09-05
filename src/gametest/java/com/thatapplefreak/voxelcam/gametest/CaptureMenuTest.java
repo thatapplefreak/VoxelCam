@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
@@ -88,10 +89,16 @@ public class CaptureMenuTest implements FabricClientGameTest {
 
 		context.getInput().pressKey(InputConstants.KEY_F2);
 
+		// Sampled straight after the press: which of these is false says where a tap was lost —
+		// whether the binding saw the key at all, or whether it saw it and asked for nothing.
+		String reached = context.computeOnClient(client -> "binding down=" + VoxelCamClient.captureMenuKey().isDown()
+				+ ", armed=" + CaptureMenu.isArmed()
+				+ ", capture pending=" + CaptureMenu.isCapturePending());
+
 		context.waitFor(client -> !CaptureMenu.isCapturePending(), 200);
 		context.waitTicks(40);
 
-		theNewFile(dir, before, "a real F2 tap");
+		theNewFile(dir, before, "a real F2 tap (" + reached + ")");
 	}
 
 	/** The other half of the same path: held long enough, the real key has to open the menu. */
