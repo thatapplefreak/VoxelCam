@@ -63,6 +63,10 @@
 	"voxelcam.tooltip.favorite": "Star this screenshot",
 	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
+	"voxelcam.tooltip.settings": "VoxelCam settings",
+	"voxelcam.tooltip.burstlengthdown": "Fewer frames per burst",
+	"voxelcam.tooltip.burstlengthup": "More frames per burst",
+	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big screenshot preset",
 
 	"voxelcam.delete.title": "Delete screenshot?",
 	"voxelcam.delete.confirm": "%s will be permanently deleted.",
@@ -93,6 +97,13 @@
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
-	"voxelcam.tooltip.burstscroll": "See more frames in this burst"
+	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
+
+	"voxelcam.settings": "VoxelCam Settings",
+	"voxelcam.settings.gear": "⚙",
+	"voxelcam.settings.burstlengthminus": "-",
+	"voxelcam.settings.burstlengthplus": "+",
+	"voxelcam.settings.burstlength": "Burst length: %s",
+	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s"
 
 }

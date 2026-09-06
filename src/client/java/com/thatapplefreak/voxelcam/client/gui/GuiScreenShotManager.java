@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
@@ -96,6 +97,11 @@ public class GuiScreenShotManager extends Screen {
 
 	@Override
 	protected void init() {
+		// Re-synced on every init(), not just the first: harmless on a popup return or resize,
+		// since toggleFavoritesOnly() already wrote the same value back here, and it is what
+		// picks up whatever was on disk the very first time this screen ever opens.
+		favoritesOnly = VoxelCamConfig.current().favoritesOnly;
+
 		VoxelCamIO.updateScreenShotFilesList(screenshotsDir, searchText);
 		List<File> files = filteredFiles();
 		// Not just "keep it if it is still listed": init() runs again on the way back from
@@ -141,6 +147,13 @@ public class GuiScreenShotManager extends Screen {
 		previewWidth = width - previewX - MARGIN;
 		// Leave a line under the preview for the resolution/size/date details.
 		previewHeight = listBottom - CONTENT_TOP - 14;
+
+		// The preview side of the search row is otherwise empty at this height, so the gear
+		// costs no existing control any width the way a spot lower down would have.
+		Button settingsButton = addRenderableWidget(Button.builder(Component.translatable("voxelcam.settings.gear"),
+						b -> minecraft.setScreenAndShow(new GuiSettings(this)))
+				.bounds(previewX + previewWidth - FILTER_BUTTON_SIZE, 26, FILTER_BUTTON_SIZE, FILTER_BUTTON_SIZE).build());
+		settingsButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.settings")));
 
 		// The favorite toggle is a square icon button at the start of the row; rename/delete/
 		// share then divide whatever's left three ways, same as before the toggle existed.
@@ -225,6 +238,7 @@ public class GuiScreenShotManager extends Screen {
 	private void cycleSort() {
 		SortMode.setCurrent(SortMode.current().next());
 		sortButton.setMessage(Component.translatable(SortMode.current().labelKey()));
+		VoxelCamConfig.saveCurrent();
 		refreshFiles();
 	}
 
@@ -256,6 +270,8 @@ public class GuiScreenShotManager extends Screen {
 
 	private void toggleFavoritesOnly() {
 		favoritesOnly = !favoritesOnly;
+		VoxelCamConfig.current().favoritesOnly = favoritesOnly;
+		VoxelCamConfig.saveCurrent();
 		refreshFiles();
 	}
 
@@ -498,16 +514,27 @@ public class GuiScreenShotManager extends Screen {
 		// is submitted to the GPU later.
 		ScreenshotImageCache.uploadPending();
 
+		// The preview panel's dark background has to render before the widgets — including the
+		// filmstrip's Set as key and scroll buttons, which sit inside the preview's own bounds —
+		// or it paints over them afterward, at the same darkening alpha whether a button is
+		// active or not, reading as "greyed out" for buttons that are actually fully usable.
+		if (previewWidth > 0 && previewHeight > 0) {
+			context.fill(previewX, previewY, previewX + previewWidth, previewY + previewHeight, 0x66000000);
+		}
+
 		// Do NOT call extractBackground() here: extractRenderStateWithTooltipAndSubtitles
 		// already does, and its blur pass throws "Can only blur once per frame" if repeated.
 		super.extractRenderState(context, mouseX, mouseY, delta);
 
 		context.centeredText(font, title, width / 2, 14, 0xFFFFFFFF);
 
+		// Right-aligned to clear the gear button's own corner rather than width - MARGIN, which
+		// the gear button also anchors to — the two used to overlap directly.
+		int countRight = previewX + previewWidth - FILTER_BUTTON_SIZE - GAP;
 		int count = visibleFiles.size();
 		Component countText = Component.translatable(count == 1 ? "voxelcam.count.one" : "voxelcam.count.many", count);
 		context.text(font, countText.copy().withStyle(ChatFormatting.GRAY),
-				width - MARGIN - font.width(countText), 31, 0xFFA0A0A0);
+				countRight - font.width(countText), 31, 0xFFA0A0A0);
 
 		extractPreview(context);
 	}
@@ -516,7 +543,6 @@ public class GuiScreenShotManager extends Screen {
 		if (previewWidth <= 0 || previewHeight <= 0) {
 			return;
 		}
-		context.fill(previewX, previewY, previewX + previewWidth, previewY + previewHeight, 0x66000000);
 
 		if (selected == null) {
 			// "No screenshots yet" would be misleading here: the favorites filter can empty

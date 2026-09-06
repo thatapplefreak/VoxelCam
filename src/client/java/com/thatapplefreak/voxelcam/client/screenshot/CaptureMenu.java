@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
@@ -294,6 +295,9 @@ public final class CaptureMenu {
 			case BIG_SCREENSHOT -> BigScreenshot.setSize(BigScreenshotSize.DIAL_OPTIONS.get(option));
 			case BURST -> Burst.setLength(Burst.DIAL_OPTIONS[option]);
 		}
+		// Unreachable from the unit suite: crossing into OPEN (where this is called from) already
+		// needs a real client, same as the busy-guard refusal and firing either mode do.
+		VoxelCamConfig.saveCurrent();
 	}
 
 	/** How many ring options {@code mode} offers — 0 for {@code SCREENSHOT}, which has none. */

@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -74,6 +75,7 @@ public final class BigScreenshotCommand {
 		}
 
 		BigScreenshot.setSize(size);
+		VoxelCamConfig.saveCurrent();
 		BigScreenshotSize.Resolved resolved = size.resolve(source.getClient().getWindow());
 		source.sendFeedback(Component.translatable("voxelcam.bigshot.set", describe(size, resolved)));
 		if (resolved.clamped()) {

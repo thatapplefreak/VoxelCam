@@ -63,6 +63,10 @@
 	"voxelcam.tooltip.favorite": "Mark this map with an X",
 	"voxelcam.tooltip.favoritesonly": "Show only th' maps marked with an X",
 	"voxelcam.tooltip.openmanager": "Open th' VoxelCam map chest",
+	"voxelcam.tooltip.settings": "VoxelCam settin's",
+	"voxelcam.tooltip.burstlengthdown": "Fewer maps per flurry",
+	"voxelcam.tooltip.burstlengthup": "More maps per flurry",
+	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big map preset",
 
 	"voxelcam.delete.title": "Scuttle th' map?",
 	"voxelcam.delete.confirm": "%s'll be sent t' Davy Jones's locker, permanent-like.",
@@ -93,6 +97,13 @@
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.tooltip.setaskey": "Show this map in th' chest instead o' th' current key",
-	"voxelcam.tooltip.burstscroll": "See more maps in this flurry"
+	"voxelcam.tooltip.burstscroll": "See more maps in this flurry",
+
+	"voxelcam.settings": "VoxelCam Settin's",
+	"voxelcam.settings.gear": "⚙",
+	"voxelcam.settings.burstlengthminus": "-",
+	"voxelcam.settings.burstlengthplus": "+",
+	"voxelcam.settings.burstlength": "Flurry size: %s",
+	"voxelcam.settings.bigscreenshotsize": "Big map size: %s"
 
 }

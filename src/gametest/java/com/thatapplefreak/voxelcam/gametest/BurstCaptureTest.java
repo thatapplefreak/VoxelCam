@@ -1,10 +1,12 @@
 package com.thatapplefreak.voxelcam.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,6 +44,7 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			context.waitTicks(20);
 
 			assertAHeldAndAimedReleaseFiresABurstAtWindowSize(context, dir);
+			assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(context, dir);
 			assertAScreenOpeningMidBurstStopsItEarly(context, dir);
 		}
 	}
@@ -106,6 +109,35 @@ public class BurstCaptureTest implements FabricClientGameTest {
 				throw new AssertionError(name + " should be offset after the key, was " + frame.offsetMillis() + "ms");
 			}
 		}
+	}
+
+	/**
+	 * Live-playtest finding: the preview's dark background panel used to render after the
+	 * widgets, painting over anything inside its bounds — including the filmstrip's Set as key
+	 * and scroll buttons — so a fully active button read identically dimmed to a disabled one.
+	 * Opens the manager on this burst's own directory (DATE_NEWEST is the default sort, and
+	 * nothing has captured anything newer since, so the key this test just captured is exactly
+	 * what a fresh selection falls back to) and screenshots it for visual confirmation.
+	 */
+	private static void assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(
+			ClientGameTestContext context, File dir) {
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+		// Thumbnails decode off-thread and upload on the render thread.
+		context.waitTicks(20);
+
+		boolean hasFilmstrip = context.computeOnClient(client -> {
+			File selected = VoxelCamIO.getSelectedPhoto();
+			return selected != null && VoxelCamIO.burstFrameCount(selected) > 0;
+		});
+		if (!hasFilmstrip) {
+			throw new AssertionError("the manager's fallback selection should be this burst's own key");
+		}
+
+		context.takeScreenshot("manager-with-burst-filmstrip");
+
+		context.setScreen(() -> null);
+		context.waitForScreen(null);
 	}
 
 	/**
