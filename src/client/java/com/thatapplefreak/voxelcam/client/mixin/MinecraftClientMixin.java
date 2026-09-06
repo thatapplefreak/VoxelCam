@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.mixin;
 
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
+import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -40,5 +41,9 @@ public class MinecraftClientMixin {
 		// After BigScreenshot: a menu selection that starts an oversized capture must not land in
 		// the same blit an oversized readback is already being issued from.
 		CaptureMenu.beforeBlit();
+		// After CaptureMenu, unlike BigScreenshot: a burst has no window to resize, and the frame
+		// CaptureMenu released into is already finished and menu-free — so the key frame is taken
+		// on the very blit a plain screenshot would have used, not one later.
+		Burst.beforeBlit();
 	}
 }

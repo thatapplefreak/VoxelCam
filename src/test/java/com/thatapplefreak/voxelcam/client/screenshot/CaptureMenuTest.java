@@ -63,11 +63,16 @@ class CaptureMenuTest {
 	}
 
 	@Test
-	void offsetsResolveToTheGeometricallyCorrectWedgeForATwoModeMenu() {
+	void offsetsResolveToTheGeometricallyCorrectWedgeForAThreeModeMenu() {
 		// Mouse above the anchor (screen-space y decreases upward) selects the first mode...
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, -50));
-		// ...below it selects the second.
-		assertEquals(CaptureMenu.Mode.BIG_SCREENSHOT, CaptureMenu.modeForOffset(0, 50));
+		// Straight down (0, 50) sits exactly on the boundary between the second and third wedges
+		// at three modes — floor((pi + pi/3) / (2*pi/3)) lands on floor(2.0), which double
+		// rounding could tip either way — so the other two modes are asserted off their own
+		// wedge centres instead: atan2(130, -75) is 2*pi/3 (the second wedge) and atan2(-130, -75)
+		// is 4*pi/3 (the third), both comfortably clear of either boundary.
+		assertEquals(CaptureMenu.Mode.BIG_SCREENSHOT, CaptureMenu.modeForOffset(130, 75));
+		assertEquals(CaptureMenu.Mode.BURST, CaptureMenu.modeForOffset(-130, 75));
 	}
 
 	/**

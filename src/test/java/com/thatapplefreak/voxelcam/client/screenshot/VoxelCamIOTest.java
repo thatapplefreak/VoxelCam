@@ -401,6 +401,184 @@ class VoxelCamIOTest {
 		VoxelCamIO.toggleSelectedFavorite();
 	}
 
+	// --- burst grouping ----------------------------------------------------------------------
+
+	@Test
+	void aBurstsFramesAreFoldedIntoItsKey() throws IOException {
+		shot("burst.png", 1_000L);
+		shot("burst_burst01.png", 1_000L);
+		shot("burst_burst02.png", 1_000L);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(List.of("burst.png"), names());
+	}
+
+	@Test
+	void burstFrameCountReflectsTheFoldedFrames() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		shot("burst_burst01.png", 1_000L);
+		shot("burst_burst02.png", 1_000L);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(2, VoxelCamIO.burstFrameCount(key));
+	}
+
+	@Test
+	void burstFrameCountIsZeroForAPlainShot() throws IOException {
+		File plain = shot("plain.png", 1_000L);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(0, VoxelCamIO.burstFrameCount(plain));
+	}
+
+	/**
+	 * The key-name lookup a sub-frame is folded through has to come from the unfiltered
+	 * listing: with the needle applied first, typing something that matches a frame's name but
+	 * not its key's would make the frame pop back into view as if its key were gone, when it is
+	 * sitting right there on disk.
+	 */
+	@Test
+	void aSearchThatExcludesTheKeyDoesNotUnhideItsFrames() throws IOException {
+		shot("sunset.png", 1_000L);
+		shot("sunset_burst01.png", 1_000L);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "burst");
+
+		assertEquals(List.of(), names(),
+				"the frame matches the needle but its key does not, so neither should be listed");
+	}
+
+	/** A frame whose key has been renamed or deleted out from under it is not lost — it
+	 * reappears as an ordinary screenshot rather than becoming invisible and unreachable. */
+	@Test
+	void aFrameWhoseKeyIsGoneIsListedOnItsOwn() throws IOException {
+		shot("burst_burst01.png", 1_000L);
+
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(List.of("burst_burst01.png"), names());
+	}
+
+	@Test
+	void deletingABurstKeyTakesItsFramesWithIt() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		File frame1 = shot("burst_burst01.png", 1_000L);
+		File frame2 = shot("burst_burst02.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.delete());
+
+		assertFalse(key.exists());
+		assertFalse(frame1.exists());
+		assertFalse(frame2.exists());
+		assertNull(VoxelCamIO.getSelectedPhoto());
+	}
+
+	/**
+	 * Deleting the key after a frame failed would both manufacture an orphan and make a
+	 * "deleted" report a lie about a file that is still there, so a frame that cannot be
+	 * removed has to stop the whole delete rather than only itself. The stubborn frame here is
+	 * the same portable stand-in {@code aRefusedDeleteKeepsTheEntryAndTheSelection} uses for a
+	 * file another program holds open: a non-empty directory named like one.
+	 */
+	@Test
+	void aRefusedFrameDeleteLeavesTheKeyAndReportsFailure() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		File stubbornFrame = dir.resolve("burst_burst01.png").toFile();
+		assertTrue(stubbornFrame.mkdir());
+		Files.writeString(stubbornFrame.toPath().resolve("holding-it-open.txt"), "x");
+		File okFrame = shot("burst_burst02.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.delete());
+
+		assertTrue(key.exists(), "the key must survive a partial delete");
+		assertTrue(stubbornFrame.exists());
+		assertTrue(okFrame.exists());
+	}
+
+	@Test
+	void renamingABurstKeyCarriesItsFramesAcross() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		shot("burst_burst01.png", 1_000L);
+		shot("burst_burst02.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "sunset");
+
+		assertEquals("sunset.png", renamed.getName());
+		assertTrue(dir.resolve("sunset_burst01.png").toFile().exists());
+		assertTrue(dir.resolve("sunset_burst02.png").toFile().exists());
+		assertFalse(dir.resolve("burst_burst01.png").toFile().exists());
+		assertFalse(dir.resolve("burst_burst02.png").toFile().exists());
+	}
+
+	/**
+	 * Every target name — the key's and every frame's — is collision-checked before anything
+	 * moves, so a rename that would only fail on frame 2 of 8 refuses cleanly rather than
+	 * carrying the first frame across and then rolling it back.
+	 */
+	@Test
+	void aRenameThatCollidesOnAFrameNameIsRefusedWholesale() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		File frame = shot("burst_burst01.png", 1_000L);
+		// Blocks the frame's target name, even though "sunset.png" itself is free.
+		shot("sunset_burst01.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "sunset"));
+
+		assertTrue(key.exists(), "nothing should have moved once a frame's target was found to collide");
+		assertTrue(frame.exists());
+		assertFalse(dir.resolve("sunset.png").toFile().exists());
+	}
+
+	// --- Set as key ----------------------------------------------------------------------------
+
+	@Test
+	void setAsKeySwapsTheTwoFilesContents() throws IOException {
+		File key = dir.resolve("burst.png").toFile();
+		Files.writeString(key.toPath(), "key-bytes");
+		File frame = dir.resolve("burst_burst01.png").toFile();
+		Files.writeString(frame.toPath(), "frame-bytes");
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.setAsKey(frame));
+
+		// The paths — and so the group's structure, and which one is folded under the other —
+		// are untouched; only the bytes underneath moved.
+		assertEquals("frame-bytes", Files.readString(key.toPath()));
+		assertEquals("key-bytes", Files.readString(frame.toPath()));
+	}
+
+	@Test
+	void setAsKeyRefusesWithNothingSelected() throws IOException {
+		File frame = shot("burst_burst01.png", 1_000L);
+
+		assertFalse(VoxelCamIO.setAsKey(frame));
+	}
+
+	@Test
+	void setAsKeyRefusesToPromoteTheKeyToItself() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.setAsKey(key));
+	}
+
+	@Test
+	void setAsKeyRefusesANullFrame() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.setAsKey(null));
+	}
+
 	private static List<String> names() {
 		return VoxelCamIO.getScreenShotFiles().stream().map(File::getName).toList();
 	}

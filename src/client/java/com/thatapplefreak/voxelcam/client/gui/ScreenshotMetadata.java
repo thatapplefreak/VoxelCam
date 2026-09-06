@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
@@ -42,6 +43,7 @@ public final class ScreenshotMetadata {
 
 	private static final Map<File, Optional<Dimensions>> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
+	private static final Map<File, Optional<BurstFrame>> BURST_FRAMES = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final Map<File, String> NAMES = new HashMap<>();
 	private static final Map<File, String> SIZES = new HashMap<>();
@@ -54,8 +56,12 @@ public final class ScreenshotMetadata {
 	private static final Pattern PNG_SUFFIX = Pattern.compile("(?i)\\.png$");
 	// Deliberately no UNICODE_CHARACTER_CLASS: ScreenshotNamer stamps its timestamp with
 	// Locale.ROOT precisely because this is an ASCII-only \d test, and widening it here
-	// would quietly start matching names ScreenshotNamer can never produce.
-	private static final Pattern CAPTURE_NAME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?");
+	// would quietly start matching names ScreenshotNamer can never produce. The optional
+	// "_burstNN" tail matches ScreenshotNamer.burstFrameName's own shape, so an orphaned
+	// sub-frame (one whose key has been renamed or deleted, and so is listed on its own) still
+	// gets a friendly time instead of a raw stamp.
+	private static final Pattern CAPTURE_NAME =
+			Pattern.compile("\\d{4}-\\d{2}-\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2}(_\\d+)?(_burst\\d+)?");
 
 	private ScreenshotMetadata() {
 	}
@@ -126,9 +132,30 @@ public final class ScreenshotMetadata {
 		return starred;
 	}
 
+	/**
+	 * The burst position tags a frame was captured with — group id, index, and how long after
+	 * the key frame it was taken — or null if this file has none. Cached the same way {@link
+	 * #captureContext(File)} is, a whole-file read included: only the burst-frames popup ever
+	 * calls this, never a row or the badge (the badge counts sub-frames from a free directory
+	 * scan in {@code VoxelCamIO} instead), so it must never be asked for per row.
+	 */
+	public static BurstFrame burstFrame(File file) {
+		if (file == null) {
+			return null;
+		}
+		Optional<BurstFrame> cached = BURST_FRAMES.get(file);
+		if (cached != null) {
+			return cached.orElse(null);
+		}
+		BurstFrame frame = BurstFrame.fromTags(PngTextChunk.read(file));
+		BURST_FRAMES.put(file, Optional.ofNullable(frame));
+		return frame;
+	}
+
 	public static void forgetAll() {
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
+		BURST_FRAMES.clear();
 		STARRED.clear();
 		NAMES.clear();
 		SIZES.clear();
@@ -146,6 +173,22 @@ public final class ScreenshotMetadata {
 	 * {@link #forgetAll()} on manager close is what gives a failed read another chance.
 	 */
 	public static void forget(File file) {
+		STARRED.remove(file);
+		NAMES.remove(file);
+		SIZES.remove(file);
+	}
+
+	/**
+	 * Drops every cached fact for one file, dimensions and capture context included — unlike
+	 * {@link #forget(File)}. A star toggle only splices a chunk in after the IHDR, so those two
+	 * cannot have changed; a "Set as key" swap rewrites the file's actual bytes at that path
+	 * (it swaps the two files' contents, not their tags), so nothing cached about it can be
+	 * trusted afterwards.
+	 */
+	public static void forgetFile(File file) {
+		DIMENSIONS.remove(file);
+		CONTEXTS.remove(file);
+		BURST_FRAMES.remove(file);
 		STARRED.remove(file);
 		NAMES.remove(file);
 		SIZES.remove(file);

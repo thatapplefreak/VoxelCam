@@ -31,10 +31,16 @@ public final class CaptureMenu {
 		OPEN
 	}
 
-	/** Registered capture modes, in menu order — order is wedge order. */
+	/**
+	 * Registered capture modes, in menu order — order is wedge order. {@code SCREENSHOT} must
+	 * stay first: {@link #modeForOffset} returns {@code modes[0]} inside the dead zone, so a hold
+	 * the player never aimed has to take an ordinary screenshot rather than whatever was appended
+	 * last.
+	 */
 	public enum Mode {
 		SCREENSHOT,
-		BIG_SCREENSHOT
+		BIG_SCREENSHOT,
+		BURST
 	}
 
 	/**
@@ -111,7 +117,7 @@ public final class CaptureMenu {
 			// ticksHeld and re-arm a menu that is already open.
 			return;
 		}
-		if (ScreenshotHandler.isSaving() || BigScreenshot.isBusy()) {
+		if (ScreenshotHandler.isSaving() || BigScreenshot.isBusy() || Burst.isBusy()) {
 			ChatMessages.send("voxelcam.savingpleasewait");
 			return;
 		}
@@ -231,11 +237,18 @@ public final class CaptureMenu {
 		suppressUntilRelease = true;
 	}
 
+	/**
+	 * A switch <em>expression</em> rather than the equivalent statement on purpose: a statement
+	 * missing an arm for a new {@link Mode} compiles silently and does nothing, capturing nothing
+	 * when that mode fires; an expression forces the compiler to check every case is handled.
+	 */
 	private static void fire(Mode mode) {
-		switch (mode) {
-			case SCREENSHOT -> ScreenshotHandler.captureNow();
-			case BIG_SCREENSHOT -> BigScreenshot.request();
-		}
+		Runnable action = switch (mode) {
+			case SCREENSHOT -> ScreenshotHandler::captureNow;
+			case BIG_SCREENSHOT -> BigScreenshot::request;
+			case BURST -> Burst::request;
+		};
+		action.run();
 	}
 
 	private static void freeCursor(Minecraft client) {

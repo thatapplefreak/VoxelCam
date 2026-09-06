@@ -67,6 +67,7 @@
 	"voxelcam.delete.title": "Delete screenshot?",
 	"voxelcam.delete.confirm": "%s will be permanently deleted.",
 	"voxelcam.delete.confirm.generic": "This screenshot will be permanently deleted.",
+	"voxelcam.delete.confirm.burst": "%s and its %s burst frames will be permanently deleted.",
 	"voxelcam.delete.failed": "Could not delete %s",
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
@@ -75,12 +76,23 @@
 
 	"voxelcam.capturemenu.screenshot": "Screenshot",
 	"voxelcam.capturemenu.bigscreenshot": "Big Screenshot",
+	"voxelcam.capturemenu.burst": "Burst",
 
 	"voxelcam.bigshot.current": "Big screenshot size is %s. Hold F2 and aim to pick it.",
 	"voxelcam.bigshot.set": "Big screenshot size set to %s",
 	"voxelcam.bigshot.clamped": "Clamped to this GPU's maximum texture size of %s",
 	"voxelcam.bigshot.invalid": "Don't know the size '%s'. Try WIDTHxHEIGHT, or one of: %s",
 	"voxelcam.bigshot.unavailable": "Big screenshots need a world open and no menu on screen",
-	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details"
+	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details",
+
+	"voxelcam.burst.saved": "Saved a %s-frame burst as: %s",
+	"voxelcam.burst.unavailable": "Bursts need a world open and no menu on screen",
+	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
+	"voxelcam.burst.setaskey": "Set as Key",
+	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
+	"voxelcam.burst.scrollleft": "<",
+	"voxelcam.burst.scrollright": ">",
+	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
+	"voxelcam.tooltip.burstscroll": "See more frames in this burst"
 
 }

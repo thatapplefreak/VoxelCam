@@ -67,6 +67,7 @@
 	"voxelcam.delete.title": "Scuttle th' map?",
 	"voxelcam.delete.confirm": "%s'll be sent t' Davy Jones's locker, permanent-like.",
 	"voxelcam.delete.confirm.generic": "This map'll be sent t' Davy Jones's locker, permanent-like.",
+	"voxelcam.delete.confirm.burst": "%s an' its %s flurry maps'll be sent t' Davy Jones's locker, permanent-like.",
 	"voxelcam.delete.failed": "Couldn't scuttle %s",
 
 	"voxelcam.rename.exists": "A map by that name already sails these waters",
@@ -75,12 +76,23 @@
 
 	"voxelcam.capturemenu.screenshot": "Chart a Map",
 	"voxelcam.capturemenu.bigscreenshot": "Big Map",
+	"voxelcam.capturemenu.burst": "Flurry o' Maps",
 
 	"voxelcam.bigshot.current": "Yer big map size be %s. Hold F2 an' aim t' pick it.",
 	"voxelcam.bigshot.set": "Big map size set t' %s",
 	"voxelcam.bigshot.clamped": "Clamped t' this here GPU's max canvas size o' %s",
 	"voxelcam.bigshot.invalid": "Don't know th' size '%s'. Try WIDTHxHEIGHT, or one o': %s",
 	"voxelcam.bigshot.unavailable": "Big maps need a world open and no menu on screen, arr",
-	"voxelcam.bigshot.failed": "Big map charting failed, check th' log fer details"
+	"voxelcam.bigshot.failed": "Big map charting failed, check th' log fer details",
+
+	"voxelcam.burst.saved": "Stowed a %s-map flurry as: %s",
+	"voxelcam.burst.unavailable": "A flurry needs a world open and no menu on screen, arr",
+	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
+	"voxelcam.burst.setaskey": "Make th' Key",
+	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
+	"voxelcam.burst.scrollleft": "<",
+	"voxelcam.burst.scrollright": ">",
+	"voxelcam.tooltip.setaskey": "Show this map in th' chest instead o' th' current key",
+	"voxelcam.tooltip.burstscroll": "See more maps in this flurry"
 
 }

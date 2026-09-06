@@ -146,6 +146,7 @@ public final class CaptureMenuHud {
 		return switch (mode) {
 			case SCREENSHOT -> "voxelcam.capturemenu.screenshot";
 			case BIG_SCREENSHOT -> "voxelcam.capturemenu.bigscreenshot";
+			case BURST -> "voxelcam.capturemenu.burst";
 		};
 	}
 }

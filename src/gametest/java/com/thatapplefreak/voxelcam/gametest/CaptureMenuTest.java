@@ -44,6 +44,7 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyTapTakesAPlainScreenshot(context, dir);
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
+			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
 		}
@@ -137,9 +138,11 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		try {
 			context.waitFor(client -> CaptureMenu.isOpen(), 200);
 
-			// Straight down from the centre the cursor was released at, well clear of the dead
-			// zone: unambiguously the second wedge, BIG_SCREENSHOT.
-			context.getInput().moveCursor(0, 150);
+			// Aimed at the second wedge's centre (down-right, 120° clockwise from straight up)
+			// rather than straight down: with three modes, straight down sits exactly on the
+			// second/third wedge boundary, which floating-point rounding could tip either way.
+			// Same magnitude as the two-mode version this replaced, well clear of the dead zone.
+			context.getInput().moveCursor(130, 75);
 			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT, 100);
 		} finally {
 			context.getInput().releaseKey(InputConstants.KEY_F2);
@@ -157,6 +160,30 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			throw new AssertionError("aiming at the big-screenshot wedge should have produced a "
 					+ expected + " capture, was " + size);
 		}
+	}
+
+	/**
+	 * "Zero geometry work for a third wedge" is true of the code but not of verifying it: at
+	 * three modes the labels sit at 120° and 240° rather than directly opposite each other, where
+	 * the label's screen-edge clamp does real work for the first time and the sector dividers are
+	 * unevenly spaced for the first time. A screenshot is what catches a dial that compiles fine
+	 * and still looks wrong. Escapes out afterwards so nothing is captured.
+	 */
+	private static void assertTheThreeWedgeDialRendersCorrectly(ClientGameTestContext context) {
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+			context.getInput().moveCursor(-130, 75);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BURST, 100);
+			context.waitTicks(2);
+			context.takeScreenshot("capture-menu-three-wedges");
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(20);
 	}
 
 	/**
