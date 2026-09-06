@@ -44,6 +44,7 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyTapTakesAPlainScreenshot(context, dir);
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
+			assertAimingPastTheRingCommitsItsOption(context, dir);
 			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
@@ -158,6 +159,55 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		Dimensions expected = new Dimensions(window.width() * 2, window.height() * 2);
 		if (!size.equals(expected)) {
 			throw new AssertionError("aiming at the big-screenshot wedge should have produced a "
+					+ expected + " capture, was " + size);
+		}
+	}
+
+	/**
+	 * Aimed past {@code CaptureMenu.OPTION_RADIUS} at the big-screenshot wedge's own centre — the
+	 * same non-boundary vector the test above uses, just far enough out to have also picked a
+	 * ring option. The middle of {@code BigScreenshotSize.DIAL_OPTIONS} is {@code fhd}, a fixed
+	 * 1920x1080 rather than a multiple of the window, which is what lets this assert on exact
+	 * pixels regardless of the dev window's own size — proof the ring's geometry landed on the
+	 * option a release actually commits, not merely that some size changed.
+	 */
+	private static void assertAimingPastTheRingCommitsItsOption(ClientGameTestContext context, File dir) {
+		Set<String> before;
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+			// moveCursor moves the real, unscaled cursor, but CaptureMenu's aim offset is in
+			// GUI-scaled space (mouseHandler.getScaledXPos/YPos) — at this window's own GUI
+			// scale, (130, 75) only reaches OPTION_RADIUS's dead-zone-sized cousin, not
+			// OPTION_RADIUS (90) itself, which is why the mode-only assertion above this method
+			// gets away with the smaller vector and this one cannot. Same 130:75 ratio — same
+			// wedge centre, same angle — just scaled up for a comfortable margin past 90.
+			context.getInput().moveCursor(390, 225);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT
+					&& CaptureMenu.aimedOption() == 2, 100);
+			// A frame for the HUD to actually draw the ring before the screenshot below.
+			context.waitTicks(2);
+			context.takeScreenshot("capture-menu-option-ring");
+			// Taken here, after the diagnostic screenshot above rather than at the top of the
+			// method: context.takeScreenshot writes into this same directory (both it and
+			// Screenshot.SCREENSHOT_DIR resolve under the game directory's own "screenshots"),
+			// so "before" has to already include it or theNewFile below finds two new files
+			// instead of one.
+			before = listing(dir);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+
+		context.waitFor(client -> !CaptureMenu.isCapturePending() && !BigScreenshot.isBusy(), 200);
+		context.waitTicks(40);
+
+		File written = theNewFile(dir, before, "an aimed release past the option ring");
+		Dimensions size = pngSize(written);
+		Dimensions expected = new Dimensions(1920, 1080);
+		if (!size.equals(expected)) {
+			throw new AssertionError("aiming past the ring at fhd should have produced a "
 					+ expected + " capture, was " + size);
 		}
 	}

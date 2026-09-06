@@ -52,6 +52,14 @@ public final class Burst {
 	public static final int MAX_LENGTH = 20;
 	public static final int DEFAULT_LENGTH = 8;
 
+	/**
+	 * The length options on the capture menu's outer ring — the same 24°-per-option spacing
+	 * {@link BigScreenshotSize#DIAL_OPTIONS} is sized for, five values fitting a 120° wedge
+	 * without their labels colliding. {@link #setLength} still accepts any value up to {@link
+	 * #MAX_LENGTH}; this is only the ring's quick ladder.
+	 */
+	public static final int[] DIAL_OPTIONS = { 2, 4, 8, 12, 20 };
+
 	/** Frames a burst may sit stalled between issues before giving up rather than hanging the
 	 * capture key forever if the IO pool never drains. */
 	private static final int STALL_FRAMES = 120;

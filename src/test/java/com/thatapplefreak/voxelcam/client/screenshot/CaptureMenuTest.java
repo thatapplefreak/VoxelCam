@@ -87,6 +87,62 @@ class CaptureMenuTest {
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(-8, 8));
 	}
 
+	// --- subOptionForAngle -----------------------------------------------------------------------
+
+	@Test
+	void aWedgesOwnCentreSelectsTheMiddleOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(2, CaptureMenu.subOptionForAngle(wedgeOneCenter, 3, 1, 5));
+	}
+
+	@Test
+	void theWedgesOwnNearEdgeSelectsTheFirstOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(0, CaptureMenu.subOptionForAngle(wedgeOneCenter - wedgeWidth / 2 + 0.001, 3, 1, 5));
+	}
+
+	@Test
+	void theWedgesOwnFarEdgeSelectsTheLastOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(4, CaptureMenu.subOptionForAngle(wedgeOneCenter + wedgeWidth / 2 - 0.001, 3, 1, 5));
+	}
+
+	/**
+	 * Exactly on the wedge's own far boundary, the raw division lands one index past the last
+	 * valid option — clamped rather than thrown, since aiming at the seam between two wedges is
+	 * an ordinary thing to do with a mouse and must not crash the HUD that recomputes this every
+	 * frame the menu is open.
+	 */
+	@Test
+	void anAngleExactlyOnTheWedgesEdgeClampsRatherThanOverflowing() {
+		double wedgeWidth = Math.PI; // two wedges, for a wide, easy-to-land-on boundary
+		assertEquals(2, CaptureMenu.subOptionForAngle(wedgeWidth / 2, 2, 0, 3));
+	}
+
+	// --- optionForOffset -------------------------------------------------------------------------
+
+	@Test
+	void insideOptionRadiusSelectsNoOptionRegardlessOfAngle() {
+		assertEquals(-1, CaptureMenu.optionForOffset(0, 50));
+		assertEquals(-1, CaptureMenu.optionForOffset(80, 0));
+	}
+
+	@Test
+	void screenshotHasNoOptionsEvenWellPastOptionRadius() {
+		assertEquals(-1, CaptureMenu.optionForOffset(0, -200));
+	}
+
+	@Test
+	void aWedgesOwnCentrePastOptionRadiusSelectsItsMiddleOption() {
+		// The same vectors offsetsResolveToTheGeometricallyCorrectWedgeForAThreeModeMenu uses for
+		// BIG_SCREENSHOT and BURST's own wedge centres — both already well past OPTION_RADIUS (90).
+		assertEquals(2, CaptureMenu.optionForOffset(130, 75));
+		assertEquals(2, CaptureMenu.optionForOffset(-130, 75));
+	}
+
 	// --- state machine, no Minecraft ------------------------------------------------------------
 
 	@Test
