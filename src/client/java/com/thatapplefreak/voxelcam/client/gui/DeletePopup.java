@@ -13,10 +13,18 @@ public final class DeletePopup {
 
 	public static ConfirmScreen create(GuiScreenShotManager parent) {
 		File target = VoxelCamIO.getSelectedPhoto();
-		// Name the file being deleted rather than asking "are you sure" about nothing.
-		Component message = target == null
-				? Component.translatable("voxelcam.delete.confirm.generic")
-				: Component.translatable("voxelcam.delete.confirm", target.getName());
+		// Name the file being deleted rather than asking "are you sure" about nothing. A burst
+		// key also names its frame count, since Delete removes the whole group — silently
+		// deleting several files under a confirmation that only named one would be a surprise.
+		int frameCount = target == null ? 0 : VoxelCamIO.burstFrameCount(target);
+		Component message;
+		if (target == null) {
+			message = Component.translatable("voxelcam.delete.confirm.generic");
+		} else if (frameCount > 0) {
+			message = Component.translatable("voxelcam.delete.confirm.burst", target.getName(), frameCount);
+		} else {
+			message = Component.translatable("voxelcam.delete.confirm", target.getName());
+		}
 
 		return new ConfirmScreen(confirmed -> {
 			if (confirmed && target != null) {

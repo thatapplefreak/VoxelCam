@@ -4,14 +4,22 @@ import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public final class VoxelCamIO {
 
 	private static List<File> screenShotFiles = new ArrayList<>();
 	private static File selected;
+
+	/** How many sub-frames are folded under each burst key, from the same scan that builds
+	 * {@link #screenShotFiles}. A key absent here has none. */
+	private static Map<File, Integer> burstCounts = Map.of();
 
 	private VoxelCamIO() {
 	}
@@ -30,9 +38,10 @@ public final class VoxelCamIO {
 
 	/**
 	 * Lists .png files in the directory, ordered by {@link SortMode#current()}, filtered by a
-	 * case-insensitive name match.
+	 * case-insensitive name match — except a burst's sub-frames, which are folded under their key
+	 * rather than listed, so a burst shows as one row.
 	 *
-	 * This runs on the render thread from {@code GuiScreenShotManager.init()}, which is re-run
+	 * <p>This runs on the render thread from {@code GuiScreenShotManager.init()}, which is re-run
 	 * for every search keystroke and every window-resize event, so what it does per entry is
 	 * paid tens of times during a window drag. That is why the name is lowercased once rather
 	 * than per predicate, why the sort is {@link SortMode#sort} rather than a comparator, and
@@ -40,21 +49,83 @@ public final class VoxelCamIO {
 	 * every entry — including under the name modes, which otherwise touch the disk not at all
 	 * — to exclude a directory someone named {@code something.png}. Such a directory is listed
 	 * and refuses to be deleted, which {@code VoxelCamIOTest} relies on.
+	 *
+	 * <p>The key-name lookup used to fold a sub-frame away is built from the <em>unfiltered</em>
+	 * listing, not the needle-filtered one: with the needle applied first, typing something that
+	 * excludes a key's own name would make all of its frames pop back into view as if they were
+	 * orphaned. A frame whose key is genuinely absent — renamed or deleted — is not folded and
+	 * reappears as an ordinary screenshot; that is the orphan rule, and it is what keeps a
+	 * sub-frame reachable even if the two channels this mod uses to track a group (the filename
+	 * tag and the PNG's embedded {@code voxelcam:burst} tags) ever disagree.
 	 */
 	public static void updateScreenShotFilesList(File screenshotsDir, String filter) {
 		File[] filesInDir = screenshotsDir.listFiles();
 		String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
 		List<File> files = new ArrayList<>();
+		Map<File, Integer> counts = new HashMap<>();
+
 		if (filesInDir != null) {
+			Map<String, File> byLowerName = new HashMap<>();
 			for (File file : filesInDir) {
 				String name = file.getName().toLowerCase(Locale.ROOT);
-				if (name.endsWith(".png") && name.contains(needle)) {
-					files.add(file);
+				if (name.endsWith(".png")) {
+					byLowerName.put(name, file);
 				}
 			}
+
+			for (File file : filesInDir) {
+				String name = file.getName().toLowerCase(Locale.ROOT);
+				if (!name.endsWith(".png") || !name.contains(needle)) {
+					continue;
+				}
+				String keyName = ScreenshotNamer.burstKeyName(name);
+				File key = keyName == null ? null : byLowerName.get(keyName);
+				if (key != null) {
+					counts.merge(key, 1, Integer::sum);
+					continue;
+				}
+				files.add(file);
+			}
 		}
+
 		SortMode.current().sort(files);
 		screenShotFiles = files;
+		burstCounts = counts;
+	}
+
+	/** The number of sub-frames folded under {@code key}, or 0 if it is not a burst key —
+	 * never 1, since a burst of one frame has no sub-frames to fold. Free: counted from the
+	 * name scan {@link #updateScreenShotFilesList} already did. */
+	public static int burstFrameCount(File key) {
+		return burstCounts.getOrDefault(key, 0);
+	}
+
+	/**
+	 * The sub-frames folded under {@code key}, in index order, read fresh from disk. The caller
+	 * is about to touch these files (the frame browser, delete, rename), so a fresh listing
+	 * rather than the cached count is worth the extra directory read here.
+	 */
+	public static List<File> burstFrames(File screenshotsDir, File key) {
+		if (key == null) {
+			return List.of();
+		}
+		File[] filesInDir = screenshotsDir.listFiles();
+		if (filesInDir == null) {
+			return List.of();
+		}
+		String keyLower = key.getName().toLowerCase(Locale.ROOT);
+		List<File> frames = new ArrayList<>();
+		for (File file : filesInDir) {
+			String name = file.getName().toLowerCase(Locale.ROOT);
+			if (!name.endsWith(".png")) {
+				continue;
+			}
+			if (keyLower.equals(ScreenshotNamer.burstKeyName(name))) {
+				frames.add(file);
+			}
+		}
+		frames.sort(Comparator.comparing(File::getName));
+		return frames;
 	}
 
 	/**
@@ -111,7 +182,13 @@ public final class VoxelCamIO {
 	 * happen, which the caller has to tell the player about: nothing here throws, the file
 	 * keeps its old name, and the manager re-lists it as if nothing had been asked.
 	 *
-	 * {@code File.renameTo} rather than {@link Files#move}: move reports success without
+	 * <p>When the selection is a burst key, its sub-frames are carried across too: every target
+	 * name (the key's and every frame's) is collision-checked up front, then the frames are
+	 * renamed before the key, and a failure anywhere rolls back everything already moved. A
+	 * player renaming a burst key — something they do constantly to their good shots — would
+	 * otherwise shatter the group into several ungrouped rows on every rename.
+	 *
+	 * <p>{@code File.renameTo} rather than {@link Files#move}: move reports success without
 	 * moving anything for a case-only rename on a case-insensitive filesystem, where it
 	 * finds source and target are the same file — silently undoing the recapitalisation
 	 * renameTo performs. The reason for a failure is lost to a bare false, so it is only
@@ -128,13 +205,116 @@ public final class VoxelCamIO {
 		if (target.getName().equals(selected.getName())) {
 			return null;
 		}
-		if (!selected.renameTo(target)) {
-			VoxelCamClient.LOGGER.error("Failed to rename {} to {}", selected, target);
+		if (nameCollides(screenshotsDir, newName, selected)) {
 			return null;
+		}
+
+		List<File> frames = burstFrames(screenshotsDir, selected);
+		List<File> frameTargets = new ArrayList<>(frames.size());
+		for (File frame : frames) {
+			String suffix = ScreenshotNamer.burstFrameSuffix(frame.getName());
+			if (suffix == null || nameCollides(screenshotsDir, newName + suffix, frame)) {
+				return null;
+			}
+			frameTargets.add(new File(screenshotsDir, newName + suffix + ".png"));
+		}
+
+		List<File> movedFrom = new ArrayList<>();
+		List<File> movedTo = new ArrayList<>();
+		for (int i = 0; i < frames.size(); i++) {
+			File from = frames.get(i);
+			File to = frameTargets.get(i);
+			if (!from.renameTo(to)) {
+				VoxelCamClient.LOGGER.error("Failed to rename burst frame {} to {}; rolling back", from, to);
+				rollbackRename(movedFrom, movedTo);
+				return null;
+			}
+			movedFrom.add(from);
+			movedTo.add(to);
+		}
+
+		if (!selected.renameTo(target)) {
+			if (movedTo.isEmpty()) {
+				VoxelCamClient.LOGGER.error("Failed to rename {} to {}", selected, target);
+			} else {
+				VoxelCamClient.LOGGER.error("Failed to rename {} to {}; rolling back its burst frames", selected, target);
+			}
+			rollbackRename(movedFrom, movedTo);
+			return null;
+		}
+
+		for (File frame : movedTo) {
+			ScreenshotImageCache.release(frame);
 		}
 		ScreenshotImageCache.release(selected);
 		selected = target;
 		return target;
+	}
+
+	/** Undoes whichever burst-frame renames already succeeded, in reverse order, after the
+	 * group rename they were part of failed partway through. */
+	private static void rollbackRename(List<File> movedFrom, List<File> movedTo) {
+		for (int i = movedTo.size() - 1; i >= 0; i--) {
+			File from = movedFrom.get(i);
+			File to = movedTo.get(i);
+			if (!to.renameTo(from)) {
+				VoxelCamClient.LOGGER.error("Failed to roll back {} to {} after a failed group rename", to, from);
+			}
+		}
+	}
+
+	/**
+	 * Swaps the bytes of the selected burst key with one of its frames — the iPhone "set key
+	 * photo" gesture. Only the two files' contents move; their paths, and so the whole group's
+	 * structure (which one is the key, which are frames, the collapse that hides the frames),
+	 * are untouched. The tags inside each file — capture order, offset from the key — are
+	 * deliberately NOT rewritten to match: the name a swap changes is a presentation choice, the
+	 * tags record capture history, and a future export needs the latter regardless of which
+	 * frame is shown first.
+	 *
+	 * @return true if the swap happened.
+	 */
+	public static boolean setAsKey(File frame) {
+		if (selected == null || frame == null || frame.equals(selected)) {
+			return false;
+		}
+		File dir = selected.getParentFile();
+		File tmp;
+		try {
+			Path tmpPath = Files.createTempFile(dir.toPath(), "voxelcam-setkey-", ".png.tmp");
+			Files.delete(tmpPath);
+			tmp = tmpPath.toFile();
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to reserve a swap file for Set as key", e);
+			return false;
+		}
+
+		if (!selected.renameTo(tmp)) {
+			VoxelCamClient.LOGGER.error("Failed to swap {} aside for Set as key", selected);
+			return false;
+		}
+		if (!frame.renameTo(selected)) {
+			VoxelCamClient.LOGGER.error("Failed to move {} into the key slot for Set as key; rolling back", frame);
+			if (!tmp.renameTo(selected)) {
+				VoxelCamClient.LOGGER.error("Failed to roll back {} to {} after a failed Set as key", tmp, selected);
+			}
+			return false;
+		}
+		if (!tmp.renameTo(frame)) {
+			VoxelCamClient.LOGGER.error("Failed to move the old key into {} for Set as key; rolling back", frame);
+			if (!selected.renameTo(frame) || !tmp.renameTo(selected)) {
+				VoxelCamClient.LOGGER.error("Failed to fully roll back a failed Set as key swap between {} and {}",
+						selected, frame);
+			}
+			return false;
+		}
+
+		// Cache invalidation is the caller's job, the same as toggleSelectedFavorite()'s: this
+		// class only touches files, and ScreenshotMetadata lives in the gui package that calls
+		// into this one, not the other way around.
+		ScreenshotImageCache.release(selected);
+		ScreenshotImageCache.release(frame);
+		return true;
 	}
 
 	/**
@@ -170,11 +350,28 @@ public final class VoxelCamIO {
 	 * The list and the selection are only touched once the file is gone: the manager
 	 * re-lists the directory when a popup closes, so a row dropped from an optimistic
 	 * delete would silently come back with nothing to explain it.
+	 *
+	 * <p>When the selection is a burst key, its sub-frames go first and the key only if every
+	 * one of them actually went. Deleting the key after a frame failure would both manufacture
+	 * orphans and make a "deleted" report a lie about a file that is still there; this way a
+	 * partial failure leaves an honest row behind with a smaller badge.
 	 */
 	public static boolean delete() {
 		if (selected == null) {
 			return false;
 		}
+		File dir = selected.getParentFile();
+		List<File> frames = burstFrames(dir, selected);
+		for (File frame : frames) {
+			try {
+				Files.delete(frame.toPath());
+			} catch (IOException e) {
+				VoxelCamClient.LOGGER.error("Failed to delete burst frame {}", frame, e);
+				return false;
+			}
+			ScreenshotImageCache.release(frame);
+		}
+
 		try {
 			Files.delete(selected.toPath());
 		} catch (IOException e) {

@@ -100,6 +100,10 @@ public class VoxelCamClient implements ClientModInitializer {
 
 		BigScreenshotCommand.register();
 
+		// Before anything that could read the settings it restores — the capture menu is
+		// reachable the moment a title screen appears, well before any world loads.
+		VoxelCamConfig.load();
+
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
 
 		// Last, so the menu draws over the hotbar and bars rather than under them.

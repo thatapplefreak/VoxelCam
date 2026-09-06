@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
@@ -234,13 +235,18 @@ class ScreenshotMetadataTest {
 	@Test
 	void captureNamesBecomeFriendlyTimesButRenamesAreKept() throws IOException {
 		File capture = sized("2026-08-27_10.00.00.png", 1);
-		File burst = sized("2026-08-27_10.00.00_3.png", 1);
+		File collision = sized("2026-08-27_10.00.00_3.png", 1);
+		// An orphaned burst sub-frame — its key renamed or deleted out from under it, so
+		// VoxelCamIO lists it on its own — still gets a friendly time rather than a raw stamp.
+		File burstFrame = sized("2026-08-27_10.00.00_burst02.png", 1);
 		File renamed = sized("sunset over base.png", 1);
 
 		assertTrue(ScreenshotMetadata.displayName(capture).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(capture));
-		assertTrue(ScreenshotMetadata.displayName(burst).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
-				ScreenshotMetadata.displayName(burst));
+		assertTrue(ScreenshotMetadata.displayName(collision).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(collision));
+		assertTrue(ScreenshotMetadata.displayName(burstFrame).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+				ScreenshotMetadata.displayName(burstFrame));
 		assertEquals("sunset over base", ScreenshotMetadata.displayName(renamed));
 	}
 
@@ -312,6 +318,48 @@ class ScreenshotMetadataTest {
 		PngTextChunk.embed(file, Map.of("voxelcam:dimension", "minecraft:overworld", "some:other:tag", "x"));
 
 		assertNull(ScreenshotMetadata.captureContext(file));
+	}
+
+	@Test
+	void readsBurstFrameTagsEmbeddedByPngTextChunk() throws IOException {
+		File file = png("burst01.png", 640, 480);
+		BurstFrame embedded = new BurstFrame("2026-09-05_14.30.00", 1, 420);
+		PngTextChunk.embed(file, embedded.toTags());
+
+		assertEquals(embedded, ScreenshotMetadata.burstFrame(file));
+	}
+
+	/** Every screenshot that isn't part of a burst, which is most of them, has no tags at all. */
+	@Test
+	void burstFrameIsNullWhenThereAreNoTags() throws IOException {
+		assertNull(ScreenshotMetadata.burstFrame(png("untagged.png", 100, 100)));
+		assertNull(ScreenshotMetadata.burstFrame(null));
+	}
+
+	/**
+	 * Unlike a star toggle, which only splices a chunk in after the IHDR, a "Set as key" swap
+	 * rewrites the whole file — so its cached facts have to be dropped wholesale, dimensions and
+	 * capture context included, rather than through {@link ScreenshotMetadata#forget(File)}.
+	 */
+	@Test
+	void forgetFileDropsEverythingIncludingDimensionsAndContext() throws IOException {
+		File file = png("shot.png", 640, 480);
+		CaptureContext embedded = new CaptureContext("minecraft:the_nether", 12, 70, -45, "New World");
+		PngTextChunk.embed(file, embedded.toTags());
+		ScreenshotMetadata.dimensions(file);
+		ScreenshotMetadata.captureContext(file);
+		ScreenshotMetadata.isStarred(file);
+
+		// Overwrite with a differently-sized, untagged image at the same path — the same thing
+		// a content swap does — without going through forgetFile() first.
+		png(file.getName(), 1, 1);
+		assertEquals(new ScreenshotMetadata.Dimensions(640, 480), ScreenshotMetadata.dimensions(file),
+				"the stale cache should still be answering for the old bytes");
+
+		ScreenshotMetadata.forgetFile(file);
+
+		assertEquals(new ScreenshotMetadata.Dimensions(1, 1), ScreenshotMetadata.dimensions(file));
+		assertNull(ScreenshotMetadata.captureContext(file), "the new bytes carry no capture tags");
 	}
 
 	@Test

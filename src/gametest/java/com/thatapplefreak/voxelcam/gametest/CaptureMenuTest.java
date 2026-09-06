@@ -44,6 +44,8 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyTapTakesAPlainScreenshot(context, dir);
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
+			assertAimingPastTheRingCommitsItsOption(context, dir);
+			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
 		}
@@ -137,9 +139,11 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		try {
 			context.waitFor(client -> CaptureMenu.isOpen(), 200);
 
-			// Straight down from the centre the cursor was released at, well clear of the dead
-			// zone: unambiguously the second wedge, BIG_SCREENSHOT.
-			context.getInput().moveCursor(0, 150);
+			// Aimed at the second wedge's centre (down-right, 120° clockwise from straight up)
+			// rather than straight down: with three modes, straight down sits exactly on the
+			// second/third wedge boundary, which floating-point rounding could tip either way.
+			// Same magnitude as the two-mode version this replaced, well clear of the dead zone.
+			context.getInput().moveCursor(130, 75);
 			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT, 100);
 		} finally {
 			context.getInput().releaseKey(InputConstants.KEY_F2);
@@ -157,6 +161,79 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			throw new AssertionError("aiming at the big-screenshot wedge should have produced a "
 					+ expected + " capture, was " + size);
 		}
+	}
+
+	/**
+	 * Aimed past {@code CaptureMenu.OPTION_RADIUS} at the big-screenshot wedge's own centre — the
+	 * same non-boundary vector the test above uses, just far enough out to have also picked a
+	 * ring option. The middle of {@code BigScreenshotSize.DIAL_OPTIONS} is {@code fhd}, a fixed
+	 * 1920x1080 rather than a multiple of the window, which is what lets this assert on exact
+	 * pixels regardless of the dev window's own size — proof the ring's geometry landed on the
+	 * option a release actually commits, not merely that some size changed.
+	 */
+	private static void assertAimingPastTheRingCommitsItsOption(ClientGameTestContext context, File dir) {
+		Set<String> before;
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+			// moveCursor moves the real, unscaled cursor, but CaptureMenu's aim offset is in
+			// GUI-scaled space (mouseHandler.getScaledXPos/YPos) — at this window's own GUI
+			// scale, (130, 75) only reaches OPTION_RADIUS's dead-zone-sized cousin, not
+			// OPTION_RADIUS (90) itself, which is why the mode-only assertion above this method
+			// gets away with the smaller vector and this one cannot. Same 130:75 ratio — same
+			// wedge centre, same angle — just scaled up for a comfortable margin past 90.
+			context.getInput().moveCursor(390, 225);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT
+					&& CaptureMenu.aimedOption() == 2, 100);
+			// A frame for the HUD to actually draw the ring before the screenshot below.
+			context.waitTicks(2);
+			context.takeScreenshot("capture-menu-option-ring");
+			// Taken here, after the diagnostic screenshot above rather than at the top of the
+			// method: context.takeScreenshot writes into this same directory (both it and
+			// Screenshot.SCREENSHOT_DIR resolve under the game directory's own "screenshots"),
+			// so "before" has to already include it or theNewFile below finds two new files
+			// instead of one.
+			before = listing(dir);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+
+		context.waitFor(client -> !CaptureMenu.isCapturePending() && !BigScreenshot.isBusy(), 200);
+		context.waitTicks(40);
+
+		File written = theNewFile(dir, before, "an aimed release past the option ring");
+		Dimensions size = pngSize(written);
+		Dimensions expected = new Dimensions(1920, 1080);
+		if (!size.equals(expected)) {
+			throw new AssertionError("aiming past the ring at fhd should have produced a "
+					+ expected + " capture, was " + size);
+		}
+	}
+
+	/**
+	 * "Zero geometry work for a third wedge" is true of the code but not of verifying it: at
+	 * three modes the labels sit at 120° and 240° rather than directly opposite each other, where
+	 * the label's screen-edge clamp does real work for the first time and the sector dividers are
+	 * unevenly spaced for the first time. A screenshot is what catches a dial that compiles fine
+	 * and still looks wrong. Escapes out afterwards so nothing is captured.
+	 */
+	private static void assertTheThreeWedgeDialRendersCorrectly(ClientGameTestContext context) {
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+			context.getInput().moveCursor(-130, 75);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BURST, 100);
+			context.waitTicks(2);
+			context.takeScreenshot("capture-menu-three-wedges");
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(20);
 	}
 
 	/**

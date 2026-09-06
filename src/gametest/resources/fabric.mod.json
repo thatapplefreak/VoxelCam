@@ -11,10 +11,12 @@
 			"com.thatapplefreak.voxelcam.gametest.ScreenshotManagerTest",
 			"com.thatapplefreak.voxelcam.gametest.CaptureTest",
 			"com.thatapplefreak.voxelcam.gametest.CaptureMenuTest",
+			"com.thatapplefreak.voxelcam.gametest.BurstCaptureTest",
 			"com.thatapplefreak.voxelcam.gametest.SharePopupTest",
 			"com.thatapplefreak.voxelcam.gametest.RenamePopupFocusTest",
 			"com.thatapplefreak.voxelcam.gametest.RenamePopupFailureTest",
-			"com.thatapplefreak.voxelcam.gametest.RenameSelectionTest"
+			"com.thatapplefreak.voxelcam.gametest.RenameSelectionTest",
+			"com.thatapplefreak.voxelcam.gametest.SettingsScreenTest"
 		]
 	},
 	"depends": {

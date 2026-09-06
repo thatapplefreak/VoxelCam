@@ -63,11 +63,16 @@ class CaptureMenuTest {
 	}
 
 	@Test
-	void offsetsResolveToTheGeometricallyCorrectWedgeForATwoModeMenu() {
+	void offsetsResolveToTheGeometricallyCorrectWedgeForAThreeModeMenu() {
 		// Mouse above the anchor (screen-space y decreases upward) selects the first mode...
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, -50));
-		// ...below it selects the second.
-		assertEquals(CaptureMenu.Mode.BIG_SCREENSHOT, CaptureMenu.modeForOffset(0, 50));
+		// Straight down (0, 50) sits exactly on the boundary between the second and third wedges
+		// at three modes — floor((pi + pi/3) / (2*pi/3)) lands on floor(2.0), which double
+		// rounding could tip either way — so the other two modes are asserted off their own
+		// wedge centres instead: atan2(130, -75) is 2*pi/3 (the second wedge) and atan2(-130, -75)
+		// is 4*pi/3 (the third), both comfortably clear of either boundary.
+		assertEquals(CaptureMenu.Mode.BIG_SCREENSHOT, CaptureMenu.modeForOffset(130, 75));
+		assertEquals(CaptureMenu.Mode.BURST, CaptureMenu.modeForOffset(-130, 75));
 	}
 
 	/**
@@ -80,6 +85,62 @@ class CaptureMenuTest {
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, 1));
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(0, 12));
 		assertEquals(CaptureMenu.Mode.SCREENSHOT, CaptureMenu.modeForOffset(-8, 8));
+	}
+
+	// --- subOptionForAngle -----------------------------------------------------------------------
+
+	@Test
+	void aWedgesOwnCentreSelectsTheMiddleOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(2, CaptureMenu.subOptionForAngle(wedgeOneCenter, 3, 1, 5));
+	}
+
+	@Test
+	void theWedgesOwnNearEdgeSelectsTheFirstOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(0, CaptureMenu.subOptionForAngle(wedgeOneCenter - wedgeWidth / 2 + 0.001, 3, 1, 5));
+	}
+
+	@Test
+	void theWedgesOwnFarEdgeSelectsTheLastOption() {
+		double wedgeWidth = Math.PI * 2 / 3;
+		double wedgeOneCenter = wedgeWidth;
+		assertEquals(4, CaptureMenu.subOptionForAngle(wedgeOneCenter + wedgeWidth / 2 - 0.001, 3, 1, 5));
+	}
+
+	/**
+	 * Exactly on the wedge's own far boundary, the raw division lands one index past the last
+	 * valid option — clamped rather than thrown, since aiming at the seam between two wedges is
+	 * an ordinary thing to do with a mouse and must not crash the HUD that recomputes this every
+	 * frame the menu is open.
+	 */
+	@Test
+	void anAngleExactlyOnTheWedgesEdgeClampsRatherThanOverflowing() {
+		double wedgeWidth = Math.PI; // two wedges, for a wide, easy-to-land-on boundary
+		assertEquals(2, CaptureMenu.subOptionForAngle(wedgeWidth / 2, 2, 0, 3));
+	}
+
+	// --- optionForOffset -------------------------------------------------------------------------
+
+	@Test
+	void insideOptionRadiusSelectsNoOptionRegardlessOfAngle() {
+		assertEquals(-1, CaptureMenu.optionForOffset(0, 50));
+		assertEquals(-1, CaptureMenu.optionForOffset(80, 0));
+	}
+
+	@Test
+	void screenshotHasNoOptionsEvenWellPastOptionRadius() {
+		assertEquals(-1, CaptureMenu.optionForOffset(0, -200));
+	}
+
+	@Test
+	void aWedgesOwnCentrePastOptionRadiusSelectsItsMiddleOption() {
+		// The same vectors offsetsResolveToTheGeometricallyCorrectWedgeForAThreeModeMenu uses for
+		// BIG_SCREENSHOT and BURST's own wedge centres — both already well past OPTION_RADIUS (90).
+		assertEquals(2, CaptureMenu.optionForOffset(130, 75));
+		assertEquals(2, CaptureMenu.optionForOffset(-130, 75));
 	}
 
 	// --- state machine, no Minecraft ------------------------------------------------------------

@@ -257,6 +257,28 @@ under the menu above it. `TitleScreenButtonTest` guards exactly that. The slot p
 the row's own spacing, and there is a fallback to the old position past the bottom full-width row
 for menu-replacing mods.
 
+**Config** — `VoxelCamConfig` persists four settings to `voxelcam.json` (Gson, under
+`FabricLoader.getConfigDir()`): burst length, big-screenshot size, the manager's sort mode, and its
+favourites-only filter. Three mirror an existing session-static holder (`Burst.getLength()`,
+`BigScreenshot.getSize()`, `SortMode.current()`); `favoritesOnly` is the exception, living only as
+`VoxelCamConfig.current().favoritesOnly` — the manager reads it in `init()` and writes it in
+`toggleFavoritesOnly()` rather than keeping a second copy that could drift.
+
+`Burst.setLength`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
+`VoxelCamConfig.saveCurrent()` themselves — that would touch `FabricLoader.getInstance()` from
+`BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setLength`
+directly. `saveCurrent()` is instead called explicitly from every place a setting actually changes
+at the player's hand: the capture menu's outer ring, `BigScreenshotCommand`, and the manager's sort
+button and favourites toggle — all of which already need a live client to run at all. `load()` (once,
+from `VoxelCamClient.onInitializeClient`) applies the three session-static settings directly and
+does not itself trigger a save, since restoring what was already on disk is not a change worth
+writing straight back.
+
+A settings screen (`GuiSettings`, reachable from a gear button in the manager, or from Mod Menu if
+installed — `VoxelCamModMenu`, `compileOnly` in `build.gradle` so it costs nothing for a player who
+does not have Mod Menu) reaches burst length across its full range and every `BigScreenshotSize`
+preset, complementing the ring's five-value ladders for each.
+
 ## Version-specific API traps
 
 These cost real debugging time and are not guessable from the class names:
@@ -301,9 +323,14 @@ follow the player's system locale are the exception, not the rule.
 
 ## Known dead ends
 
-- **No config file exists.** `VoxelCamConfig` was deleted once nothing read it, and the big-screenshot
-  size deliberately stayed session-only rather than bringing it back; no `voxelcam.json` is written.
-  The version pins in `gradle.properties` are build-time only and are not runtime config.
+- **"No config file exists" is no longer true, and should not be treated as a default to fall back
+  on.** `VoxelCamConfig` was deleted once nothing read it (2.0.0-era), and big-screenshot size
+  deliberately stayed session-only through 2.3.0 rather than bringing it back. That held only as
+  long as nothing needed to persist — the capture menu's outer ring (2.4.0) gave burst length and
+  big-screenshot size the first two settings actually worth remembering across a restart, which is
+  the entire justification for `voxelcam.json` existing again. See the Architecture section's
+  **Config** entry for how it works. The version pins in `gradle.properties` are still build-time
+  only and are not runtime config.
 - **There is no data generation.** `configureDataGeneration()` was removed in 2.2.0: no
   `fabric-datagen` entrypoint was ever declared and `src/main/java` has no sources, so its
   `runDatagen` task only ever generated nothing. The mod ships hand-written assets. Do not add the

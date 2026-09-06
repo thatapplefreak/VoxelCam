@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.util.List;
 import java.util.function.Consumer;
@@ -120,6 +121,20 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 						thumbX + THUMBNAIL_WIDTH - BADGE_SIZE - 1, thumbY + 1,
 						0F, 0F, BADGE_SIZE, BADGE_SIZE, BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE,
 						BADGE_TEXTURE_SIZE, BADGE_TEXTURE_SIZE, BADGE_GOLD);
+			}
+			// The star owns the top-right corner, so the burst count takes the opposite one.
+			// Text on a fill plate rather than a texture: it needs to say how many, which an
+			// icon cannot, and it ships nothing new to the texture atlas. Counts the whole
+			// group (the key plus its frames), matching the length a burst announces in chat.
+			int frameCount = VoxelCamIO.burstFrameCount(file);
+			if (frameCount > 0) {
+				var font = Minecraft.getInstance().font;
+				String label = Integer.toString(frameCount + 1);
+				int labelWidth = font.width(label);
+				int plateLeft = thumbX + THUMBNAIL_WIDTH - labelWidth - 3;
+				int plateTop = thumbY + thumbHeight - BADGE_SIZE + 1;
+				context.fill(plateLeft, plateTop, thumbX + THUMBNAIL_WIDTH, thumbY + thumbHeight, 0xCC101010);
+				context.text(font, Component.literal(label), plateLeft + 1, plateTop + 1, 0xFFFFFFFF);
 			}
 
 			int textX = thumbX + THUMBNAIL_WIDTH + 6;
