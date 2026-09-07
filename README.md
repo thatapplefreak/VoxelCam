@@ -9,16 +9,36 @@ Features
 --------
 
 * A screenshot manager with search, thumbnails, and a large preview, opened
-  with the `H` key in-game or from the camera button on the title screen.
+  with the `H` key in-game or from the camera button on the title screen and
+  the pause menu. Sort by date, name, file size or dimensions, star the ones
+  worth keeping, and filter down to just those.
 * Rename and delete screenshots without leaving the game.
+* Hold `F2` for a capture menu: aim at **Screenshot**, **Big Screenshot** or
+  **Burst** and let go. Tapping `F2` still takes an ordinary screenshot, so
+  nothing changes if you never hold it. The menu's outer ring sets the burst
+  length and the oversized size without leaving the dial.
 * Take screenshots far larger than your window — up to whatever your GPU
   allows — with `Shift`+`F2`. Set the size with `/bigscreenshot` (or `/bs`),
   which takes presets like `4k` and `imax`, a multiple of your window such as
   `4x`, or exact dimensions like `3840x2160`.
+* Capture a burst of consecutive frames in one go. The manager lists a burst as
+  a single entry you can expand, and any frame in it can be promoted to the one
+  that represents the group.
+* Let VoxelCam catch the moments you would have missed: it takes a screenshot
+  by itself when you earn an advancement, when a boss bar empties, when you
+  die, and the first time you arrive in a dimension. All four are on by
+  default, each can be switched off, and no more than one is taken every ten
+  seconds so a run of advancements is one screenshot rather than five.
+* Every capture records where it came from — dimension and coordinates, the
+  world or server name, the mods that were loaded, and the Iris shader pack if
+  there is one. It is written into the PNG itself, so it survives copying,
+  renaming and sharing. The server's address is deliberately not recorded.
 * Share a screenshot by saving a copy through your platform's native file
   dialog, showing it in your file manager, copying its path, or uploading it to
   [catbox.moe](https://catbox.moe) for a link. No account or API key is needed
   for any of these.
+* Settings live behind the gear button in the manager, or in
+  [Mod Menu](https://modrinth.com/mod/modmenu) if you have it installed.
 
 Requirements
 ------------
@@ -37,7 +57,7 @@ it, and you can use it on any server, modded or vanilla.
 1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.19.3 or newer
    for Minecraft 26.2.
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 26.2.
-3. Download `voxelcam-2.2.0.jar` from the
+3. Download `voxelcam-2.4.0.jar` from the
    [latest release](https://github.com/thatapplefreak/VoxelCam/releases/latest).
 4. Put both jars in your `mods` folder, creating it if it does not exist:
    * Windows — `%appdata%\.minecraft\mods`
@@ -46,8 +66,10 @@ it, and you can use it on any server, modded or vanilla.
 5. Launch Minecraft using the Fabric profile.
 
 Press `H` in-game to open the screenshot manager, or use the camera button on
-the title screen. `F2` takes a screenshot as usual; hold `Shift` for an
-oversized one.
+the title screen or the pause menu. `F2` takes a screenshot as usual; hold
+`Shift` for an oversized one, or hold `F2` on its own to pick a capture mode
+from the dial. Both keys can be rebound under Controls, in a VoxelCam
+category.
 
 VoxelCam targets **Java 25**, the runtime Minecraft 26.2 ships with, so the
 official launcher needs no changes.
