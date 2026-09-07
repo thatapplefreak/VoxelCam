@@ -104,6 +104,26 @@
 	"voxelcam.settings.burstlengthminus": "-",
 	"voxelcam.settings.burstlengthplus": "+",
 	"voxelcam.settings.burstlength": "Flurry size: %s",
-	"voxelcam.settings.bigscreenshotsize": "Big map size: %s"
+	"voxelcam.settings.bigscreenshotsize": "Big map size: %s",
 
+	"voxelcam.settings.autocapture": "Maps by themselves…",
+	"voxelcam.tooltip.autocapture": "Let th' camera snap on its own when somethin' worth rememberin' happens",
+
+	"voxelcam.autocapture.title": "Maps By Themselves",
+	"voxelcam.autocapture.cooldown": "No more than one ev'ry %s seconds",
+	"voxelcam.autocapture.cooldownminus": "-",
+	"voxelcam.autocapture.cooldownplus": "+",
+	"voxelcam.tooltip.cooldowndown": "Let 'em come closer together",
+	"voxelcam.tooltip.cooldownup": "Leave more time betwixt 'em",
+
+	"voxelcam.moment.advancement": "Feat o' note",
+	"voxelcam.moment.bossdefeated": "Beastie slain",
+	"voxelcam.moment.death": "Yer end",
+	"voxelcam.moment.newdimension": "New shore",
+	"voxelcam.tooltip.moment.advancement": "Snap a map when ye earn a feat — from any mod aboard",
+	"voxelcam.tooltip.moment.bossdefeated": "Snap a map when a beastie's bar empties an' fades",
+	"voxelcam.tooltip.moment.death": "Snap a map th' moment ye meet Davy Jones",
+	"voxelcam.tooltip.moment.newdimension": "Snap a map th' first time ye make landfall somewhere new",
+	"voxelcam.moment.subject": "%s: %s",
+	"voxelcam.moment.saved": "%s — stowed as %s"
 }

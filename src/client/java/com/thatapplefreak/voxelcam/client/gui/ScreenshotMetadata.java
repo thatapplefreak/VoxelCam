@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
+import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
@@ -44,6 +45,7 @@ public final class ScreenshotMetadata {
 	private static final Map<File, Optional<Dimensions>> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Optional<BurstFrame>> BURST_FRAMES = new HashMap<>();
+	private static final Map<File, Optional<MomentTag>> MOMENTS = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final Map<File, String> NAMES = new HashMap<>();
 	private static final Map<File, String> SIZES = new HashMap<>();
@@ -152,10 +154,30 @@ public final class ScreenshotMetadata {
 		return frame;
 	}
 
+	/**
+	 * Why an automatic capture exists — which trigger armed it and what it was about — or null for
+	 * the screenshots somebody pressed a key for, which is most of them. Cached exactly the way
+	 * {@link #captureContext(File)} is, and read for the same reason: it feeds the details line
+	 * under the preview, which redraws every frame for the one selected file.
+	 */
+	public static MomentTag moment(File file) {
+		if (file == null) {
+			return null;
+		}
+		Optional<MomentTag> cached = MOMENTS.get(file);
+		if (cached != null) {
+			return cached.orElse(null);
+		}
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(file));
+		MOMENTS.put(file, Optional.ofNullable(tag));
+		return tag;
+	}
+
 	public static void forgetAll() {
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
 		BURST_FRAMES.clear();
+		MOMENTS.clear();
 		STARRED.clear();
 		NAMES.clear();
 		SIZES.clear();
@@ -189,6 +211,7 @@ public final class ScreenshotMetadata {
 		DIMENSIONS.remove(file);
 		CONTEXTS.remove(file);
 		BURST_FRAMES.remove(file);
+		MOMENTS.remove(file);
 		STARRED.remove(file);
 		NAMES.remove(file);
 		SIZES.remove(file);

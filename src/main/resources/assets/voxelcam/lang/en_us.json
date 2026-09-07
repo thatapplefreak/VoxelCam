@@ -104,6 +104,26 @@
 	"voxelcam.settings.burstlengthminus": "-",
 	"voxelcam.settings.burstlengthplus": "+",
 	"voxelcam.settings.burstlength": "Burst length: %s",
-	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s"
+	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s",
 
+	"voxelcam.settings.autocapture": "Automatic capture…",
+	"voxelcam.tooltip.autocapture": "Take a screenshot by itself at moments worth keeping",
+
+	"voxelcam.autocapture.title": "Automatic Capture",
+	"voxelcam.autocapture.cooldown": "No more than one every %s seconds",
+	"voxelcam.autocapture.cooldownminus": "-",
+	"voxelcam.autocapture.cooldownplus": "+",
+	"voxelcam.tooltip.cooldowndown": "Allow automatic captures closer together",
+	"voxelcam.tooltip.cooldownup": "Leave more time between automatic captures",
+
+	"voxelcam.moment.advancement": "Advancement",
+	"voxelcam.moment.bossdefeated": "Boss defeated",
+	"voxelcam.moment.death": "Death",
+	"voxelcam.moment.newdimension": "New dimension",
+	"voxelcam.tooltip.moment.advancement": "Capture when you earn an advancement — from any mod",
+	"voxelcam.tooltip.moment.bossdefeated": "Capture when a boss bar empties and disappears",
+	"voxelcam.tooltip.moment.death": "Capture the moment you die",
+	"voxelcam.tooltip.moment.newdimension": "Capture the first time you arrive in a dimension",
+	"voxelcam.moment.subject": "%s: %s",
+	"voxelcam.moment.saved": "%s — saved as %s"
 }

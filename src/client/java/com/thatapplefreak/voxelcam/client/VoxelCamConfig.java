@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
@@ -45,6 +46,11 @@ public final class VoxelCamConfig {
 	public String bigScreenshotSize = BigScreenshotSize.DEFAULT.token();
 	public String sortMode = SortMode.DATE_NEWEST.name();
 	public boolean favoritesOnly = false;
+	public boolean autoCaptureAdvancement = true;
+	public boolean autoCaptureBossDefeat = true;
+	public boolean autoCaptureDeath = true;
+	public boolean autoCaptureNewDimension = true;
+	public int autoCaptureCooldownSeconds = AutoCapture.DEFAULT_COOLDOWN_SECONDS;
 
 	public static VoxelCamConfig current() {
 		return current;
@@ -94,15 +100,44 @@ public final class VoxelCamConfig {
 	 * tag embed.
 	 */
 	public static void saveCurrent() {
+		VoxelCamConfig snapshot = snapshot();
+		current = snapshot;
+
+		Path path = configPath();
+		Util.ioPool().execute(() -> save(snapshot, path));
+	}
+
+	/**
+	 * The one place every field has to be accounted for, split out from {@link #saveCurrent()} as a
+	 * seam because it is the half worth testing and the half that needs no {@code FabricLoader}.
+	 *
+	 * <p>Two kinds of field meet here. The ones mirroring a session-static are read back off it;
+	 * the ones that live only on {@link #current} — {@link #favoritesOnly} and the auto-capture
+	 * settings, none of which has a holder to mirror — are copied across. Forgetting one of the
+	 * second kind writes its default straight back to disk the next time anything else is saved,
+	 * silently undoing whatever the player just toggled. {@code roundTripsThroughDisk} cannot catch
+	 * that: it builds its object directly and never comes through here, which is exactly why
+	 * {@code snapshotKeepsSettingsThatHaveNoSessionStatic} does.
+	 */
+	static VoxelCamConfig snapshot() {
 		VoxelCamConfig snapshot = new VoxelCamConfig();
 		snapshot.burstLength = Burst.getLength();
 		snapshot.bigScreenshotSize = BigScreenshot.getSize().token();
 		snapshot.sortMode = SortMode.current().name();
 		snapshot.favoritesOnly = current.favoritesOnly;
-		current = snapshot;
+		snapshot.autoCaptureAdvancement = current.autoCaptureAdvancement;
+		snapshot.autoCaptureBossDefeat = current.autoCaptureBossDefeat;
+		snapshot.autoCaptureDeath = current.autoCaptureDeath;
+		snapshot.autoCaptureNewDimension = current.autoCaptureNewDimension;
+		snapshot.autoCaptureCooldownSeconds = current.autoCaptureCooldownSeconds;
+		return snapshot;
+	}
 
-		Path path = configPath();
-		Util.ioPool().execute(() -> save(snapshot, path));
+	/** Test-only reset: {@link #current} is static and outlives any one test. Public only because
+	 * the settings it now carries are read from other packages, so the suites that mutate them live
+	 * there too — nothing in the mod calls this. */
+	public static void forgetCurrent() {
+		current = new VoxelCamConfig();
 	}
 
 	/** Package-private seam, mirrored with {@link #load(Path)}. */

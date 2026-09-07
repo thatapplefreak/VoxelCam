@@ -2,10 +2,12 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.thatapplefreak.voxelcam.client.gui.GuiAutoCaptureSettings;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.GuiSettings;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
+import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,6 +42,7 @@ public class SettingsScreenTest implements FabricClientGameTest {
 		assertGearButtonOpensSettings(context);
 		assertBurstLengthStepsAndPersists(context);
 		assertBigScreenshotSizeButtonReflectsState(context);
+		assertAutoCaptureTogglesAndPersists(context);
 		assertDoneReturnsToTheManager(context);
 
 		context.setScreen(TitleScreen::new);
@@ -110,6 +113,56 @@ public class SettingsScreenTest implements FabricClientGameTest {
 		if (!labels.contains(expected)) {
 			throw new AssertionError("settings screen should show \"" + expected + "\", offers " + labels);
 		}
+	}
+
+	/**
+	 * The automatic-capture sub-screen, and the one setting on it with no session-static holder to
+	 * mirror — which makes this the check that {@code VoxelCamConfig.snapshot()} really did copy the
+	 * new fields across. The unit suite proves the seam in isolation; only here does a real click go
+	 * all the way to a real {@code voxelcam.json}.
+	 */
+	private static void assertAutoCaptureTogglesAndPersists(ClientGameTestContext context) {
+		context.clickScreenButton("voxelcam.settings.autocapture");
+		context.waitForScreen(GuiAutoCaptureSettings.class);
+		context.takeScreenshot("auto-capture-settings");
+
+		// Pressable only because the toggle is a CycleButton: the API's matcher reads a cycle
+		// button's *name* (the plain translation) rather than its rendered "Death: ON" label, and
+		// handles no other widget with separate label and value — a checkbox it cannot press at all.
+		context.clickScreenButton("voxelcam.moment.death");
+		context.waitTicks(20);
+
+		if (context.computeOnClient(client -> MomentTrigger.DEATH.isEnabled())) {
+			throw new AssertionError("clicking the death toggle should have switched the trigger off");
+		}
+		if (writtenDeathTrigger(context)) {
+			throw new AssertionError("voxelcam.json should record the death trigger as off");
+		}
+
+		// Back on, so the shipped default is what the rest of the suite and the next launch see.
+		context.clickScreenButton("voxelcam.moment.death");
+		context.waitTicks(20);
+		if (!writtenDeathTrigger(context)) {
+			throw new AssertionError("switching the death trigger back on should have been written too");
+		}
+
+		context.clickScreenButton("voxelcam.done");
+		context.waitForScreen(GuiSettings.class);
+	}
+
+	private static boolean writtenDeathTrigger(ClientGameTestContext context) {
+		return context.computeOnClient(client -> {
+			File configFile = FabricLoader.getInstance().getConfigDir().resolve("voxelcam.json").toFile();
+			if (!configFile.exists()) {
+				throw new AssertionError("voxelcam.json should have been written after toggling a trigger");
+			}
+			try {
+				JsonObject parsed = JsonParser.parseString(Files.readString(configFile.toPath())).getAsJsonObject();
+				return parsed.get("autoCaptureDeath").getAsBoolean();
+			} catch (IOException e) {
+				throw new AssertionError("could not read voxelcam.json", e);
+			}
+		});
 	}
 
 	private static void assertDoneReturnsToTheManager(ClientGameTestContext context) {
