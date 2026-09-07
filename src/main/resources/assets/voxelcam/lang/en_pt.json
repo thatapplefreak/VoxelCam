@@ -1,6 +1,7 @@
 {
 	"key.category.voxelcam.voxelcam": "VoxelCam",
 	"key.voxelcam.openscreenshotmanager": "Open th' Map Chest",
+	"key.voxelcam.capturemenu": "Chart a Map / Chartin' Wheel",
 
 	"voxelcam.chat.prefix": "[VoxelCam]",
 
@@ -62,21 +63,67 @@
 	"voxelcam.tooltip.favorite": "Mark this map with an X",
 	"voxelcam.tooltip.favoritesonly": "Show only th' maps marked with an X",
 	"voxelcam.tooltip.openmanager": "Open th' VoxelCam map chest",
+	"voxelcam.tooltip.settings": "VoxelCam settin's",
+	"voxelcam.tooltip.burstlengthdown": "Fewer maps per flurry",
+	"voxelcam.tooltip.burstlengthup": "More maps per flurry",
+	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big map preset",
 
 	"voxelcam.delete.title": "Scuttle th' map?",
 	"voxelcam.delete.confirm": "%s'll be sent t' Davy Jones's locker, permanent-like.",
 	"voxelcam.delete.confirm.generic": "This map'll be sent t' Davy Jones's locker, permanent-like.",
+	"voxelcam.delete.confirm.burst": "%s an' its %s flurry maps'll be sent t' Davy Jones's locker, permanent-like.",
 	"voxelcam.delete.failed": "Couldn't scuttle %s",
 
 	"voxelcam.rename.exists": "A map by that name already sails these waters",
 	"voxelcam.rename.invalid": "That name's got scallywag characters that ain't allowed",
 	"voxelcam.rename.failed": "Couldn't re-christen this map — try another name",
 
-	"voxelcam.bigshot.current": "Yer big map size be %s. Shift+F2 t' chart one.",
+	"voxelcam.capturemenu.screenshot": "Chart a Map",
+	"voxelcam.capturemenu.bigscreenshot": "Big Map",
+	"voxelcam.capturemenu.burst": "Flurry o' Maps",
+
+	"voxelcam.bigshot.current": "Yer big map size be %s. Hold F2 an' aim t' pick it.",
 	"voxelcam.bigshot.set": "Big map size set t' %s",
 	"voxelcam.bigshot.clamped": "Clamped t' this here GPU's max canvas size o' %s",
 	"voxelcam.bigshot.invalid": "Don't know th' size '%s'. Try WIDTHxHEIGHT, or one o': %s",
 	"voxelcam.bigshot.unavailable": "Big maps need a world open and no menu on screen, arr",
-	"voxelcam.bigshot.failed": "Big map charting failed, check th' log fer details"
+	"voxelcam.bigshot.failed": "Big map charting failed, check th' log fer details",
 
+	"voxelcam.burst.saved": "Stowed a %s-map flurry as: %s",
+	"voxelcam.burst.unavailable": "A flurry needs a world open and no menu on screen, arr",
+	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
+	"voxelcam.burst.setaskey": "Make th' Key",
+	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
+	"voxelcam.burst.scrollleft": "<",
+	"voxelcam.burst.scrollright": ">",
+	"voxelcam.tooltip.setaskey": "Show this map in th' chest instead o' th' current key",
+	"voxelcam.tooltip.burstscroll": "See more maps in this flurry",
+
+	"voxelcam.settings": "VoxelCam Settin's",
+	"voxelcam.settings.gear": "⚙",
+	"voxelcam.settings.burstlengthminus": "-",
+	"voxelcam.settings.burstlengthplus": "+",
+	"voxelcam.settings.burstlength": "Flurry size: %s",
+	"voxelcam.settings.bigscreenshotsize": "Big map size: %s",
+
+	"voxelcam.settings.autocapture": "Maps by themselves…",
+	"voxelcam.tooltip.autocapture": "Let th' camera snap on its own when somethin' worth rememberin' happens",
+
+	"voxelcam.autocapture.title": "Maps By Themselves",
+	"voxelcam.autocapture.cooldown": "No more than one ev'ry %s seconds",
+	"voxelcam.autocapture.cooldownminus": "-",
+	"voxelcam.autocapture.cooldownplus": "+",
+	"voxelcam.tooltip.cooldowndown": "Let 'em come closer together",
+	"voxelcam.tooltip.cooldownup": "Leave more time betwixt 'em",
+
+	"voxelcam.moment.advancement": "Feat o' note",
+	"voxelcam.moment.bossdefeated": "Beastie slain",
+	"voxelcam.moment.death": "Yer end",
+	"voxelcam.moment.newdimension": "New shore",
+	"voxelcam.tooltip.moment.advancement": "Snap a map when ye earn a feat — from any mod aboard",
+	"voxelcam.tooltip.moment.bossdefeated": "Snap a map when a beastie's bar empties an' fades",
+	"voxelcam.tooltip.moment.death": "Snap a map th' moment ye meet Davy Jones",
+	"voxelcam.tooltip.moment.newdimension": "Snap a map th' first time ye make landfall somewhere new",
+	"voxelcam.moment.subject": "%s: %s",
+	"voxelcam.moment.saved": "%s — stowed as %s"
 }

@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -37,6 +38,18 @@ public final class BigScreenshotSize {
 	}
 
 	public static final BigScreenshotSize DEFAULT = PRESETS.get("2x");
+
+	/**
+	 * The subset offered on the capture menu's outer ring — five options fit a 120° wedge at
+	 * 24° apart without their labels colliding; the full eight-preset list would be 15° apart,
+	 * and {@code CaptureMenuHud.extractLabel}'s clamp only keeps a label on the screen, it does
+	 * nothing about a label colliding with its neighbour. {@code /bigscreenshot} still reaches
+	 * every preset here — {@code imax} and an arbitrary {@code WxH} included — so this is only
+	 * the common ladder quick enough to dial in without leaving the game; keep the two lists
+	 * from silently drifting apart if either one changes.
+	 */
+	public static final List<BigScreenshotSize> DIAL_OPTIONS =
+			List.of(PRESETS.get("2x"), PRESETS.get("4x"), PRESETS.get("fhd"), PRESETS.get("4k"), PRESETS.get("8k"));
 
 	private final String token;
 	private final int multiple;

@@ -145,6 +145,11 @@ public final class BigScreenshot {
 		if (state != State.CAPTURING) {
 			return;
 		}
+		// The oversized path is gated by this class's own state, not by ScreenshotHandler's
+		// counter, so it joins unconditionally rather than through beginSave's cap: nothing else
+		// can be in flight by the time this runs — every other capture path refuses while
+		// isBusy() is true.
+		ScreenshotHandler.joinSave();
 		int issued = beginReadback();
 
 		Minecraft client = Minecraft.getInstance();
@@ -152,6 +157,7 @@ public final class BigScreenshot {
 			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(),
 					image -> onImageReady(issued, image));
 		} catch (Throwable t) {
+			ScreenshotHandler.endSave();
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
 			ChatMessages.send("voxelcam.bigshot.failed");
 			deferRestore();

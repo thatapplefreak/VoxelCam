@@ -4,8 +4,13 @@
 	"package": "com.thatapplefreak.voxelcam.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"AdvancementToastAccessor",
+		"BossHealthOverlayMixin",
+		"KeyMappingAccessor",
+		"KeyboardHandlerMixin",
 		"MinecraftClientMixin",
-		"ScreenshotRecorderMixin"
+		"ScreenshotRecorderMixin",
+		"ToastManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

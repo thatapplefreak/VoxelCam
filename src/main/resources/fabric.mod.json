@@ -15,6 +15,9 @@
 	"entrypoints": {
 		"client": [
 			"com.thatapplefreak.voxelcam.client.VoxelCamClient"
+		],
+		"modmenu": [
+			"com.thatapplefreak.voxelcam.client.gui.VoxelCamModMenu"
 		]
 	},
 	"mixins": [

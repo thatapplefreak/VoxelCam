@@ -1,6 +1,7 @@
 {
 	"key.category.voxelcam.voxelcam": "VoxelCam",
 	"key.voxelcam.openscreenshotmanager": "Screenshot Manager",
+	"key.voxelcam.capturemenu": "Screenshot / Capture Menu",
 
 	"voxelcam.chat.prefix": "[VoxelCam]",
 
@@ -62,21 +63,67 @@
 	"voxelcam.tooltip.favorite": "Star this screenshot",
 	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
+	"voxelcam.tooltip.settings": "VoxelCam settings",
+	"voxelcam.tooltip.burstlengthdown": "Fewer frames per burst",
+	"voxelcam.tooltip.burstlengthup": "More frames per burst",
+	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big screenshot preset",
 
 	"voxelcam.delete.title": "Delete screenshot?",
 	"voxelcam.delete.confirm": "%s will be permanently deleted.",
 	"voxelcam.delete.confirm.generic": "This screenshot will be permanently deleted.",
+	"voxelcam.delete.confirm.burst": "%s and its %s burst frames will be permanently deleted.",
 	"voxelcam.delete.failed": "Could not delete %s",
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
 	"voxelcam.rename.failed": "Could not rename this screenshot — try another name",
 
-	"voxelcam.bigshot.current": "Big screenshot size is %s. Shift+F2 to take one.",
+	"voxelcam.capturemenu.screenshot": "Screenshot",
+	"voxelcam.capturemenu.bigscreenshot": "Big Screenshot",
+	"voxelcam.capturemenu.burst": "Burst",
+
+	"voxelcam.bigshot.current": "Big screenshot size is %s. Hold F2 and aim to pick it.",
 	"voxelcam.bigshot.set": "Big screenshot size set to %s",
 	"voxelcam.bigshot.clamped": "Clamped to this GPU's maximum texture size of %s",
 	"voxelcam.bigshot.invalid": "Don't know the size '%s'. Try WIDTHxHEIGHT, or one of: %s",
 	"voxelcam.bigshot.unavailable": "Big screenshots need a world open and no menu on screen",
-	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details"
+	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details",
 
+	"voxelcam.burst.saved": "Saved a %s-frame burst as: %s",
+	"voxelcam.burst.unavailable": "Bursts need a world open and no menu on screen",
+	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
+	"voxelcam.burst.setaskey": "Set as Key",
+	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
+	"voxelcam.burst.scrollleft": "<",
+	"voxelcam.burst.scrollright": ">",
+	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
+	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
+
+	"voxelcam.settings": "VoxelCam Settings",
+	"voxelcam.settings.gear": "⚙",
+	"voxelcam.settings.burstlengthminus": "-",
+	"voxelcam.settings.burstlengthplus": "+",
+	"voxelcam.settings.burstlength": "Burst length: %s",
+	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s",
+
+	"voxelcam.settings.autocapture": "Automatic capture…",
+	"voxelcam.tooltip.autocapture": "Take a screenshot by itself at moments worth keeping",
+
+	"voxelcam.autocapture.title": "Automatic Capture",
+	"voxelcam.autocapture.cooldown": "No more than one every %s seconds",
+	"voxelcam.autocapture.cooldownminus": "-",
+	"voxelcam.autocapture.cooldownplus": "+",
+	"voxelcam.tooltip.cooldowndown": "Allow automatic captures closer together",
+	"voxelcam.tooltip.cooldownup": "Leave more time between automatic captures",
+
+	"voxelcam.moment.advancement": "Advancement",
+	"voxelcam.moment.bossdefeated": "Boss defeated",
+	"voxelcam.moment.death": "Death",
+	"voxelcam.moment.newdimension": "New dimension",
+	"voxelcam.tooltip.moment.advancement": "Capture when you earn an advancement — from any mod",
+	"voxelcam.tooltip.moment.bossdefeated": "Capture when a boss bar empties and disappears",
+	"voxelcam.tooltip.moment.death": "Capture the moment you die",
+	"voxelcam.tooltip.moment.newdimension": "Capture the first time you arrive in a dimension",
+	"voxelcam.moment.subject": "%s: %s",
+	"voxelcam.moment.saved": "%s — saved as %s"
 }
