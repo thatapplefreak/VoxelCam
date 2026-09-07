@@ -5,10 +5,12 @@ import com.thatapplefreak.voxelcam.client.command.BigScreenshotCommand;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
 import com.thatapplefreak.voxelcam.client.mixin.KeyMappingAccessor;
+import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenuHud;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -105,6 +107,11 @@ public class VoxelCamClient implements ClientModInitializer {
 		VoxelCamConfig.load();
 
 		ClientTickEvents.END_CLIENT_TICK.register(VoxelCamClient::onEndTick);
+
+		// Everything AutoCapture remembers is scoped to one connection: which dimensions have been
+		// visited, whether the player was alive, which boss bars are up. A pending capture outliving
+		// the world it was armed in has nothing left to shoot either.
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> AutoCapture.forgetSession());
 
 		// Last, so the menu draws over the hotbar and bars rather than under them.
 		HudElementRegistry.addLast(
@@ -244,6 +251,10 @@ public class VoxelCamClient implements ClientModInitializer {
 		if (CaptureMenu.isArmed()) {
 			CaptureMenu.tick();
 		}
+
+		// The two automatic triggers that need no mixin — a death and a first arrival in a dimension
+		// are both plain client state, watched rather than hooked.
+		AutoCapture.tick(client);
 		// A screen can appear while the menu is open (Escape, disconnect, inventory…) without the
 		// key itself ever going up; catch that here rather than leaving the cursor stuck freed.
 		if (CaptureMenu.isOpen() && client.gui.screen() != null) {

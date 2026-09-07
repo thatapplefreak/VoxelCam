@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.client.gui;
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
@@ -602,6 +603,12 @@ public class GuiScreenShotManager extends Screen {
 		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
 		if (captureContext != null) {
 			details.append("  ·  ").append(captureContext.describeLocation());
+		}
+		// Last, and only for the handful of screenshots that have one: an automatic capture is the
+		// only kind whose existence needs explaining after the fact.
+		MomentTag moment = ScreenshotMetadata.moment(selected);
+		if (moment != null) {
+			details.append("  ·  ").append(moment.describe().getString());
 		}
 		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),

@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.mixin;
 
+import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
@@ -45,5 +46,8 @@ public class MinecraftClientMixin {
 		// CaptureMenu released into is already finished and menu-free — so the key frame is taken
 		// on the very blit a plain screenshot would have used, not one later.
 		Burst.beforeBlit();
+		// Last: an automatic capture is the only one nobody asked for, so it yields the frame to
+		// every deliberate capture above it rather than competing for the same in-flight slot.
+		AutoCapture.beforeBlit();
 	}
 }

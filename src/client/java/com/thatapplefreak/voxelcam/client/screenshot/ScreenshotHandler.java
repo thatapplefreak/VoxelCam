@@ -6,6 +6,7 @@ import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 
 import java.io.File;
@@ -139,6 +140,31 @@ public final class ScreenshotHandler {
 		capture(framebuffer);
 	}
 
+	/**
+	 * Takes the single frame an {@link AutoCapture} moment armed, tagged with what armed it.
+	 *
+	 * <p>Deliberately not {@link #captureNow(RenderTarget)}: that path answers a refusal with
+	 * {@code voxelcam.savingpleasewait} in chat, which is right for a keypress and wrong here.
+	 * Nobody asked for this screenshot, so nobody wants to be told at length why it did not happen
+	 * — the caller gets a {@code false} and drops it.
+	 *
+	 * @return whether the readback was actually issued.
+	 */
+	static boolean captureMoment(RenderTarget framebuffer, MomentTag moment) {
+		if (BigScreenshot.isBusy() || Burst.isBusy() || !beginSave(1)) {
+			return false;
+		}
+		try {
+			Screenshot.takeScreenshot(framebuffer, image -> saveCapturedImage(image, moment));
+		} catch (Throwable t) {
+			endSave();
+			VoxelCamClient.LOGGER.error("Failed to read back an automatic {} capture",
+					moment.trigger().token(), t);
+			return false;
+		}
+		return true;
+	}
+
 	private static void capture(RenderTarget framebuffer) {
 		try {
 			Screenshot.takeScreenshot(framebuffer, ScreenshotHandler::saveCapturedImage);
@@ -157,7 +183,7 @@ public final class ScreenshotHandler {
 	 */
 	static void captureBurstFrame(RenderTarget framebuffer, File target, BurstFrame frame) {
 		try {
-			Screenshot.takeScreenshot(framebuffer, image -> saveCapturedImage(image, target, frame));
+			Screenshot.takeScreenshot(framebuffer, image -> saveCapturedImage(image, target, frame, null));
 		} catch (Throwable t) {
 			endSave();
 			VoxelCamClient.LOGGER.error("Failed to read back burst frame {}", frame.index(), t);
@@ -175,16 +201,28 @@ public final class ScreenshotHandler {
 	 * the manager without any extra plumbing.
 	 */
 	static void saveCapturedImage(NativeImage image) {
+		saveCapturedImage(image, null);
+	}
+
+	static void saveCapturedImage(NativeImage image, MomentTag moment) {
 		File screenshotsDir = new File(Minecraft.getInstance().gameDirectory, Screenshot.SCREENSHOT_DIR);
 		if (!screenshotsDir.exists()) {
 			screenshotsDir.mkdirs();
 		}
 		File target = ScreenshotNamer.getScreenshotName(screenshotsDir);
-		saveCapturedImage(image, target, null);
+		saveCapturedImage(image, target, null, moment);
 	}
 
-	/** Shared by the plain/oversized path ({@code burst == null}) and {@link #captureBurstFrame}. */
-	static void saveCapturedImage(NativeImage image, File target, BurstFrame burst) {
+	/**
+	 * Shared by the plain/oversized path ({@code burst == null}) and {@link #captureBurstFrame}.
+	 *
+	 * <p>{@code burst} and {@code moment} stay separate parameters rather than one bag of extras
+	 * because they are not the same kind of thing: {@code burst} carries <em>behaviour</em> — the
+	 * completion accounting {@link Burst#frameCompleted} depends on, and the chat suppression that
+	 * keeps a burst from announcing every frame — while {@code moment} carries only tags and a
+	 * different chat key. Both are null for an ordinary keypress, and never both non-null.
+	 */
+	static void saveCapturedImage(NativeImage image, File target, BurstFrame burst, MomentTag moment) {
 		// Read while still on the render thread: by the time write() runs on the IO pool, the
 		// player may have moved on to a different frame's state entirely.
 		//
@@ -197,7 +235,7 @@ public final class ScreenshotHandler {
 			CaptureContext context = CaptureContext.capture();
 			// This runs on the render thread, where encoding an oversized PNG would stall the
 			// game for seconds. The slot stays claimed until the write is actually finished.
-			Util.ioPool().execute(() -> write(image, target, context, burst));
+			Util.ioPool().execute(() -> write(image, target, context, burst, moment));
 			submitted = true;
 		} finally {
 			if (!submitted) {
@@ -213,15 +251,16 @@ public final class ScreenshotHandler {
 		}
 	}
 
-	private static void write(NativeImage image, File target, CaptureContext context, BurstFrame burst) {
+	private static void write(NativeImage image, File target, CaptureContext context, BurstFrame burst,
+			MomentTag moment) {
 		Minecraft client = Minecraft.getInstance();
 		boolean succeeded = false;
 		try (image) {
 			writeOrDiscard(target, image::writeToFile);
 			succeeded = true;
-			embedMetadata(target, context, burst);
+			embedMetadata(target, context, burst, moment);
 			if (burst == null) {
-				client.execute(() -> ChatMessages.send("voxelcam.savedscreenshotas", target.getName()));
+				client.execute(() -> announceSaved(target, moment));
 			}
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
@@ -241,6 +280,20 @@ public final class ScreenshotHandler {
 			}
 			endSave();
 		}
+	}
+
+	/**
+	 * An automatic capture says what caught it, not just where it landed — the file name alone
+	 * would leave the player wondering what they had just been given. Unlike most of VoxelCam's
+	 * feedback this can safely go to chat: {@code ChatMessages} is silent with no player, and every
+	 * moment trigger requires one.
+	 */
+	private static void announceSaved(File target, MomentTag moment) {
+		if (moment == null) {
+			ChatMessages.send("voxelcam.savedscreenshotas", target.getName());
+			return;
+		}
+		ChatMessages.send(Component.translatable("voxelcam.moment.saved", moment.describe(), target.getName()));
 	}
 
 	/**
@@ -278,7 +331,7 @@ public final class ScreenshotHandler {
 	 * context: the mod list is fixed for the session and the shader pack reads fresh
 	 * either way, so neither needs a snapshot before the frame moves on.
 	 */
-	private static void embedMetadata(File target, CaptureContext context, BurstFrame burst) {
+	private static void embedMetadata(File target, CaptureContext context, BurstFrame burst, MomentTag moment) {
 		Map<String, String> tags = new LinkedHashMap<>();
 		if (context != null) {
 			tags.putAll(context.toTags());
@@ -286,6 +339,9 @@ public final class ScreenshotHandler {
 		tags.putAll(ModProvenance.capture().toTags());
 		if (burst != null) {
 			tags.putAll(burst.toTags());
+		}
+		if (moment != null) {
+			tags.putAll(moment.toTags());
 		}
 		if (tags.isEmpty()) {
 			return;

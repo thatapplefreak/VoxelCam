@@ -45,7 +45,8 @@ public class GuiSettings extends Screen {
 		int centerX = width / 2;
 		burstRowY = height / 2 - 30;
 		int sizeRowY = burstRowY + ROW_GAP;
-		int doneY = sizeRowY + ROW_GAP + 16;
+		int autoCaptureRowY = sizeRowY + ROW_GAP;
+		int doneY = autoCaptureRowY + ROW_GAP + 16;
 
 		burstMinusButton = addRenderableWidget(
 				Button.builder(Component.translatable("voxelcam.settings.burstlengthminus"), b -> adjustBurstLength(-1))
@@ -60,6 +61,14 @@ public class GuiSettings extends Screen {
 		bigScreenshotSizeButton = addRenderableWidget(Button.builder(sizeLabel(), b -> cycleBigScreenshotSize())
 				.bounds(centerX - ROW_WIDTH / 2, sizeRowY, ROW_WIDTH, ROW_HEIGHT).build());
 		bigScreenshotSizeButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.bigscreenshotsize")));
+
+		// A row rather than four more toggles here: see GuiAutoCaptureSettings for why it is its own
+		// screen.
+		Button autoCaptureButton = addRenderableWidget(
+				Button.builder(Component.translatable("voxelcam.settings.autocapture"),
+							b -> minecraft.setScreenAndShow(new GuiAutoCaptureSettings(this)))
+						.bounds(centerX - ROW_WIDTH / 2, autoCaptureRowY, ROW_WIDTH, ROW_HEIGHT).build());
+		autoCaptureButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.autocapture")));
 
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(centerX - ROW_WIDTH / 2, doneY, ROW_WIDTH, ROW_HEIGHT).build());
