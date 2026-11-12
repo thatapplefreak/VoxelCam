@@ -63,6 +63,15 @@ jobs:
   client-game-tests:
     name: Client game tests
     runs-on: ubuntu-24.04
+    # This job passed in about 3.5 minutes for the whole 26.2 era and then hung
+    # indefinitely on the first 26.3 run, inside `runClientGameTest` itself with
+    # xvfb installed fine. A hung job is worse than a failing one twice over: it
+    # burns the 6-hour default before anyone hears about it, and GitHub only
+    # uploads a job's log when the job ends, so there is nothing to read while it
+    # hangs. Failing at 15 minutes ends both problems — the step fails, which is
+    # what makes the `if: failure()` upload below run and hand over the client's
+    # own logs.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -85,6 +94,9 @@ jobs:
 
       # The failure screenshots are usually the fastest way to see what went
       # wrong on a machine nobody can look at.
+      # Minecraft's own log is the only place the graphics backend it selected is
+      # recorded ("Using graphics backend {}, using drivers: {}"), which is the first
+      # thing to check on a runner that has software GL and no Vulkan ICD.
       - name: Upload game test output
         if: failure()
         uses: actions/upload-artifact@v4
