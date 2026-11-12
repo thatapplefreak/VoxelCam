@@ -144,7 +144,7 @@ src/gametest/resources/ fabric.mod.json for the test mod (id voxelcam-gametest)
 `client`. VoxelCam is client-only (`"environment": "client"`), so everything lands in `client` and
 `main` is left holding resources — `fabric.mod.json` and the assets have to live there because
 `main` is the primary resource root that ends up at the jar root. `voxelcam.mixins.json` sits in
-`client/resources` instead, next to the two mixins it registers.
+`client/resources` instead, next to the mixins it registers.
 
 Three consequences worth recognising rather than re-diagnosing:
 
@@ -166,8 +166,9 @@ Worth revisiting some time that is not immediately before a release.
 **Capture** — `ScreenshotRecorderMixin` injects at `HEAD` of `Screenshot.grab` and cancels vanilla's
 save, handing off to `ScreenshotHandler`, which names the file via `ScreenshotNamer` and writes it.
 
-**Oversized capture** — Shift+F2 takes a "big screenshot"; `/bigscreenshot <size>` (aliased `/bs`)
-sets how big. `BigScreenshot` is a state machine spanning two frames, driven by two
+**Oversized capture** — the capture menu's Big Screenshot wedge takes a "big screenshot";
+`/bigscreenshot <size>` (aliased `/bs`) sets how big. (Shift+F2 used to, and was removed in 2.4.0;
+see ADR-0005.) Why it resizes the real window rather than rendering off-screen is ADR-0004. `BigScreenshot` is a state machine spanning two frames, driven by two
 `MinecraftClientMixin` injections into `renderFrame(Z)V`: at `HEAD` it resizes, and just before
 `GpuSurface.blitFromTexture(...)` it reads the finished frame back.
 
@@ -219,6 +220,68 @@ expected and not a bug. `BigScreenshot` holds the size in a session static, whic
 written to disk, up to and including 2.3.0. PNG
 encoding runs on `Util.ioPool()`, so `ScreenshotHandler.saving` clears in that task, not
 at the call site, and its chat feedback is bounced back through `client.execute`.
+
+**Capture menu** — `F2` reaches every capture mode (ADR-0005). `CaptureMenu` is a renderer-free
+state machine ticked from `END_CLIENT_TICK`: a release before `HOLD_THRESHOLD_TICKS` is a tap and
+takes a plain screenshot, a longer hold opens the dial, and releasing fires the aimed wedge.
+`CaptureMenuHud` draws it as a Fabric `HudElement`, rasterised on a coarse grid of filled
+rectangles because the extractor draws nothing else. The HUD is also what feeds the aim, recomputing
+it from the live cursor every frame. So an aim a test writes by hand does not survive the next
+frame, and an aimed test has to move the real cursor.
+
+Five things here each cost a playtest to find:
+
+- **The press is read from every route at once.** VoxelCam's binding and vanilla's screenshot key
+  share `F2`, and vanilla's key map gives the press to exactly one of them. So `CaptureMenu` reads
+  the mapping's clicks, its down-state, and GLFW's raw state for the bound key (through
+  `KeyMappingAccessor`), and arming is idempotent. A release is any tick where something is armed
+  and the key is not held, which is what catches a tap shorter than a tick. Reasoning about which
+  route is live was wrong twice. `CaptureMenuTest` presses the real key, which is what settled it.
+- **`ScreenshotRecorderMixin` ignores a grab only while the capture binding is held or the menu is
+  armed.** Ignoring every grab silently swallowed every other caller of `Screenshot.grab`. The held
+  check resolves the key from the binding rather than hardcoding `F2`, so a player who rebinds the
+  menu keeps vanilla's `F2`.
+- **The chosen mode fires from the next frame's blit, not at release.** At release the framebuffer
+  still holds the frame the dial was drawn on. It is the same pre-blit point `BigScreenshot` reads
+  back from.
+- **A hold the player never aimed takes a plain screenshot.** Anything inside `DEAD_ZONE` resolves
+  to the first mode: with wedges meeting at the centre, a pixel of cursor drift otherwise selects
+  whichever wedge is below.
+- **Escape is swallowed in `KeyboardHandlerMixin`, and only while the menu is open.** A tick later
+  the pause screen has already opened, and a cancel that pauses the game is not a cancel. A
+  cancelled hold latches until the key comes up, or the next tick reopens the menu. The pointer is
+  *hidden* while aiming, not disabled, because disabling it hands the deltas back to mouse-look.
+
+The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
+`BigScreenshotSize.DIAL_OPTIONS`: five values each, because eight would put labels 15° apart and
+colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. In a game test,
+`moveCursor` moves the raw cursor while aim is GUI-scaled, so a vector that clears the dead zone
+may not clear the ring.
+
+**Burst** — a run of plain-size captures across consecutive frames, grouped in the manager as one
+key frame with the rest folded under it (ADR-0006). `Burst.request()` reserves every frame's name
+up front and synchronously, and `beforeBlit()` issues one frame per call. `MAX_IN_FLIGHT` is the
+schedule rather than a timer, because each in-flight frame is a full-resolution `NativeImage` held
+until `Util.ioPool()` encodes it. `ScreenshotHandler`'s save latch is a counted guard
+(`beginSave`/`endSave`/`joinSave`) for the same reason, shared by all three capture paths.
+
+Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
+reserved for it, so no generation tag is needed. The end-of-burst chat line waits in
+`frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
+mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
+search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
+bytes, not names. Rename and delete take the whole group, with rollback.
+
+**Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
+are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
+it (ADR-0002). `PngTextChunk` does the splice and the read. Two of its rules each fixed a real bug:
+`embed` strips same-keyword chunks before inserting, because `read` keeps the last value walking
+forward and new chunks land first, so a toggle would otherwise stick after one flip. A foreign
+chunk with no keyword is skipped before `keys.contains`, because a `Map.of` key set throws on
+`null`. Every write of a capture's tags is merged into one splice. `Favorite.setStarred` is the one
+rewrite of an existing file and restores its mtime so date sort does not move it. `CaptureContext`
+records the server-list name, never the address (ADR-0003). `ModProvenance` curates by denylist and
+`ShaderPack` reads Iris entirely by reflection (ADR-0009).
 
 **Automatic capture** — four vanilla-visible signals arm a single plain-size screenshot nobody
 pressed a key for: an advancement toast, a boss bar emptying and disappearing, the player's own
@@ -453,3 +516,17 @@ follow the player's system locale are the exception, not the rule.
   the datagen call was. The `clientGameTest` run config must be tuned in a *separate* `loom` block
   placed after it; naming it in the `loom` block above instead fails with a duplicate-name error,
   because `configureTests` is what creates that run config.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `thatapplefreak/VoxelCam`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage roles, each label named after its role (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root, maintained by `/domain-modeling`. See `docs/agents/domain.md`. Use the glossary's terms in issues, test names and player-facing strings ("big screenshot", not "oversized screenshot"), and read the ADRs before changing anything they cover. Several record decisions that look like mistakes until you know why.
