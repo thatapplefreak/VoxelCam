@@ -36,7 +36,7 @@ public class MinecraftClientMixin {
 	 */
 	@Inject(method = "renderFrame(Z)V",
 			at = @At(value = "INVOKE",
-					target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"))
+					target = "Lcom/mojang/renderpearl/api/device/GpuSurface;blitFromTexture(Lcom/mojang/renderpearl/api/commands/CommandEncoder;Lcom/mojang/renderpearl/api/textures/GpuTextureView;)V"))
 	private void voxelcam$beforeBlit(boolean tick, CallbackInfo ci) {
 		BigScreenshot.beforeBlit();
 		// After BigScreenshot: a menu selection that starts an oversized capture must not land in

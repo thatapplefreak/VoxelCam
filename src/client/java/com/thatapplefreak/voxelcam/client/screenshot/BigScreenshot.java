@@ -12,8 +12,8 @@ import net.minecraft.client.Screenshot;
  *
  * <p>The old mod resized the real game window through a VoxelCommon reflection helper. Here it
  * is plain public API — {@link Window#setWidth(int)} plus
- * {@link Minecraft#framebufferSizeChanged()}, the same call GLFW's framebuffer-size callback
- * makes. That alone is not enough on 26.x, where it only recalculates the GUI scale, so
+ * {@link Minecraft#framebufferSizeChanged()}, the same call the platform's framebuffer-size
+ * callback makes. That alone is not enough on 26.x, where it only recalculates the GUI scale, so
  * {@code GameRenderer.resize} has to be driven alongside it — see {@code applySize}.
  *
  * <p>The capture spans two frames:

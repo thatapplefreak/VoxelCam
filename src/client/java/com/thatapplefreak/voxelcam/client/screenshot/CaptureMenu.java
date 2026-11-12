@@ -3,7 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLMouse;
 
 /**
  * Holding the screenshot key opens a mouse-aimed menu of capture modes instead of firing
@@ -318,17 +318,22 @@ public final class CaptureMenu {
 		// is a second thing to track while aiming something that already shows its own selection.
 		// Hidden, not disabled: disabled would hand the deltas back to mouse-look and turn the
 		// camera under the menu.
-		GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_HIDDEN);
+		SDLMouse.SDL_HideCursor();
 	}
 
 	private static void restoreCursor(Minecraft client) {
+		// Unconditionally, and before the grab: SDL's cursor visibility is a global flag
+		// independent of relative-mouse mode, and nothing in vanilla ever calls
+		// SDL_ShowCursor - grabMouse/releaseMouse only drive
+		// SDL_SetWindowRelativeMouseMode and SDL_WarpMouseInWindow. Under GLFW this was
+		// free, because grabMouse's CURSOR_DISABLED overwrote CURSOR_HIDDEN. On SDL a hide
+		// left standing survives the grab, and the player gets an invisible pointer in the
+		// next inventory screen with nothing to undo it short of a restart.
+		SDLMouse.SDL_ShowCursor();
 		// A screen opening is what aborted the menu in the first place on that path; vanilla
 		// re-grabs when it closes, so grabbing here would capture the cursor out from under it.
 		if (cursorWasGrabbed && client.gui.screen() == null) {
 			client.mouseHandler.grabMouse();
-		} else {
-			// Nothing else is going to undo the hide, and a screen that is up now needs a pointer.
-			GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
 		}
 		cursorWasGrabbed = false;
 	}

@@ -77,7 +77,7 @@ public class SharePopupTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * The one share target that runs end to end in a test. It goes through GLFW's
+	 * The one share target that runs end to end in a test. It goes through vanilla's
 	 * clipboard, which is text-only — hence a path rather than the image — and needs
 	 * a real window, so this is the only place it can be exercised at all.
 	 */

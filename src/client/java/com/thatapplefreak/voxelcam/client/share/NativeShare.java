@@ -3,13 +3,16 @@ package com.thatapplefreak.voxelcam.client.share;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Util;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
+import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDLError;
+import org.lwjgl.sdl.SDL_DialogFileCallback;
+import org.lwjgl.sdl.SDL_DialogFileFilter;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -22,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  * Windows DataTransferManager both need native interop and a window to anchor
  * to, and Linux has no equivalent portal at all. What is reachable is the
  * native file dialog LWJGL already ships with Minecraft, the platform file
- * manager, and GLFW's (text-only) clipboard.
+ * manager, and vanilla's (text-only) clipboard.
  */
 public final class NativeShare {
 
@@ -34,20 +37,24 @@ public final class NativeShare {
 	 * wherever the user points it - a synced Dropbox/iCloud/OneDrive folder
 	 * included, which is as close to "share" as this gets.
 	 *
-	 * <p>The dialog blocks its thread and, on macOS, drives AppleScript, so it
-	 * runs on the IO worker rather than the render thread. Completes with null
-	 * if the user cancelled.
+	 * <p>Completes with null if the user cancelled.
+	 *
+	 * <p>26.3 moved the client from GLFW to SDL and dropped {@code lwjgl-tinyfd} with it,
+	 * so the blocking {@code tinyfd_saveFileDialog} this used to call no longer exists.
+	 * SDL's dialog is its successor and is <em>asynchronous</em>: it must be shown from
+	 * the main thread and answers through a callback invoked later, on a thread SDL does
+	 * not document. So the shape here inverts - the dialog is opened on the calling (render)
+	 * thread rather than on {@code Util.ioPool()}, and only the copy that follows runs on
+	 * the IO worker. The returned future is unchanged, which is what keeps
+	 * {@code SharePopup} untouched.
+	 *
+	 * <p>{@code dialogTitle} is accepted and unused: SDL's simple save-dialog entry point
+	 * takes no caption, so the OS default shows instead. It stays in the signature, with its
+	 * lang key, so that restoring it later costs one call rather than a signature change -
+	 * see ADR-0012.
 	 */
 	public static CompletableFuture<Path> saveCopy(File screenshot, String dialogTitle, String filterDescription) {
-		return CompletableFuture.supplyAsync(() -> {
-			String chosen;
-			try (MemoryStack stack = MemoryStack.stackPush()) {
-				PointerBuffer filters = stack.mallocPointer(1);
-				filters.put(stack.UTF8("*.png"));
-				filters.flip();
-				chosen = TinyFileDialogs.tinyfd_saveFileDialog(
-						dialogTitle, screenshot.getName(), filters, filterDescription);
-			}
+		return showSaveDialog(screenshot, filterDescription).thenApplyAsync(chosen -> {
 			if (chosen == null) {
 				return null;
 			}
@@ -60,9 +67,61 @@ public final class NativeShare {
 	}
 
 	/**
+	 * Shows SDL's save dialog and completes with the chosen path, or null on cancel.
+	 *
+	 * <p>Nothing handed to SDL here may live on the {@code MemoryStack}: the callback can
+	 * arrive long after a stack frame would have been popped, and SDL does not copy the
+	 * filters. So the filter struct, its two strings and
+	 * the default location are all allocated off-heap and freed in the callback - which is
+	 * also the only place the callback itself can be freed, since it has to outlive the
+	 * call that registers it.
+	 *
+	 * <p>The default location is the screenshot's own full path, so the dialog opens in the
+	 * screenshots folder with that name filled in. tinyfd got the bare filename, which left
+	 * the starting folder to the process's working directory - this is the better default,
+	 * and it means the pre-filled target is the source file, which {@code Files.copy} treats
+	 * as a no-op rather than an error if the player just presses Save.
+	 */
+	private static CompletableFuture<String> showSaveDialog(File screenshot, String filterDescription) {
+		CompletableFuture<String> chosen = new CompletableFuture<>();
+
+		ByteBuffer filterName = MemoryUtil.memUTF8(filterDescription);
+		ByteBuffer filterPattern = MemoryUtil.memUTF8("png");
+		ByteBuffer location = MemoryUtil.memUTF8(screenshot.getAbsolutePath());
+		SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.calloc(1);
+		filters.get(0).set(filterName, filterPattern);
+
+		// The callback frees itself, so it needs a handle on itself: hence the
+		// one-element holder rather than a plain local.
+		SDL_DialogFileCallback[] callback = new SDL_DialogFileCallback[1];
+		callback[0] = SDL_DialogFileCallback.create((userdata, filelist, filter) -> {
+			try {
+				if (filelist == MemoryUtil.NULL) {
+					chosen.completeExceptionally(
+							new IOException("The save dialog failed: " + SDLError.SDL_GetError()));
+					return;
+				}
+				// A non-null but empty list is a cancel, which is not a failure.
+				long first = MemoryUtil.memGetAddress(filelist);
+				chosen.complete(first == MemoryUtil.NULL ? null : MemoryUtil.memUTF8(first));
+			} finally {
+				filters.free();
+				MemoryUtil.memFree(filterName);
+				MemoryUtil.memFree(filterPattern);
+				MemoryUtil.memFree(location);
+				callback[0].free();
+			}
+		});
+
+		SDLDialog.SDL_ShowSaveFileDialog(callback[0], MemoryUtil.NULL,
+				Minecraft.getInstance().getWindow().handle(), filters, location);
+		return chosen;
+	}
+
+	/**
 	 * Everything saveCopy does once the user has picked a path. Split out from the
-	 * dialog so it can be tested: the dialog itself is a blocking native call with
-	 * no headless mode.
+	 * dialog so it can be tested: the dialog itself is a native window with no
+	 * headless mode, and now answers through an SDL callback besides.
 	 */
 	static Path copyTo(File screenshot, String chosen) throws IOException {
 		Path target = targetPath(chosen);
@@ -108,7 +167,7 @@ public final class NativeShare {
 		File parent = screenshot.getParentFile();
 		String[] command = revealCommand(Util.getPlatform(), screenshot);
 		return CompletableFuture.supplyAsync(
-				() -> reveal(command, parent, () -> Util.getPlatform().openFile(parent)), Util.ioPool());
+				() -> reveal(command, parent, () -> openFolder(parent)), Util.ioPool());
 	}
 
 	/**
@@ -167,6 +226,48 @@ public final class NativeShare {
 	}
 
 	/**
+	 * Opens a directory in the platform file manager.
+	 *
+	 * <p>26.3 reduced {@code Util.OS} to a telemetry tag - {@code openFile(File)} and the
+	 * rest of its behaviour went with the GLFW-to-SDL switch - so there is no vanilla
+	 * call left to delegate to and the command is ours to name. Failure is logged and
+	 * swallowed: this backs a button and a fallback, neither of which has anywhere to
+	 * report to.
+	 *
+	 * <p><strong>Runs the command on the calling thread</strong>, which waits on the child
+	 * for up to {@link #REVEAL_TIMEOUT_SECONDS}. That suits {@link #reveal}'s fallback,
+	 * which is already on {@code Util.ioPool()} and wants the wait; the one render-thread
+	 * caller (the manager's folder button) dispatches for itself. Dispatching in here
+	 * instead would hand the fallback a second pool hop and let it report
+	 * {@code OPENED_FOLDER} before the command had even started.
+	 */
+	public static void openFolder(File directory) {
+		String[] command = openFolderCommand(Util.getPlatform(), directory);
+		if (command == null) {
+			VoxelCamClient.LOGGER.warn("No folder-open command for platform {}", Util.getPlatform());
+			return;
+		}
+		runReveal(command);
+	}
+
+	/**
+	 * The "open this folder" command for a platform, or null where there is none.
+	 * Separate from {@link #revealCommand} because xdg-open is the right tool for a
+	 * directory on Linux while no Linux file manager has a documented reveal.
+	 */
+	static String[] openFolderCommand(Util.OS platform, File directory) {
+		if (directory == null) {
+			return null;
+		}
+		return switch (platform) {
+			case OSX -> new String[] { "open", directory.getAbsolutePath() };
+			case WINDOWS -> new String[] { "explorer.exe", directory.getAbsolutePath() };
+			case LINUX, SOLARIS -> new String[] { "xdg-open", directory.getAbsolutePath() };
+			default -> null;
+		};
+	}
+
+	/**
 	 * The "reveal this item" command for a platform, or null where there is none and
 	 * the containing folder has to be opened instead.
 	 */
@@ -178,7 +279,7 @@ public final class NativeShare {
 		};
 	}
 
-	/** GLFW's clipboard carries text only, so this shares the path, not the image. */
+	/** The platform clipboard carries text only here, so this shares the path, not the image. */
 	public static void copyPath(File screenshot) {
 		Minecraft.getInstance().keyboardHandler.setClipboard(screenshot.getAbsolutePath());
 	}

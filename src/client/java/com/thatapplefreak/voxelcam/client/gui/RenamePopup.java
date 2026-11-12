@@ -1,7 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.io.File;
 import net.minecraft.ChatFormatting;
@@ -119,7 +119,7 @@ public class RenamePopup extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent input) {
-		if (input.input() == GLFW.GLFW_KEY_ENTER || input.input() == GLFW.GLFW_KEY_KP_ENTER) {
+		if (input.input() == InputConstants.KEY_RETURN || input.input() == InputConstants.KEY_NUMPADENTER) {
 			confirm();
 			return true;
 		}

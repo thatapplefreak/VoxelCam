@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-VoxelCam is a **client-only Fabric mod** for Minecraft 26.2: an in-game screenshot browser with
+VoxelCam is a **client-only Fabric mod** for Minecraft 26.3: an in-game screenshot browser with
 rename/delete, keyless sharing, and oversized capture. Version 2.0.0 was a ground-up port of a
 LiteLoader mod; the pre-2.0 implementation (Twitter/Reddit/Facebook/Imgur uploaders, an image
 editor, a settings panel, a "big screenshot" capture mode) lived in `src/com/` and was **deleted but
@@ -21,13 +21,24 @@ was left behind.
 ```
 
 **Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
-logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` was checked
+logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` (now `net.minecraft.util.Util.OS`) was checked
 and does load outside the game; `./gradlew runClientGameTest` launches a real client and runs
 the Fabric client game tests in `src/gametest/java`, which cover the title-screen and pause-screen
 buttons, the manager's render path, both capture paths (including an in-world oversized capture
 asserted at exactly 2x the window), the share popup, the rename dialog's focus, its failure
 path, and the selection following a rename, the settings screen and the config file it writes, and
 the automatic-capture path from an armed moment to a tagged PNG.
+
+**26.3 picks the graphics backend itself, and both are worth testing.** On an M3 Pro it chose
+OpenGL (`drivers: 4.1 Metal`) even though the device reports the Vulkan portability subset. To run
+the suite on the other one, pass Minecraft's own launch argument through the run config -
+`programArgs "--graphicsBackend", "vulkan"` in the `clientGameTest` block - which logs
+`Graphics backend forced to vulkan by launch argument` and, on macOS, comes up on MoltenVK. The
+in-game setting is `preferredGraphicsBackend` in `options.txt` (`default`/`opengl`/`vulkan`), but
+`deleteGameTestRunDir` wipes the run directory, so the launch argument is the route for a test run.
+Worth doing before a release: the readback in `BigScreenshot` is the one part of this mod whose
+correctness is a GPU timing property, and the backend is now a variable underneath it. Both
+backends passed on 26.3.
 
 **`./gradlew build` does not run the client game tests.** `check` pulls in `test` and vanilla's
 server-side `runGameTest`; `runClientGameTest` is outside `build` entirely, and CI
@@ -36,8 +47,9 @@ three separate steps. A green `build` locally says nothing about the client test
 name.
 
 The client game test API is **not bundled in fabric-api** and is pinned separately in
-`gradle.properties` as `client_gametest_version`; its `+515ac5339e` build suffix is the one 26.2's
-bundled fabric-api modules carry. `fabricApi { configureTests { ... } }` is what creates the
+`gradle.properties` as `client_gametest_version`; its `+131f8d475d` build suffix is the one 26.3's
+bundled fabric-api modules carry. The suffix changes every version: read it off the
+`fabric-api` POM for the pinned `fabric_version` rather than guessing. `fabricApi { configureTests { ... } }` is what creates the
 `gametest` source set and the `runClientGameTest` task.
 
 `splitEnvironmentSourceSets()` leaves the `test` source set extending `main`, which holds only
@@ -48,7 +60,7 @@ counts rather than the exit code.
 `CatboxUploaderTest` stubs catbox with a `com.sun.net.httpserver` server on loopback rather than
 touching the network, which is also the only way to reproduce its refusal-as-HTTP-200. Where a
 class wraps something untestable, the pattern has been to extract a package-private seam beside it
-(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`,
+(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`/`openFolderCommand`,
 `ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
 `ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`,
 `AutoCapture.gateFor`/`shouldArm`/`markVisited`, `VoxelCamConfig.snapshot`) rather
@@ -65,9 +77,15 @@ dialog blocks on a native window, revealing spawns the platform file manager, an
 would upload to the real catbox.
 
 **Still untested, and not by oversight:** the native Save-As dialog itself, the real `open -R` /
-`explorer.exe` reveal and the `Util.OS.openFile` fallback it lands on, and the upload-result branch
+`explorer.exe` reveal and the `NativeShare.openFolder` fallback it lands on, and the upload-result branch
 of `SharePopup` (which would need an injectable endpoint the popup does not have). Those are manual
 checks before a release.
+
+26.3 added two more to that list. **SDL's save dialog** is asynchronous, so neither its callback nor
+the free-in-callback discipline is reachable by a test — and a leak there is invisible rather than
+loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor` is a global flag
+that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
+and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
 **So are all four automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
 directly, because earning an advancement, killing a boss, dying and walking a portal are
@@ -86,7 +104,7 @@ skipped. That is why `GuiAutoCaptureSettings`' per-trigger toggles are `CycleBut
 reads a cycle button's *name* (the plain translation) rather than its rendered "Death: ON" label, so
 the label can carry live state and still be findable. The related rule is that a plain `Button`
 whose label carries a substitution is equally unfindable — see the big-screenshot size button in
-`SettingsScreenTest`, which is only asserted on, never pressed. `copyPath` *is* covered, end to end through the real GLFW clipboard, in
+`SettingsScreenTest`, which is only asserted on, never pressed. `copyPath` *is* covered, end to end through vanilla's real clipboard, in
 `SharePopupTest`, and `NativeShare.reveal`'s choice between revealing, opening the folder and giving
 up is covered in `NativeShareTest` by running harmless commands with known exit codes.
 
@@ -118,7 +136,7 @@ Yarn is gone — its last release ever was `1.21.11+build.6` — and there is no
 ```bash
 # the client jar for the version in gradle.properties
 URL=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print([v['url'] for v in d['versions'] if v['id']=='26.2'][0])")
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([v['url'] for v in d['versions'] if v['id']=='26.3'][0])")
 curl -s "$(curl -s "$URL" | python3 -c "import json,sys;print(json.load(sys.stdin)['downloads']['client']['url'])")" -o mc.jar
 javap -p -classpath mc.jar net.minecraft.client.gui.components.Button
 ```
@@ -157,7 +175,7 @@ Three consequences worth recognising rather than re-diagnosing:
 
 **The split is kept deliberately.** For a client-only mod it buys nothing at runtime, and collapsing
 everything into `src/main/java` would remove both the launch warning and the test classpath wiring.
-It stays because it is the layout Fabric's own 26.2 example mod ships, so it is what anyone who has
+It stays because it is the layout Fabric's own 26.3 example mod ships, so it is what anyone who has
 seen another Fabric mod expects — and rearranging every file changes nothing a player can observe.
 Worth revisiting some time that is not immediately before a release.
 
@@ -177,12 +195,26 @@ acquiring the surface through presenting it, and both injections belong in the l
 is no longer `RenderTarget.blitToScreen` — that method is gone — but a blit of the main render
 target's texture onto the window's swapchain surface.
 
+**26.3 moved that surface, and everything around it, into `com.mojang.renderpearl`.** The injection
+point is structurally identical but its descriptor is not:
+`Lcom/mojang/renderpearl/api/device/GpuSurface;blitFromTexture(Lcom/mojang/renderpearl/api/commands/CommandEncoder;Lcom/mojang/renderpearl/api/textures/GpuTextureView;)V`.
+`CommandEncoder`, `GpuDevice`, `GpuBuffer` and `GpuTextureView` all moved with it, and there is now
+a Vulkan backend (`com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface`) under the abstraction.
+No mod source imports any of those types — the `@At` target string is the only place the rename
+reaches, which is why a whole-package move cost one line. `RenderSystem`, `NativeImage`, `Window`
+and `RenderTarget` stayed in `com.mojang.blaze3d`.
+
+`GameRenderer.render()` is also no-arg from 26.3 on (it was `render(DeltaTracker, boolean)`), and a
+new `GameRenderer.update(DeltaTracker)` runs earlier in the frame. The order the capture paths
+depend on is otherwise unchanged: `extract` → `executePendingTasks` → `render` →
+`getColorTextureView` → `blitFromTexture`.
+
 The resize is `Window.setWidth/setHeight` (which write `framebufferWidth/Height`, so they are the
 framebuffer setters despite the names) followed by **both** `GameRenderer.resize` and
 `Minecraft.framebufferSizeChanged()`. On 26.x `framebufferSizeChanged` only recalculates the GUI
 scale; nothing in `Minecraft` resizes the main render target for you, so omitting
 `GameRenderer.resize` leaves the frame rendering at the old size. `framebufferSizeChanged` is the
-`WindowEventHandler` entry point GLFW's own callback uses; `resizeGui` is a narrower GUI-only path
+`WindowEventHandler` entry point the platform's own resize callback uses; `resizeGui` is a narrower GUI-only path
 and is **not** a substitute.
 
 Five things here are load-bearing and were each found the hard way:
@@ -233,8 +265,8 @@ Five things here each cost a playtest to find:
 
 - **The press is read from every route at once.** VoxelCam's binding and vanilla's screenshot key
   share `F2`, and vanilla's key map gives the press to exactly one of them. So `CaptureMenu` reads
-  the mapping's clicks, its down-state, and GLFW's raw state for the bound key (through
-  `KeyMappingAccessor`), and arming is idempotent. A release is any tick where something is armed
+  the mapping's clicks, its down-state, and the platform's raw state for the bound key
+  (`InputConstants.isKeyDown`, reached through `KeyMappingAccessor`), and arming is idempotent. A release is any tick where something is armed
   and the key is not held, which is what catches a tap shorter than a tick. Reasoning about which
   route is live was wrong twice. `CaptureMenuTest` presses the real key, which is what settled it.
 - **`ScreenshotRecorderMixin` ignores a grab only while the capture binding is held or the menu is
@@ -383,9 +415,10 @@ Five invariants that are easy to break:
   Delete would be aimed at.
 
 **Sharing** — `SharePopup` offers four targets, none needing credentials: `NativeShare.saveCopy`
-(LWJGL `TinyFileDialogs` native Save-As, run on `Util.ioPool()` because it blocks and
-drives AppleScript on macOS), `NativeShare.revealInFileManager` (`open -R` / `explorer /select,`,
-falling back to opening the parent directory), `NativeShare.copyPath` (GLFW clipboard, **text only**),
+(SDL's native Save-As — **asynchronous**, so the dialog is shown on the calling thread and only the
+copy runs on `Util.ioPool()`; see the SDL trap below), `NativeShare.revealInFileManager`
+(`open -R` / `explorer /select,`, falling back to `NativeShare.openFolder`),
+`NativeShare.copyPath` (vanilla's clipboard, **text only**),
 and `CatboxUploader` (catbox.moe, no key; it signals refusals with HTTP 200 plus an error body, so the
 response is validated by checking for a `https://` prefix). `MultipartBody` exists because
 `java.net.http` ships no multipart publisher.
@@ -457,6 +490,31 @@ smallest GUI scale a player can pick.
 
 These cost real debugging time and are not guessable from the class names:
 
+- **26.3 runs on SDL, not GLFW, and `org.lwjgl:lwjgl-glfw` is no longer a Minecraft library.**
+  Nothing can import `org.lwjgl.glfw`, so key codes come from `InputConstants`, which now exposes
+  the full set itself (`KEY_DELETE`, `KEY_BACKSPACE`, `KEY_F2`, `KEY_LEFT`, `KEY_RIGHT`,
+  `KEY_RETURN`, `KEY_NUMPADENTER`, `KEY_ESCAPE`) plus `PRESS`/`RELEASE`/`REPEAT`. Two further
+  signature changes come with it: `InputConstants.Type.KEYSYM` is now `Type.KEYBOARD` (`SCANCODE`
+  is gone), and `InputConstants.isKeyDown` lost its `Window` parameter. `Window.handle()` is now an
+  SDL window pointer, so what is left of raw platform access goes through `org.lwjgl.sdl.*` —
+  `SDLMouse.SDL_HideCursor()`/`SDL_ShowCursor()` is what `CaptureMenu` hides the pointer with.
+- **`lwjgl-tinyfd` went with GLFW, so the native Save-As dialog is SDL's and asynchronous.**
+  `SDLDialog.SDL_ShowSaveFileDialog` answers through a callback invoked later, on a thread SDL
+  does not document, where `tinyfd_saveFileDialog` blocked its own. Three consequences, all load-bearing:
+  nothing handed to SDL may live on the `MemoryStack`, because the stack frame is long gone by the
+  time the callback runs and SDL does not copy the filters — the filter struct, its strings and the
+  default location are malloc'd and freed in the callback, which is also the only place the
+  callback can free itself; a non-null but **empty** file list is a cancel while a null list is a
+  real failure, and conflating them turns "the user changed their mind" into a failure on the
+  popup's status line; and
+  SDL's simple entry point takes **no title**, so the OS default caption shows unless someone takes
+  `SDL_ShowFileDialogWithProperties`. None of this is reachable by a test.
+- **`Util` is `net.minecraft.util.Util` and `Util.OS` is now only a telemetry tag.** The enum and
+  `Util.getPlatform()` survive with the same constants, but the behaviour methods are gone —
+  including `openFile(File)`. `NativeShare.openFolder`/`openFolderCommand` is the replacement, built
+  on the same per-OS command seam as `revealCommand` so it stays testable without a file manager
+  opening on the tester's desktop.
+- **`DisplayInfo` is a record-style accessor from 26.3: `title()`, not `getTitle()`.**
 - **The GUI is retained-mode from 26.x on: widgets no longer draw, they extract render state.**
   `Screen.render` is `extractRenderState(GuiGraphicsExtractor, ...)`, `Button.renderContents` is
   `extractContents`, list entries implement `extractContent`, and the drawing calls are `text`,

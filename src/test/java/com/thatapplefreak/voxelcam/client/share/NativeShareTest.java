@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * The parts of the share targets that are reachable without a window.
  *
- * The native Save-As dialog and GLFW's clipboard both need a live client, so what
+ * The native Save-As dialog and the clipboard both need a live client, so what
  * is tested here is everything on either side of them: which path the dialog's
  * answer turns into, that the copy really happens, and which command each platform
  * gets for revealing a file.
@@ -160,16 +160,70 @@ class NativeShareTest {
 		assertNull(NativeShare.revealCommand(Util.OS.valueOf(platform), file));
 	}
 
-	/** Every platform must be handled, so the switch cannot fall through unexpectedly. */
+	// --- opening the containing folder ---------------------------------------
+
+	/**
+	 * 26.3 reduced Util.OS to a telemetry tag, taking openFile(File) with it, so the
+	 * folder-open command is VoxelCam's own now and needs the same per-platform cover
+	 * revealCommand has.
+	 */
+	@Test
+	void macOsOpensTheFolderWithOpen() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.OSX, dir));
+	}
+
+	@Test
+	void windowsOpensTheFolderWithExplorer() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "explorer.exe", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.WINDOWS, dir));
+	}
+
+	/**
+	 * Unlike revealing, opening a directory does have a documented Linux command, which
+	 * is the whole reason this is a separate seam rather than a branch of revealCommand.
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = { "LINUX", "SOLARIS" })
+	void unixLikePlatformsUseXdgOpen(String platform) throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "xdg-open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.valueOf(platform), dir));
+	}
+
+	@Test
+	void anUnknownPlatformHasNoFolderCommand() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertNull(NativeShare.openFolderCommand(Util.OS.UNKNOWN, dir));
+	}
+
+	/** A null directory must not become a command that opens the process's cwd. */
+	@Test
+	void aNullDirectoryHasNoFolderCommand() {
+		assertNull(NativeShare.openFolderCommand(Util.OS.OSX, null));
+	}
+
+	/** Neither switch may fall through to an empty command on any platform. */
 	@Test
 	void everyPlatformIsAccountedFor() throws IOException {
 		File file = screenshot("shot.png");
+		File dir = file.getParentFile();
 
 		for (Util.OS platform : Util.OS.values()) {
-			String[] command = NativeShare.revealCommand(platform, file);
-			if (command != null && command.length == 0) {
-				throw new AssertionError(platform + " produced an empty command");
-			}
+			assertNoEmptyCommand(platform, NativeShare.revealCommand(platform, file), "reveal");
+			assertNoEmptyCommand(platform, NativeShare.openFolderCommand(platform, dir), "folder-open");
+		}
+	}
+
+	private static void assertNoEmptyCommand(Util.OS platform, String[] command, String what) {
+		if (command != null && command.length == 0) {
+			throw new AssertionError(platform + " produced an empty " + what + " command");
 		}
 	}
 
