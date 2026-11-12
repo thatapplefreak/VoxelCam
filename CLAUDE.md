@@ -29,6 +29,17 @@ asserted at exactly 2x the window), the share popup, the rename dialog's focus, 
 path, and the selection following a rename, the settings screen and the config file it writes, and
 the automatic-capture path from an armed moment to a tagged PNG.
 
+**26.3 picks the graphics backend itself, and both are worth testing.** On an M3 Pro it chose
+OpenGL (`drivers: 4.1 Metal`) even though the device reports the Vulkan portability subset. To run
+the suite on the other one, pass Minecraft's own launch argument through the run config -
+`programArgs "--graphicsBackend", "vulkan"` in the `clientGameTest` block - which logs
+`Graphics backend forced to vulkan by launch argument` and, on macOS, comes up on MoltenVK. The
+in-game setting is `preferredGraphicsBackend` in `options.txt` (`default`/`opengl`/`vulkan`), but
+`deleteGameTestRunDir` wipes the run directory, so the launch argument is the route for a test run.
+Worth doing before a release: the readback in `BigScreenshot` is the one part of this mod whose
+correctness is a GPU timing property, and the backend is now a variable underneath it. Both
+backends passed on 26.3.
+
 **`./gradlew build` does not run the client game tests.** `check` pulls in `test` and vanilla's
 server-side `runGameTest`; `runClientGameTest` is outside `build` entirely, and CI
 (`.github/workflows/`) gets both suites only by invoking `test`, `runClientGameTest` and `build` as
