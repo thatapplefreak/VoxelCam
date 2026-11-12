@@ -68,8 +68,8 @@ public class SharePopup extends Screen {
 	}
 
 	private void saveCopy() {
-		// The native dialog runs off-thread; keep the button from being pressed
-		// again while one is already open.
+		// The native dialog answers asynchronously (ADR-0012); keep the button from being
+		// pressed again while one is already open.
 		saveButton.active = false;
 		setStatus("voxelcam.share.choosing", false);
 		NativeShare.saveCopy(screenshot,

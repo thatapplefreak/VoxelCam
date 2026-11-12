@@ -50,7 +50,7 @@ public class VoxelCamClient implements ClientModInitializer {
 	/**
 	 * Bound to F2 by default, same as vanilla's own {@code keyScreenshot} — Minecraft lets
 	 * multiple {@code KeyMapping}s share one physical key, each independently tracking its own
-	 * down/up state from GLFW, so this reads hold duration without a raw keyboard mixin. Vanilla's
+	 * down/up state from the platform, so this reads hold duration without a raw keyboard mixin. Vanilla's
 	 * own binding still fires its usual callback at key-down; {@code ScreenshotHandler} just
 	 * always cancels it now and lets {@link CaptureMenu} decide what actually happens.
 	 */
@@ -61,7 +61,8 @@ public class VoxelCamClient implements ClientModInitializer {
 	 * fires its callback while this is true, and that callback has to keep its hands off — see
 	 * {@code ScreenshotHandler.onScreenshotKeyPressed}.
 	 *
-	 * <p>GLFW is asked for the raw key state rather than the mapping's own {@code isDown()}.
+	 * <p>The platform is asked for the raw key state ({@code InputConstants.isKeyDown}) rather
+	 * than the mapping's own {@code isDown()}.
 	 * Vanilla handles the screenshot key from {@code RenderSystem.pollEvents()}, i.e. inside the
 	 * key callback itself, and whether {@code KeyMapping} has had its down-state updated by that
 	 * point is vanilla's internal ordering — not something to bet a double screenshot on every
@@ -229,7 +230,7 @@ public class VoxelCamClient implements ClientModInitializer {
 		// to exactly one of them. When it goes to vanilla, this mapping never sees a click or a
 		// down-state at all and the press arrives at ScreenshotHandler instead; when it goes here,
 		// vanilla's grab never fires. Reading all of them, and arming idempotently, is what makes
-		// the menu work either way — and asking GLFW directly also catches a hold whose press was
+		// the menu work either way — and asking the platform directly also catches a hold whose press was
 		// consumed elsewhere.
 		while (captureMenuKey.consumeClick()) {
 			CaptureMenu.onKeyDown();

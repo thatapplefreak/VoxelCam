@@ -206,7 +206,8 @@ public class GuiScreenShotManager extends Screen {
 
 		int leftWidth = Math.round((listWidth - GAP) / 2F);
 		addRenderableWidget(button("voxelcam.openscreenshotsfolder.short", "voxelcam.tooltip.openfolder",
-				b -> NativeShare.openFolder(screenshotsDir), MARGIN, actionsY, leftWidth));
+				b -> Util.ioPool().execute(() -> NativeShare.openFolder(screenshotsDir)),
+				MARGIN, actionsY, leftWidth));
 		addRenderableWidget(button("voxelcam.done", null, b -> onClose(),
 				MARGIN + leftWidth + GAP, actionsY, listWidth - leftWidth - GAP));
 

@@ -47,6 +47,11 @@ public final class NativeShare {
 	 * thread rather than on {@code Util.ioPool()}, and only the copy that follows runs on
 	 * the IO worker. The returned future is unchanged, which is what keeps
 	 * {@code SharePopup} untouched.
+	 *
+	 * <p>{@code dialogTitle} is accepted and unused: SDL's simple save-dialog entry point
+	 * takes no caption, so the OS default shows instead. It stays in the signature, with its
+	 * lang key, so that restoring it later costs one call rather than a signature change -
+	 * see ADR-0012.
 	 */
 	public static CompletableFuture<Path> saveCopy(File screenshot, String dialogTitle, String filterDescription) {
 		return showSaveDialog(screenshot, filterDescription).thenApplyAsync(chosen -> {
@@ -71,10 +76,11 @@ public final class NativeShare {
 	 * also the only place the callback itself can be freed, since it has to outlive the
 	 * call that registers it.
 	 *
-	 * <p>SDL's simple save-dialog entry point takes no title, so {@code dialogTitle} is
-	 * unused and the OS default caption shows instead. Restoring it means
-	 * {@code SDL_ShowFileDialogWithProperties} and {@code SDL_PROP_FILE_DIALOG_TITLE_STRING},
-	 * which is more surface than a caption is worth.
+	 * <p>The default location is the screenshot's own full path, so the dialog opens in the
+	 * screenshots folder with that name filled in. tinyfd got the bare filename, which left
+	 * the starting folder to the process's working directory - this is the better default,
+	 * and it means the pre-filled target is the source file, which {@code Files.copy} treats
+	 * as a no-op rather than an error if the player just presses Save.
 	 */
 	private static CompletableFuture<String> showSaveDialog(File screenshot, String filterDescription) {
 		CompletableFuture<String> chosen = new CompletableFuture<>();
@@ -227,6 +233,13 @@ public final class NativeShare {
 	 * call left to delegate to and the command is ours to name. Failure is logged and
 	 * swallowed: this backs a button and a fallback, neither of which has anywhere to
 	 * report to.
+	 *
+	 * <p><strong>Runs the command on the calling thread</strong>, which waits on the child
+	 * for up to {@link #REVEAL_TIMEOUT_SECONDS}. That suits {@link #reveal}'s fallback,
+	 * which is already on {@code Util.ioPool()} and wants the wait; the one render-thread
+	 * caller (the manager's folder button) dispatches for itself. Dispatching in here
+	 * instead would hand the fallback a second pool hop and let it report
+	 * {@code OPENED_FOLDER} before the command had even started.
 	 */
 	public static void openFolder(File directory) {
 		String[] command = openFolderCommand(Util.getPlatform(), directory);
@@ -234,12 +247,7 @@ public final class NativeShare {
 			VoxelCamClient.LOGGER.warn("No folder-open command for platform {}", Util.getPlatform());
 			return;
 		}
-		// On the IO worker, not the caller: runReveal waits on the child for up to
-		// REVEAL_TIMEOUT_SECONDS, and both callers are on the render thread - a button in the
-		// manager and revealInFileManager's fallback. The vanilla call this replaced
-		// (Util.OS.openFile) did its own dispatching, so calling runReveal directly here
-		// would freeze the game for two seconds on a file manager that is slow to start.
-		CompletableFuture.runAsync(() -> runReveal(command), Util.ioPool());
+		runReveal(command);
 	}
 
 	/**
@@ -271,7 +279,7 @@ public final class NativeShare {
 		};
 	}
 
-	/** GLFW's clipboard carries text only, so this shares the path, not the image. */
+	/** The platform clipboard carries text only here, so this shares the path, not the image. */
 	public static void copyPath(File screenshot) {
 		Minecraft.getInstance().keyboardHandler.setClipboard(screenshot.getAbsolutePath());
 	}

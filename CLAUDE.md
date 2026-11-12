@@ -499,13 +499,14 @@ These cost real debugging time and are not guessable from the class names:
   SDL window pointer, so what is left of raw platform access goes through `org.lwjgl.sdl.*` —
   `SDLMouse.SDL_HideCursor()`/`SDL_ShowCursor()` is what `CaptureMenu` hides the pointer with.
 - **`lwjgl-tinyfd` went with GLFW, so the native Save-As dialog is SDL's and asynchronous.**
-  `SDLDialog.SDL_ShowSaveFileDialog` answers through a callback the event pump invokes frames
-  later, where `tinyfd_saveFileDialog` blocked its thread. Three consequences, all load-bearing:
+  `SDLDialog.SDL_ShowSaveFileDialog` answers through a callback invoked later, on a thread SDL
+  does not document, where `tinyfd_saveFileDialog` blocked its own. Three consequences, all load-bearing:
   nothing handed to SDL may live on the `MemoryStack`, because the stack frame is long gone by the
   time the callback runs and SDL does not copy the filters — the filter struct, its strings and the
   default location are malloc'd and freed in the callback, which is also the only place the
   callback can free itself; a non-null but **empty** file list is a cancel while a null list is a
-  real failure, and conflating them turns "the user changed their mind" into an error toast; and
+  real failure, and conflating them turns "the user changed their mind" into a failure on the
+  popup's status line; and
   SDL's simple entry point takes **no title**, so the OS default caption shows unless someone takes
   `SDL_ShowFileDialogWithProperties`. None of this is reachable by a test.
 - **`Util` is `net.minecraft.util.Util` and `Util.OS` is now only a telemetry tag.** The enum and

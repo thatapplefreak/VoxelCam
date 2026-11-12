@@ -209,16 +209,21 @@ class NativeShareTest {
 		assertNull(NativeShare.openFolderCommand(Util.OS.OSX, null));
 	}
 
-	/** Every platform must be handled, so the switch cannot fall through unexpectedly. */
+	/** Neither switch may fall through to an empty command on any platform. */
 	@Test
 	void everyPlatformIsAccountedFor() throws IOException {
 		File file = screenshot("shot.png");
+		File dir = file.getParentFile();
 
 		for (Util.OS platform : Util.OS.values()) {
-			String[] command = NativeShare.revealCommand(platform, file);
-			if (command != null && command.length == 0) {
-				throw new AssertionError(platform + " produced an empty command");
-			}
+			assertNoEmptyCommand(platform, NativeShare.revealCommand(platform, file), "reveal");
+			assertNoEmptyCommand(platform, NativeShare.openFolderCommand(platform, dir), "folder-open");
+		}
+	}
+
+	private static void assertNoEmptyCommand(Util.OS platform, String[] command, String what) {
+		if (command != null && command.length == 0) {
+			throw new AssertionError(platform + " produced an empty " + what + " command");
 		}
 	}
 
