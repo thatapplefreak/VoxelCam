@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.client.share.NativeShare;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
@@ -18,7 +19,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -205,7 +206,7 @@ public class GuiScreenShotManager extends Screen {
 
 		int leftWidth = Math.round((listWidth - GAP) / 2F);
 		addRenderableWidget(button("voxelcam.openscreenshotsfolder.short", "voxelcam.tooltip.openfolder",
-				b -> Util.getPlatform().openFile(screenshotsDir), MARGIN, actionsY, leftWidth));
+				b -> NativeShare.openFolder(screenshotsDir), MARGIN, actionsY, leftWidth));
 		addRenderableWidget(button("voxelcam.done", null, b -> onClose(),
 				MARGIN + leftWidth + GAP, actionsY, listWidth - leftWidth - GAP));
 
@@ -481,21 +482,21 @@ public class GuiScreenShotManager extends Screen {
 		// Shortcuts only make sense when not typing a search query.
 		if (!searchBar.isFocused() && selected != null) {
 			switch (input.input()) {
-				case GLFW.GLFW_KEY_DELETE, GLFW.GLFW_KEY_BACKSPACE -> {
+				case InputConstants.KEY_DELETE, InputConstants.KEY_BACKSPACE -> {
 					minecraft.setScreenAndShow(DeletePopup.create(this));
 					return true;
 				}
-				case GLFW.GLFW_KEY_F2 -> {
+				case InputConstants.KEY_F2 -> {
 					renameSelected();
 					return true;
 				}
-				case GLFW.GLFW_KEY_LEFT -> {
+				case InputConstants.KEY_LEFT -> {
 					if (VoxelCamIO.burstFrameCount(selected) > 0) {
 						scrollFilmstrip(-1);
 						return true;
 					}
 				}
-				case GLFW.GLFW_KEY_RIGHT -> {
+				case InputConstants.KEY_RIGHT -> {
 					if (VoxelCamIO.burstFrameCount(selected) > 0) {
 						scrollFilmstrip(1);
 						return true;

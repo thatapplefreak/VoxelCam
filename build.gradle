@@ -69,11 +69,11 @@ dependencies {
 
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-	// Not bundled in fabric-api, so it is pinned separately. The +515ac5339e build
-	// suffix is the same one 26.2's bundled modules carry.
+	// Not bundled in fabric-api, so it is pinned separately. The +131f8d475d build
+	// suffix is the same one 26.3's bundled modules carry.
 	gametestImplementation "net.fabricmc.fabric-api:fabric-client-gametest-api-v1:${project.client_gametest_version}"
 
-	// Plain compileOnly, not Loom's "mod" variant: 26.2 has no mappings to remap through (see
+	// Plain compileOnly, not Loom's "mod" variant: 26.3 has no mappings to remap through (see
 	// CLAUDE.md), so there is nothing for a mod-aware configuration to do here that compileOnly
 	// does not already — and it compiles VoxelCamModMenu against the API without requiring the
 	// player to have Mod Menu installed, since there is no corresponding "depends" entry in

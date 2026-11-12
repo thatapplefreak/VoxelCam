@@ -3,7 +3,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLMouse;
 
 /**
  * Holding the screenshot key opens a mouse-aimed menu of capture modes instead of firing
@@ -318,7 +318,7 @@ public final class CaptureMenu {
 		// is a second thing to track while aiming something that already shows its own selection.
 		// Hidden, not disabled: disabled would hand the deltas back to mouse-look and turn the
 		// camera under the menu.
-		GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_HIDDEN);
+		SDLMouse.SDL_HideCursor();
 	}
 
 	private static void restoreCursor(Minecraft client) {
@@ -328,7 +328,7 @@ public final class CaptureMenu {
 			client.mouseHandler.grabMouse();
 		} else {
 			// Nothing else is going to undo the hide, and a screen that is up now needs a pointer.
-			GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+			SDLMouse.SDL_ShowCursor();
 		}
 		cursorWasGrabbed = false;
 	}

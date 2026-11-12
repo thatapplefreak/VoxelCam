@@ -80,23 +80,23 @@ public class VoxelCamClient implements ClientModInitializer {
 		}
 		InputConstants.Key bound = ((KeyMappingAccessor) captureMenuKey).getKey();
 		if (bound == null || bound.equals(InputConstants.UNKNOWN)
-				|| bound.getType() != InputConstants.Type.KEYSYM) {
+				|| bound.getType() != InputConstants.Type.KEYBOARD) {
 			return false;
 		}
-		return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), bound.getValue());
+		return InputConstants.isKeyDown(bound.getValue());
 	}
 
 	@Override
 	public void onInitializeClient() {
 		openScreenshotManagerKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.voxelcam.openscreenshotmanager",
-				InputConstants.Type.KEYSYM,
+				InputConstants.Type.KEYBOARD,
 				InputConstants.KEY_H,
 				CATEGORY));
 
 		captureMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.voxelcam.capturemenu",
-				InputConstants.Type.KEYSYM,
+				InputConstants.Type.KEYBOARD,
 				InputConstants.KEY_F2,
 				CATEGORY));
 
