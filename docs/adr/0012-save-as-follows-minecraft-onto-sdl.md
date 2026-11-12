@@ -11,15 +11,16 @@ costs no new dependency and ships no native of our own.
 
 The consequence is that the dialog is now **asynchronous**. tinyfd blocked its calling thread,
 which is why `saveCopy` ran the whole thing on `Util.ioPool()` — the comment there said so. SDL
-instead wants to be shown from the main thread and answers through a callback that the event pump
-invokes some frames later. So the shape inverts: the dialog opens on the calling (render) thread,
+instead wants to be shown from the main thread and answers through a callback invoked later — SDL
+documents the dialog as non-blocking but not which thread answers, so nothing here assumes either.
+So the shape inverts: the dialog opens on the calling (render) thread,
 and only the copy that follows runs on the IO worker. `saveCopy` still returns
 `CompletableFuture<Path>` completing with null on cancel, which is what kept `SharePopup`
 unchanged — the popup already routed everything through `whenComplete` and `minecraft.execute`.
 
 Three details of the SDL path are load-bearing, and each is a silent failure if missed:
 
-- **Nothing handed to SDL may live on the `MemoryStack`.** The callback arrives long after any
+- **Nothing handed to SDL may live on the `MemoryStack`.** The callback can arrive long after any
   stack frame would have been popped, and SDL does not copy the filters. The filter struct, its two
   strings and the default location are allocated off-heap and freed in the callback, which is also
   the only place the callback can free itself.

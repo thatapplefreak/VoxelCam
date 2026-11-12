@@ -42,8 +42,8 @@ public final class NativeShare {
 	 * <p>26.3 moved the client from GLFW to SDL and dropped {@code lwjgl-tinyfd} with it,
 	 * so the blocking {@code tinyfd_saveFileDialog} this used to call no longer exists.
 	 * SDL's dialog is its successor and is <em>asynchronous</em>: it must be shown from
-	 * the main thread and answers through a callback the event pump invokes some frames
-	 * later. So the shape here inverts - the dialog is opened on the calling (render)
+	 * the main thread and answers through a callback invoked later, on a thread SDL does
+	 * not document. So the shape here inverts - the dialog is opened on the calling (render)
 	 * thread rather than on {@code Util.ioPool()}, and only the copy that follows runs on
 	 * the IO worker. The returned future is unchanged, which is what keeps
 	 * {@code SharePopup} untouched.
@@ -64,9 +64,9 @@ public final class NativeShare {
 	/**
 	 * Shows SDL's save dialog and completes with the chosen path, or null on cancel.
 	 *
-	 * <p>Nothing handed to SDL here may live on the {@code MemoryStack}: the callback
-	 * arrives frames later from the event pump, long after a stack frame would have been
-	 * popped, and SDL does not copy the filters. So the filter struct, its two strings and
+	 * <p>Nothing handed to SDL here may live on the {@code MemoryStack}: the callback can
+	 * arrive long after a stack frame would have been popped, and SDL does not copy the
+	 * filters. So the filter struct, its two strings and
 	 * the default location are all allocated off-heap and freed in the callback - which is
 	 * also the only place the callback itself can be freed, since it has to outlive the
 	 * call that registers it.

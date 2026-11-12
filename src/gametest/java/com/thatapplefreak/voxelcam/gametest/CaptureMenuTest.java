@@ -22,7 +22,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 
 /**
  * Drives {@link CaptureMenu} the way the physical key would, through its own public methods
- * directly rather than simulated GLFW press/hold/release — no such input-simulation
+ * directly rather than simulated platform press/hold/release — no such input-simulation
  * infrastructure exists in this repo (see {@code CaptureTest}, which takes the same approach for
  * {@link BigScreenshot}). Once {@code onKeyDown()} arms it, {@code VoxelCamClient}'s own end-tick
  * hook keeps calling {@code tick()} forward every real client tick exactly as it would for an

@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * The parts of the share targets that are reachable without a window.
  *
- * The native Save-As dialog and GLFW's clipboard both need a live client, so what
+ * The native Save-As dialog and the clipboard both need a live client, so what
  * is tested here is everything on either side of them: which path the dialog's
  * answer turns into, that the copy really happens, and which command each platform
  * gets for revealing a file.

@@ -17,7 +17,7 @@ nobody can tell a tap from a hold.
 
 - Vanilla's key map delivers a shared key to exactly one of the two bindings, and which one is not
   ours to choose. So the press is read from every route it can arrive by (the mapping's clicks, its
-  down-state, and GLFW's raw key state), and arming is idempotent. Two earlier attempts each picked
+  down-state, and the platform's raw key state), and arming is idempotent. Two earlier attempts each picked
   one route and were wrong in-game. Only a game test pressing the real key settled it.
 - `ScreenshotRecorderMixin` still cancels vanilla's save unconditionally, but it ignores the grab
   only while our binding is held or the menu is armed. Anything else that calls `Screenshot.grab`
