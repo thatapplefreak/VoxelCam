@@ -63,14 +63,11 @@ jobs:
   client-game-tests:
     name: Client game tests
     runs-on: ubuntu-24.04
-    # This job passed in about 3.5 minutes for the whole 26.2 era and then hung
-    # indefinitely on the first 26.3 run, inside `runClientGameTest` itself with
-    # xvfb installed fine. A hung job is worse than a failing one twice over: it
-    # burns the 6-hour default before anyone hears about it, and GitHub only
-    # uploads a job's log when the job ends, so there is nothing to read while it
-    # hangs. Failing at 15 minutes ends both problems — the step fails, which is
-    # what makes the `if: failure()` upload below run and hand over the client's
-    # own logs.
+    # Kept even though the 26.3 backend failure below is fixed, because of how that
+    # failure presented: both backends threw, and the client then hung rather than
+    # exiting, burning GitHub's 6-hour default. A job's log is only uploaded when the
+    # job ends, so a hang is also a job nobody can read. 15 minutes is generous
+    # against a suite that takes ~90 seconds locally and ~3.5 minutes here.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -83,12 +80,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       # The tests drive a real client, so the runner needs a virtual framebuffer
-      # and a software GL driver. Loom turns XVFB on by itself on Linux when CI
+      # and a software GPU driver. Loom turns XVFB on by itself on Linux when CI
       # is set, but it does not install it.
+      #
+      # mesa-vulkan-drivers is what 26.3 added to this list. 26.3 runs on SDL and
+      # picks a graphics backend at startup, and on this runner both choices failed:
+      # OpenGL with "Couldn't find matching GLX visual" (SDL's GL path wants a visual
+      # xvfb's default depth does not offer) and Vulkan with "Installed Vulkan doesn't
+      # implement the VK_KHR_surface extension" — the loader is present, an ICD is not.
+      # lavapipe, from mesa-vulkan-drivers, is a software ICD that does implement
+      # surfaces, so the Vulkan attempt succeeds and the GLX question stops mattering.
+      # Through 26.2 this step needed neither, because GLFW asked for a plain GL context.
       - name: Install a virtual display
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils \
+            mesa-vulkan-drivers libvulkan1
 
       - run: ./gradlew runClientGameTest --stacktrace
 
