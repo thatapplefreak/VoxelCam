@@ -18,7 +18,8 @@ Features
   nothing changes if you never hold it. The menu's outer ring sets the burst
   length and the oversized size without leaving the dial.
 * Take screenshots far larger than your window — up to whatever your GPU
-  allows — with `Shift`+`F2`. Set the size with `/bigscreenshot` (or `/bs`),
+  allows — from the capture menu's **Big Screenshot** wedge. Set the size from
+  the menu's outer ring, the settings screen, or `/bigscreenshot` (or `/bs`),
   which takes presets like `4k` and `imax`, a multiple of your window such as
   `4x`, or exact dimensions like `3840x2160`.
 * Capture a burst of consecutive frames in one go. The manager lists a burst as
@@ -66,10 +67,10 @@ it, and you can use it on any server, modded or vanilla.
 5. Launch Minecraft using the Fabric profile.
 
 Press `H` in-game to open the screenshot manager, or use the camera button on
-the title screen or the pause menu. `F2` takes a screenshot as usual; hold
-`Shift` for an oversized one, or hold `F2` on its own to pick a capture mode
-from the dial. Both keys can be rebound under Controls, in a VoxelCam
-category.
+the title screen or the pause menu. Tapping `F2` takes a screenshot as usual;
+hold it to pick a big screenshot or a burst from the capture menu, and press
+`Escape` while it is open to back out without taking anything. Both keys can
+be rebound under Controls, in a VoxelCam category.
 
 VoxelCam targets **Java 25**, the runtime Minecraft 26.2 ships with, so the
 official launcher needs no changes.
