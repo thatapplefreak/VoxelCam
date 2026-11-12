@@ -49,7 +49,7 @@ counts rather than the exit code.
 `CatboxUploaderTest` stubs catbox with a `com.sun.net.httpserver` server on loopback rather than
 touching the network, which is also the only way to reproduce its refusal-as-HTTP-200. Where a
 class wraps something untestable, the pattern has been to extract a package-private seam beside it
-(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`,
+(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`/`openFolderCommand`,
 `ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
 `ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`,
 `AutoCapture.gateFor`/`shouldArm`/`markVisited`, `VoxelCamConfig.snapshot`) rather
@@ -69,6 +69,12 @@ would upload to the real catbox.
 `explorer.exe` reveal and the `NativeShare.openFolder` fallback it lands on, and the upload-result branch
 of `SharePopup` (which would need an injectable endpoint the popup does not have). Those are manual
 checks before a release.
+
+26.3 added two more to that list. **SDL's save dialog** is asynchronous, so neither its callback nor
+the free-in-callback discipline is reachable by a test — and a leak there is invisible rather than
+loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor` is a global flag
+that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
+and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
 **So are all four automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
 directly, because earning an advancement, killing a boss, dying and walking a portal are

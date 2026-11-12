@@ -234,7 +234,12 @@ public final class NativeShare {
 			VoxelCamClient.LOGGER.warn("No folder-open command for platform {}", Util.getPlatform());
 			return;
 		}
-		runReveal(command);
+		// On the IO worker, not the caller: runReveal waits on the child for up to
+		// REVEAL_TIMEOUT_SECONDS, and both callers are on the render thread - a button in the
+		// manager and revealInFileManager's fallback. The vanilla call this replaced
+		// (Util.OS.openFile) did its own dispatching, so calling runReveal directly here
+		// would freeze the game for two seconds on a file manager that is slow to start.
+		CompletableFuture.runAsync(() -> runReveal(command), Util.ioPool());
 	}
 
 	/**

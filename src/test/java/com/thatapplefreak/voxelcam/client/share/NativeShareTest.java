@@ -160,6 +160,55 @@ class NativeShareTest {
 		assertNull(NativeShare.revealCommand(Util.OS.valueOf(platform), file));
 	}
 
+	// --- opening the containing folder ---------------------------------------
+
+	/**
+	 * 26.3 reduced Util.OS to a telemetry tag, taking openFile(File) with it, so the
+	 * folder-open command is VoxelCam's own now and needs the same per-platform cover
+	 * revealCommand has.
+	 */
+	@Test
+	void macOsOpensTheFolderWithOpen() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.OSX, dir));
+	}
+
+	@Test
+	void windowsOpensTheFolderWithExplorer() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "explorer.exe", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.WINDOWS, dir));
+	}
+
+	/**
+	 * Unlike revealing, opening a directory does have a documented Linux command, which
+	 * is the whole reason this is a separate seam rather than a branch of revealCommand.
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = { "LINUX", "SOLARIS" })
+	void unixLikePlatformsUseXdgOpen(String platform) throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "xdg-open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.valueOf(platform), dir));
+	}
+
+	@Test
+	void anUnknownPlatformHasNoFolderCommand() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertNull(NativeShare.openFolderCommand(Util.OS.UNKNOWN, dir));
+	}
+
+	/** A null directory must not become a command that opens the process's cwd. */
+	@Test
+	void aNullDirectoryHasNoFolderCommand() {
+		assertNull(NativeShare.openFolderCommand(Util.OS.OSX, null));
+	}
+
 	/** Every platform must be handled, so the switch cannot fall through unexpectedly. */
 	@Test
 	void everyPlatformIsAccountedFor() throws IOException {

@@ -322,13 +322,18 @@ public final class CaptureMenu {
 	}
 
 	private static void restoreCursor(Minecraft client) {
+		// Unconditionally, and before the grab: SDL's cursor visibility is a global flag
+		// independent of relative-mouse mode, and nothing in vanilla ever calls
+		// SDL_ShowCursor - grabMouse/releaseMouse only drive
+		// SDL_SetWindowRelativeMouseMode and SDL_WarpMouseInWindow. Under GLFW this was
+		// free, because grabMouse's CURSOR_DISABLED overwrote CURSOR_HIDDEN. On SDL a hide
+		// left standing survives the grab, and the player gets an invisible pointer in the
+		// next inventory screen with nothing to undo it short of a restart.
+		SDLMouse.SDL_ShowCursor();
 		// A screen opening is what aborted the menu in the first place on that path; vanilla
 		// re-grabs when it closes, so grabbing here would capture the cursor out from under it.
 		if (cursorWasGrabbed && client.gui.screen() == null) {
 			client.mouseHandler.grabMouse();
-		} else {
-			// Nothing else is going to undo the hide, and a screen that is up now needs a pointer.
-			SDLMouse.SDL_ShowCursor();
 		}
 		cursorWasGrabbed = false;
 	}
