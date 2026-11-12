@@ -453,3 +453,17 @@ follow the player's system locale are the exception, not the rule.
   the datagen call was. The `clientGameTest` run config must be tuned in a *separate* `loom` block
   placed after it; naming it in the `loom` block above instead fails with a duplicate-name error,
   because `configureTests` is what creates that run config.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `thatapplefreak/VoxelCam`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage roles, each label named after its role (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root, created lazily by `/domain-modeling`. See `docs/agents/domain.md`.
