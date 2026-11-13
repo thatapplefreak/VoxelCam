@@ -56,6 +56,7 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 			assertTheSwitchHidesIt(context);
 			assertAMenuScreenshotDoesNotCarryIt(context, dir);
 			assertNoBurstFrameCarriesIt(context, dir);
+			assertABigScreenshotShowsTheSavingLine(context);
 			assertABigScreenshotIsAnnouncedWithoutChat(context, dir);
 		}
 		context.runOnClient(client -> {
@@ -157,6 +158,37 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 				throw new AssertionError("burst frame " + frame.getName() + " has the capture status HUD burnt into it");
 			}
 		}
+	}
+
+	/**
+	 * The busy line is derived from the save counter and the capture states rather than posted, so
+	 * only a real capture shows it is wired to them. 4x rather than 2x, so the encode outlasts a
+	 * tick or two of polling. The screenshot is for a human checking the spinner, and best-effort:
+	 * the line can be gone by the frame Fabric grabs.
+	 */
+	private static void assertABigScreenshotShowsTheSavingLine(ClientGameTestContext context) {
+		context.runOnClient(client -> CaptureStatus.forgetAll());
+		BigScreenshotSize previous = context.computeOnClient(client -> BigScreenshot.getSize());
+		context.runOnClient(client -> {
+			BigScreenshot.setSize(BigScreenshotSize.parse("4x"));
+			BigScreenshot.request();
+		});
+		try {
+			context.waitFor(client -> CaptureStatus.isBusyShowing(), 100);
+			// While the window is still oversized the GUI is laid out for it, so the moment worth a
+			// look is the encode after the restore, if it lasts long enough to catch.
+			for (int i = 0; i < 40; i++) {
+				if (context.computeOnClient(client -> !BigScreenshot.isBusy() && CaptureStatus.isBusyShowing())) {
+					context.takeScreenshot("capture-status-saving");
+					break;
+				}
+				context.waitTicks(1);
+			}
+			context.waitFor(client -> !BigScreenshot.isBusy() && !CaptureStatus.isBusyShowing(), 400);
+		} finally {
+			context.runOnClient(client -> BigScreenshot.setSize(previous));
+		}
+		context.waitTicks(20);
 	}
 
 	/** The oversized frame is the one most worth protecting, and the "saved as" that follows it is

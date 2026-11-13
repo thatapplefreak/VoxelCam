@@ -382,10 +382,13 @@ notice suppression) while `moment` carries only tags and a notice key.
 **Capture status HUD** — every capture's feedback (busy, saved, failed, refused) is a notice
 posted to `CaptureStatus` and drawn top-left by `CaptureStatusHud` (ADR-0013). Completions are
 *posted*, never polled, because the save counter drops to zero on the IO pool between two frames.
-The ambient "Saving…" line is the one derived state. It shows only after `BUSY_DELAY_MILLIS`, so a
-plain shot does not flash it, and for at most `BUSY_MAX_MILLIS`, because `AWAITING_READBACK` has
-no frame budget and a lost consumer would otherwise light it for the session. It is read from
-`Burst.isBusy()` as well as the counter, because the counter touches zero between burst frames.
+The ambient "Saving screenshot…" line, with a spinner, is the one derived state. It shows from a
+save's first frame and is held for at least `BUSY_MIN_SHOW_MILLIS`, so a quick plain shot does not
+flicker it. The save's own result notice ends that hold early. While a save really is running it
+shows for at most `BUSY_MAX_MILLIS`, because `AWAITING_READBACK` has no frame budget and a lost
+consumer would otherwise light it for the session. It is read from `Burst.isBusy()` as well as
+the counter, because the counter touches zero between burst frames. The spinner is eight dots
+whose brightness moves round, because the extractor fills rectangles and nothing else.
 
 Two things are load-bearing:
 

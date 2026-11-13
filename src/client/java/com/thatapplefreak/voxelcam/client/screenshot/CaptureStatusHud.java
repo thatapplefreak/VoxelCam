@@ -37,6 +37,15 @@ public final class CaptureStatusHud {
 	private static final int ACCENT_FAILED = 0xFFE04848;
 	private static final int ACCENT_REFUSED = 0xFFE0B040;
 
+	/** The spinner's box, square, centred on the row. Odd, so it has a centre pixel to orbit. */
+	private static final int SPINNER_SIZE = 9;
+	private static final int SPINNER_DOT = 2;
+	private static final int SPINNER_GAP = 4;
+	/** Brightness of the lit dot and the trail behind it; everything further back sits at the last. */
+	private static final int[] SPINNER_TRAIL_ALPHA = { 0xFF, 0xB0, 0x70, 0x38 };
+	/** Top-left corner of each dot, clockwise from twelve o'clock, inside the spinner's box. */
+	private static final int[][] SPINNER_DOTS = spinnerDots();
+
 	private static final String BUSY_KEY = "voxelcam.hud.saving";
 	private static final String BUSY_REFUSAL_KEY = "voxelcam.savingpleasewait";
 
@@ -54,7 +63,7 @@ public final class CaptureStatusHud {
 
 		boolean busy = CaptureStatus.isBusyShowing();
 		if (busy) {
-			extractRow(graphics, client, y, Component.translatable(BUSY_KEY), ACCENT_BUSY, TEXT, 1F);
+			extractBusyRow(graphics, client, y, now);
 			y += ROW_HEIGHT + ROW_GAP;
 		}
 
@@ -68,6 +77,47 @@ public final class CaptureStatusHud {
 					notice.kind() == CaptureStatus.Kind.FAILED ? TEXT_FAILED : TEXT, notice.opacityAt(now));
 			y += ROW_HEIGHT + ROW_GAP;
 		}
+	}
+
+	/** The notice row's plate and accent, with a spinner set in ahead of the text. */
+	private static void extractBusyRow(GuiGraphicsExtractor graphics, Minecraft client, int y, long now) {
+		Component text = Component.translatable(BUSY_KEY);
+		int contentLeft = MARGIN + ACCENT_WIDTH + PADDING;
+		int textLeft = contentLeft + SPINNER_SIZE + SPINNER_GAP;
+		int right = Math.min(textLeft + client.font.width(text) + PADDING, graphics.guiWidth() - MARGIN);
+		graphics.fill(MARGIN, y, right, y + ROW_HEIGHT, PLATE);
+		graphics.fill(MARGIN, y, MARGIN + ACCENT_WIDTH, y + ROW_HEIGHT, ACCENT_BUSY);
+
+		int top = y + (ROW_HEIGHT - SPINNER_SIZE) / 2;
+		int lit = CaptureStatus.spinnerStepAt(now);
+		for (int i = 0; i < SPINNER_DOTS.length; i++) {
+			int behind = Math.floorMod(lit - i, SPINNER_DOTS.length);
+			int alpha = SPINNER_TRAIL_ALPHA[Math.min(behind, SPINNER_TRAIL_ALPHA.length - 1)];
+			int x = contentLeft + SPINNER_DOTS[i][0];
+			int dotY = top + SPINNER_DOTS[i][1];
+			graphics.fill(x, dotY, x + SPINNER_DOT, dotY + SPINNER_DOT, (alpha << 24) | (TEXT & 0x00FFFFFF));
+		}
+
+		graphics.text(client.font, text, textLeft, y + 3, TEXT, false);
+	}
+
+	/**
+	 * Eight dots on a circle, laid out once. The extractor draws rectangles and nothing else (see
+	 * {@code CaptureMenuHud}), so the spinner is dots whose brightness moves rather than a shape
+	 * that turns.
+	 */
+	private static int[][] spinnerDots() {
+		int count = CaptureStatus.SPINNER_STEPS;
+		double centre = (SPINNER_SIZE - SPINNER_DOT) / 2.0;
+		double radius = centre;
+		int[][] dots = new int[count][];
+		for (int i = 0; i < count; i++) {
+			double angle = Math.PI * 2 * i / count;
+			dots[i] = new int[] {
+					(int) Math.round(centre + Math.sin(angle) * radius),
+					(int) Math.round(centre - Math.cos(angle) * radius) };
+		}
+		return dots;
 	}
 
 	private static void extractRow(GuiGraphicsExtractor graphics, Minecraft client, int y, Component text,

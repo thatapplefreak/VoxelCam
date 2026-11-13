@@ -114,11 +114,16 @@ public final class CaptureStatus {
 	static final int MAX_VISIBLE = 3;
 
 	/**
-	 * A save has to have been running this long before the busy state shows. A plain screenshot
-	 * encodes in well under this, and without the delay every press would flash "Saving…" for a
-	 * frame or two directly before its own "saved as".
+	 * The shortest the busy line stays up once it appears. A plain screenshot encodes in well under
+	 * this, and shown for only as long as the save really ran it would flicker for a frame or two.
+	 * Cut short by a result: once the save's own "saved as" or failure is posted, the line has
+	 * nothing left to say.
 	 */
-	static final long BUSY_DELAY_MILLIS = 250L;
+	static final long BUSY_MIN_SHOW_MILLIS = 500L;
+
+	/** One step of the busy spinner; {@link #SPINNER_STEPS} of them make a turn. */
+	static final long SPINNER_STEP_MILLIS = 100L;
+	static final int SPINNER_STEPS = 8;
 
 	/**
 	 * The longest the busy state is shown for one unbroken spell of busy. An oversized readback
@@ -128,7 +133,7 @@ public final class CaptureStatus {
 	 */
 	static final long BUSY_MAX_MILLIS = 60_000L;
 
-	private static final long NOT_BUSY = Long.MIN_VALUE;
+	static final long NOT_BUSY = Long.MIN_VALUE;
 
 	// Posted from the render thread in practice — the IO-pool paths bounce through client.execute
 	// first — but synchronised anyway: a notice is too cheap to be worth a threading rule.
@@ -137,6 +142,8 @@ public final class CaptureStatus {
 	// Render-thread state only, written by beforeFrame() and read by the HUD in the same frame.
 	private static boolean frameIsCaptured;
 	private static long busySinceMillis = NOT_BUSY;
+	private static long busyEndedMillis = NOT_BUSY;
+	private static long lastPostedMillis = NOT_BUSY;
 	private static boolean busy;
 
 	private CaptureStatus() {
@@ -154,6 +161,7 @@ public final class CaptureStatus {
 	static synchronized void post(Notice notice) {
 		notices.removeIf(notice::sameMessageAs);
 		notices.addFirst(notice);
+		lastPostedMillis = notice.postedAtMillis();
 		// Expired entries are pruned on read; this only bounds a queue nobody is reading, such as
 		// one posted into with the HUD switched off.
 		while (notices.size() > MAX_VISIBLE * 4) {
@@ -193,13 +201,30 @@ public final class CaptureStatus {
 		return savesInFlight > 0 || bigScreenshotBusy || burstBusy;
 	}
 
-	/** Whether a spell of busy that began at {@code busySince} should be showing at {@code now}. */
-	static boolean showBusyAt(long busySince, long nowMillis) {
+	/**
+	 * Whether the busy line should be showing at {@code now}, for a spell of busy that began at
+	 * {@code busySince} and ended at {@code busyEnded} ({@link #NOT_BUSY} while it is still going).
+	 * Shown from the first frame of a save; held for {@link #BUSY_MIN_SHOW_MILLIS} past a save that
+	 * finished sooner, unless a notice has been posted since the save began — that notice is the
+	 * answer the line was standing in for.
+	 */
+	static boolean showBusyAt(long busySince, long busyEnded, long lastPosted, long nowMillis) {
 		if (busySince == NOT_BUSY) {
 			return false;
 		}
 		long elapsed = nowMillis - busySince;
-		return elapsed >= BUSY_DELAY_MILLIS && elapsed < BUSY_MAX_MILLIS;
+		if (busyEnded == NOT_BUSY) {
+			return elapsed < BUSY_MAX_MILLIS;
+		}
+		if (lastPosted != NOT_BUSY && lastPosted >= busySince) {
+			return false;
+		}
+		return elapsed < BUSY_MIN_SHOW_MILLIS;
+	}
+
+	/** Which of the spinner's {@link #SPINNER_STEPS} positions is lit at {@code now}. */
+	public static int spinnerStepAt(long nowMillis) {
+		return (int) Math.floorMod(nowMillis / SPINNER_STEP_MILLIS, (long) SPINNER_STEPS);
 	}
 
 	/**
@@ -232,12 +257,24 @@ public final class CaptureStatus {
 
 		long now = Util.getMillis();
 		boolean nowBusy = busyAt(ScreenshotHandler.savesInFlight(), BigScreenshot.isBusy(), Burst.isBusy());
-		if (!nowBusy) {
-			busySinceMillis = NOT_BUSY;
-		} else if (busySinceMillis == NOT_BUSY) {
-			busySinceMillis = now;
+		if (nowBusy) {
+			// A new save, or one starting again while the last one's line was still being held.
+			if (busySinceMillis == NOT_BUSY || busyEndedMillis != NOT_BUSY) {
+				busySinceMillis = now;
+				busyEndedMillis = NOT_BUSY;
+			}
+		} else if (busySinceMillis != NOT_BUSY && busyEndedMillis == NOT_BUSY) {
+			busyEndedMillis = now;
 		}
-		busy = showBusyAt(busySinceMillis, now);
+		long lastPosted;
+		synchronized (CaptureStatus.class) {
+			lastPosted = lastPostedMillis;
+		}
+		busy = showBusyAt(busySinceMillis, busyEndedMillis, lastPosted, now);
+		if (!busy && !nowBusy) {
+			busySinceMillis = NOT_BUSY;
+			busyEndedMillis = NOT_BUSY;
+		}
 	}
 
 	/** Whether the HUD has to stay blank this frame, because the frame is going into a PNG. */
@@ -256,6 +293,8 @@ public final class CaptureStatus {
 		notices.clear();
 		frameIsCaptured = false;
 		busySinceMillis = NOT_BUSY;
+		busyEndedMillis = NOT_BUSY;
+		lastPostedMillis = NOT_BUSY;
 		busy = false;
 	}
 }

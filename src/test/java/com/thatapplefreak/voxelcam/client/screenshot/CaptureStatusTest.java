@@ -117,14 +117,48 @@ class CaptureStatusTest {
 		assertTrue(CaptureStatus.busyAt(1, true, false));
 	}
 
+	private static final long NONE = CaptureStatus.NOT_BUSY;
+
 	@Test
-	void theBusyLineWaitsOutAShortSaveAndGivesUpOnAStuckOne() {
+	void theBusyLineShowsFromTheFirstFrameOfASave() {
+		assertTrue(CaptureStatus.showBusyAt(5000L, NONE, NONE, 5000L));
+		assertFalse(CaptureStatus.showBusyAt(NONE, NONE, NONE, 5000L));
+	}
+
+	@Test
+	void aSaveThatFinishesQuicklyIsStillShownLongEnoughToSee() {
 		long since = 5000L;
-		assertFalse(CaptureStatus.showBusyAt(since, since + CaptureStatus.BUSY_DELAY_MILLIS - 1));
-		assertTrue(CaptureStatus.showBusyAt(since, since + CaptureStatus.BUSY_DELAY_MILLIS));
-		assertTrue(CaptureStatus.showBusyAt(since, since + CaptureStatus.BUSY_MAX_MILLIS - 1));
-		assertFalse(CaptureStatus.showBusyAt(since, since + CaptureStatus.BUSY_MAX_MILLIS));
-		assertFalse(CaptureStatus.showBusyAt(Long.MIN_VALUE, since));
+		long ended = since + 60;
+		assertTrue(CaptureStatus.showBusyAt(since, ended, NONE, since + CaptureStatus.BUSY_MIN_SHOW_MILLIS - 1));
+		assertFalse(CaptureStatus.showBusyAt(since, ended, NONE, since + CaptureStatus.BUSY_MIN_SHOW_MILLIS));
+	}
+
+	@Test
+	void theSavesOwnResultEndsTheHoldEarly() {
+		long since = 5000L;
+		long ended = since + 60;
+		assertFalse(CaptureStatus.showBusyAt(since, ended, ended + 1, ended + 2));
+		// A notice from before this save began is not its answer.
+		assertTrue(CaptureStatus.showBusyAt(since, ended, since - 1, ended + 2));
+	}
+
+	@Test
+	void aStillRunningSaveIsShownUntilTheCapThenGivenUpOn() {
+		long since = 5000L;
+		// Even with a notice posted meanwhile — a "please wait" from a second press is not a result.
+		assertTrue(CaptureStatus.showBusyAt(since, NONE, since + 10, since + CaptureStatus.BUSY_MAX_MILLIS - 1));
+		assertFalse(CaptureStatus.showBusyAt(since, NONE, NONE, since + CaptureStatus.BUSY_MAX_MILLIS));
+	}
+
+	@Test
+	void theSpinnerStepsRoundAndWraps() {
+		assertEquals(0, CaptureStatus.spinnerStepAt(0L));
+		assertEquals(1, CaptureStatus.spinnerStepAt(CaptureStatus.SPINNER_STEP_MILLIS));
+		assertEquals(0, CaptureStatus.spinnerStepAt(CaptureStatus.SPINNER_STEP_MILLIS * CaptureStatus.SPINNER_STEPS));
+		for (long t = 0; t < 5000; t += 37) {
+			int step = CaptureStatus.spinnerStepAt(t);
+			assertTrue(step >= 0 && step < CaptureStatus.SPINNER_STEPS, "step " + step + " at " + t);
+		}
 	}
 
 	@Test
