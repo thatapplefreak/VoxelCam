@@ -241,7 +241,7 @@ Five things here are load-bearing and were each found the hard way:
   one and every restore path leaves the window permanently huge.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
   `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
-  `rebuildWidgets`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
+  `rebuildWidgets`, and with no world the HUD is not drawn, so a multi-second freeze would come
   with no explanation. The gate has to be checked **twice**: `request()` runs from
   `RenderSystem.pollEvents()`, `beginCapture()` a whole tick later at the head of `renderFrame`, and a
   disconnect or a screen opening in between would land the resize in exactly the state it forbids.
@@ -251,7 +251,7 @@ expected and not a bug. `BigScreenshot` holds the size in a session static, whic
 `VoxelCamConfig` now persists and restores at startup — it was genuinely session-only, never
 written to disk, up to and including 2.3.0. PNG
 encoding runs on `Util.ioPool()`, so `ScreenshotHandler.saving` clears in that task, not
-at the call site, and its chat feedback is bounced back through `client.execute`.
+at the call site, and its notices are bounced back through `client.execute`.
 
 **Capture menu** — `F2` reaches every capture mode (ADR-0005). `CaptureMenu` is a renderer-free
 state machine ticked from `END_CLIENT_TICK`: a release before `HOLD_THRESHOLD_TICKS` is a tap and
@@ -298,7 +298,7 @@ until `Util.ioPool()` encodes it. `ScreenshotHandler`'s save latch is a counted 
 (`beginSave`/`endSave`/`joinSave`) for the same reason, shared by all three capture paths.
 
 Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
-reserved for it, so no generation tag is needed. The end-of-burst chat line waits in
+reserved for it, so no generation tag is needed. The end-of-burst notice waits in
 `frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
 mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
@@ -373,11 +373,38 @@ Four things here are load-bearing:
   trusted from the file — a hand-edited zero would turn a cascade into a screenshot per toast.
 
 `ScreenshotHandler.captureMoment` refuses **silently** rather than reusing `captureNow`, whose
-refusal path sends `voxelcam.savingpleasewait` to chat: nobody asked for this screenshot, so nobody
+refusal path posts a `voxelcam.savingpleasewait` notice: nobody asked for this screenshot, so nobody
 wants to be told at length why it did not happen. `MomentTag` threads through
 `saveCapturedImage`/`write`/`embedMetadata` as a fourth nullable parameter, kept separate from
 `BurstFrame` rather than bagged with it because `burst` carries *behaviour* (completion accounting,
-chat suppression) while `moment` carries only tags and a chat key.
+notice suppression) while `moment` carries only tags and a notice key.
+
+**Capture status HUD** — every capture's feedback (busy, saved, failed, refused) is a notice
+posted to `CaptureStatus` and drawn top-left by `CaptureStatusHud` (ADR-0013). Completions are
+*posted*, never polled, because the save counter drops to zero on the IO pool between two frames.
+The ambient "Saving screenshot…" line, with a spinner, is the one derived state. It shows from a
+save's first frame and is held for at least `BUSY_MIN_SHOW_MILLIS`, so a quick plain shot does not
+flicker it. The save's own result notice ends that hold early. While a save really is running it
+shows for at most `BUSY_MAX_MILLIS`, because `AWAITING_READBACK` has no frame budget and a lost
+consumer would otherwise light it for the session. It is read from `Burst.isBusy()` as well as
+the counter, because the counter touches zero between burst frames. The spinner is eight dots
+whose brightness moves round, because the extractor fills rectangles and nothing else.
+
+Two things are load-bearing:
+
+- **`CaptureStatus.beforeFrame()` runs last in `voxelcam$beforeFrame`, and the HUD is blank on any
+  frame it says will be read back.** Extraction precedes the blit every capture reads from, so
+  anything drawn on a captured frame is in the PNG. Each path contributes its own condition:
+  `BigScreenshot.isCapturing()`, `CaptureMenu.capturesThisFrame()`, `Burst.isBusy()` and
+  `AutoCapture.isPending()`. A new capture path has to add its own, or its frames carry
+  whatever notice is up. `CaptureStatusHudTest` checks pixels for this: it asserts the accent
+  bar is in the presented frame, then asserts it is absent from a menu tap, every burst frame
+  and a big screenshot.
+- **It is drawn by `HudMixin` at `TAIL` of `Hud.extractRenderState`, not a Fabric `HudElement`,**
+  so that it survives F1. The method's other return is the `LevelLoadingScreen` early-out, which
+  `TAIL` does not touch.
+
+`captureStatusHud` in `voxelcam.json` switches it off, which leaves no capture feedback at all.
 
 **Manager UI** — `GuiScreenShotManager` is the hub: `ScreenshotListWidget` (rows) on the left,
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
@@ -445,11 +472,11 @@ under the menu above it. `TitleScreenButtonTest` guards exactly that. The slot p
 the row's own spacing, and there is a fallback to the old position past the bottom full-width row
 for menu-replacing mods.
 
-**Config** — `VoxelCamConfig` persists nine settings to `voxelcam.json` (Gson, under
+**Config** — `VoxelCamConfig` persists ten settings to `voxelcam.json` (Gson, under
 `FabricLoader.getConfigDir()`): burst length, big-screenshot size, the manager's sort mode, its
 favourites-only filter, and the five automatic-capture settings (four per-trigger booleans plus
-`autoCaptureCooldownSeconds`). Only three mirror an existing session-static holder
-(`Burst.getLength()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other six live *only* on
+`autoCaptureCooldownSeconds`), and `captureStatusHud`. Only three mirror an existing session-static holder
+(`Burst.getLength()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other seven live *only* on
 `VoxelCamConfig.current()` — `favoritesOnly` is read in the manager's `init()` and written in
 `toggleFavoritesOnly()`, and `MomentTrigger`'s per-constant getter/setter lambdas point straight at
 their own flat field — rather than keeping a second copy that could drift. The fields stay flat, and
@@ -483,8 +510,11 @@ installed — `VoxelCamModMenu`, `compileOnly` in `build.gradle` so it costs not
 does not have Mod Menu) reaches burst length across its full range and every `BigScreenshotSize`
 preset, complementing the ring's five-value ladders for each. An "Automatic capture…" row opens
 `GuiAutoCaptureSettings` — its own screen rather than four more rows, because `GuiSettings`
-positions its rows by hand off `height / 2` with no scrolling and would sit at the edge of the
-smallest GUI scale a player can pick.
+positions its rows by hand with no scrolling. A "Capture status" `CycleButton` is its fourth row.
+Since 2.5.0 the rows are block-centred on `height / 2`, as `GuiAutoCaptureSettings`' are, rather
+than anchored and grown downward. That leaves room for about three more at vanilla's smallest
+scaled height, and `SettingsScreenTest` resizes to 320x240 and fails if any widget leaves the
+screen, because `clickScreenButton` presses without a hit test and would not notice.
 
 ## Version-specific API traps
 
@@ -540,8 +570,8 @@ These cost real debugging time and are not guessable from the class names:
 Files are **tab-indented**. Comments explain *why* — a constraint, a vanilla behaviour, a rejected
 alternative — not what the line does; match that rather than annotating mechanics.
 
-**`ChatMessages` silently does nothing when `client.player == null`**, which is the normal case since
-the manager is reachable from the title screen. New user-facing feedback belongs in the GUI, not chat.
+**Nothing goes to chat.** Capture feedback is a `CaptureStatus.post(kind, key, args...)` notice
+(ADR-0013); feedback inside a screen belongs on that screen.
 A refused rename keeps `RenamePopup` open with the typed name; a refused delete goes to the manager's
 details line via `reportDeleteResult`. Both add strings to **both** `en_us.json` and `en_pt.json`.
 

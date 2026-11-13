@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.sdl.SDLMouse;
 
@@ -139,7 +138,7 @@ public final class CaptureMenu {
 			return;
 		}
 		if (ScreenshotHandler.isSaving() || BigScreenshot.isBusy() || Burst.isBusy()) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
 			return;
 		}
 
@@ -202,6 +201,12 @@ public final class CaptureMenu {
 	/** True from a release until the capture it asked for has actually been taken. */
 	public static boolean isCapturePending() {
 		return pendingCapture != null;
+	}
+
+	/** Whether this frame's blit is the one a released selection fires from — valid once {@link
+	 * #beforeFrame()} has run for the frame. */
+	static boolean capturesThisFrame() {
+		return pendingCapture != null && pendingFrameStarted;
 	}
 
 	/**

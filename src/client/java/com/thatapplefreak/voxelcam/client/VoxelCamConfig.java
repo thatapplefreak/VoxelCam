@@ -51,6 +51,9 @@ public final class VoxelCamConfig {
 	public boolean autoCaptureDeath = true;
 	public boolean autoCaptureNewDimension = true;
 	public int autoCaptureCooldownSeconds = AutoCapture.DEFAULT_COOLDOWN_SECONDS;
+	/** Whether {@code CaptureStatusHud} draws at all. On by default: with chat gone it is the only
+	 * capture feedback there is. */
+	public boolean captureStatusHud = true;
 
 	public static VoxelCamConfig current() {
 		return current;
@@ -130,6 +133,7 @@ public final class VoxelCamConfig {
 		snapshot.autoCaptureDeath = current.autoCaptureDeath;
 		snapshot.autoCaptureNewDimension = current.autoCaptureNewDimension;
 		snapshot.autoCaptureCooldownSeconds = current.autoCaptureCooldownSeconds;
+		snapshot.captureStatusHud = current.captureStatusHud;
 		return snapshot;
 	}
 

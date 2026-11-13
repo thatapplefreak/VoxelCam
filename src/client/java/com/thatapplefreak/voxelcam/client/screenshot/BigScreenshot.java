@@ -3,7 +3,6 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 
@@ -85,17 +84,23 @@ public final class BigScreenshot {
 		return state != State.IDLE;
 	}
 
+	/** Resized and waiting for this frame's blit to read it back — the one frame of an oversized
+	 * capture that actually goes into the PNG. {@code CaptureStatus} keeps the HUD out of it. */
+	static boolean isCapturing() {
+		return state == State.CAPTURING;
+	}
+
 	/** Arms a capture for the next frame, explaining itself if it cannot. */
 	public static void request() {
 		// Defensive: the screenshot key already refuses while a capture is in flight, but this
 		// guard is what keeps a second request from overwriting the saved window size.
 		if (state != State.IDLE) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
 			return;
 		}
 
 		if (!canCapture(Minecraft.getInstance())) {
-			ChatMessages.send("voxelcam.bigshot.unavailable");
+			CaptureStatus.post(CaptureStatus.Kind.REFUSED, "voxelcam.bigshot.unavailable");
 			return;
 		}
 
@@ -106,8 +111,7 @@ public final class BigScreenshot {
 	/**
 	 * The modern {@code ScreenshotIncapable}: resizing runs {@code Screen.resize}, which the
 	 * manager turns into a full {@code rebuildWidgets} at an absurd scaled width; and with no world
-	 * {@code ChatMessages} is silent, so a multi-second freeze would come with no explanation at
-	 * all.
+	 * the HUD is not drawn, so a multi-second freeze would come with no explanation at all.
 	 */
 	private static boolean canCapture(Minecraft client) {
 		return client.level != null && client.gui.screen() == null;
@@ -159,7 +163,7 @@ public final class BigScreenshot {
 		} catch (Throwable t) {
 			ScreenshotHandler.endSave();
 			VoxelCamClient.LOGGER.error("Failed to read back a big screenshot", t);
-			ChatMessages.send("voxelcam.bigshot.failed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.bigshot.failed");
 			deferRestore();
 		}
 	}
@@ -231,7 +235,7 @@ public final class BigScreenshot {
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to resize for a {}x{} screenshot",
 					target.width(), target.height(), t);
-			ChatMessages.send("voxelcam.bigshot.failed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.bigshot.failed");
 			finish();
 		}
 	}

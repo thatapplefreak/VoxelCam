@@ -6,6 +6,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshotSize;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -27,6 +28,8 @@ public class GuiSettings extends Screen {
 	private static final int ROW_HEIGHT = 20;
 	private static final int STEP_BUTTON_SIZE = 20;
 	private static final int ROW_GAP = 28;
+	/** Rows above Done: burst length, big-screenshot size, automatic capture, capture status. */
+	private static final int ROWS = 4;
 
 	private final Screen parent;
 
@@ -43,10 +46,14 @@ public class GuiSettings extends Screen {
 	@Override
 	protected void init() {
 		int centerX = width / 2;
-		burstRowY = height / 2 - 30;
+		// Centred as a block, the way GuiAutoCaptureSettings is, rather than anchored and grown
+		// downward: anchored at height / 2 - 30, a fourth row pushed Done to within a row of the
+		// bottom at vanilla's smallest scaled height, and a fifth would have pushed it off.
+		burstRowY = height / 2 - ((ROWS + 1) * ROW_GAP) / 2;
 		int sizeRowY = burstRowY + ROW_GAP;
 		int autoCaptureRowY = sizeRowY + ROW_GAP;
-		int doneY = autoCaptureRowY + ROW_GAP + 16;
+		int captureHudRowY = autoCaptureRowY + ROW_GAP;
+		int doneY = captureHudRowY + ROW_GAP + 16;
 
 		burstMinusButton = addRenderableWidget(
 				Button.builder(Component.translatable("voxelcam.settings.burstlengthminus"), b -> adjustBurstLength(-1))
@@ -70,6 +77,15 @@ public class GuiSettings extends Screen {
 						.bounds(centerX - ROW_WIDTH / 2, autoCaptureRowY, ROW_WIDTH, ROW_HEIGHT).build());
 		autoCaptureButton.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.autocapture")));
 
+		// A CycleButton, not a Checkbox or a "Capture status: ON" Button: a client game test can
+		// press neither of those — see SettingsScreenTest.
+		CycleButton<Boolean> captureHudToggle = addRenderableWidget(
+				CycleButton.onOffBuilder(VoxelCamConfig.current().captureStatusHud)
+						.create(centerX - ROW_WIDTH / 2, captureHudRowY, ROW_WIDTH, ROW_HEIGHT,
+								Component.translatable("voxelcam.settings.capturehud"),
+								(button, enabled) -> setCaptureStatusHud(enabled)));
+		captureHudToggle.setTooltip(Tooltip.create(Component.translatable("voxelcam.tooltip.capturehud")));
+
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(centerX - ROW_WIDTH / 2, doneY, ROW_WIDTH, ROW_HEIGHT).build());
 
@@ -82,6 +98,11 @@ public class GuiSettings extends Screen {
 		Burst.setLength(Burst.getLength() + delta);
 		VoxelCamConfig.saveCurrent();
 		updateBurstButtons();
+	}
+
+	private void setCaptureStatusHud(boolean enabled) {
+		VoxelCamConfig.current().captureStatusHud = enabled;
+		VoxelCamConfig.saveCurrent();
 	}
 
 	private void updateBurstButtons() {

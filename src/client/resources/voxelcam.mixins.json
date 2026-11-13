@@ -6,6 +6,7 @@
 	"client": [
 		"AdvancementToastAccessor",
 		"BossHealthOverlayMixin",
+		"HudMixin",
 		"KeyMappingAccessor",
 		"KeyboardHandlerMixin",
 		"MinecraftClientMixin",

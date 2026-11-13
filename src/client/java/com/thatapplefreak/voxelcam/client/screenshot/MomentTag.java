@@ -21,7 +21,7 @@ public record MomentTag(MomentTrigger trigger, String subject) {
 	private static final String TRIGGER_KEY = "voxelcam:trigger";
 	private static final String SUBJECT_KEY = "voxelcam:momentsubject";
 
-	/** How the moment reads to the player, in chat when it lands and in the manager afterwards.
+	/** How the moment reads to the player, in the capture status HUD when it lands and in the manager afterwards.
 	 * One method rather than two so the screenshot the player was just told about is described the
 	 * same way when they go looking for it. */
 	public Component describe() {

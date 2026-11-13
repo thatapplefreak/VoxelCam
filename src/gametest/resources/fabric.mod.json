@@ -17,7 +17,8 @@
 			"com.thatapplefreak.voxelcam.gametest.RenamePopupFailureTest",
 			"com.thatapplefreak.voxelcam.gametest.RenameSelectionTest",
 			"com.thatapplefreak.voxelcam.gametest.SettingsScreenTest",
-			"com.thatapplefreak.voxelcam.gametest.MomentCaptureTest"
+			"com.thatapplefreak.voxelcam.gametest.MomentCaptureTest",
+			"com.thatapplefreak.voxelcam.gametest.CaptureStatusHudTest"
 		]
 	},
 	"depends": {

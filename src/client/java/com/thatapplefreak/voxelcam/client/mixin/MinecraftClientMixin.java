@@ -4,6 +4,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureStatus;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,6 +27,10 @@ public class MinecraftClientMixin {
 	private void voxelcam$beforeFrame(boolean tick, CallbackInfo ci) {
 		BigScreenshot.beforeFrame();
 		CaptureMenu.beforeFrame();
+		// Last: it asks whether this frame will be read back, which both calls above can change —
+		// BigScreenshot moves into CAPTURING here, and CaptureMenu marks the frame it fires from.
+		// HUD extraction comes later in this same frame, before the blit that reads it.
+		CaptureStatus.beforeFrame();
 	}
 
 	/**
