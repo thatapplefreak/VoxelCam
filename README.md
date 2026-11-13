@@ -30,6 +30,10 @@ Features
   die, and the first time you arrive in a dimension. All four are on by
   default, each can be switched off, and no more than one is taken every ten
   seconds so a run of advancements is one screenshot rather than five.
+* A small status line in the top corner says what a capture is doing — saving,
+  saved and under what name, or why it could not — instead of chat. It stays
+  visible with the HUD hidden (`F1`), never shows up in the screenshots it is
+  reporting on, and can be switched off in the settings.
 * Every capture records where it came from — dimension and coordinates, the
   world or server name, the mods that were loaded, and the Iris shader pack if
   there is one. It is written into the PNG itself, so it survives copying,

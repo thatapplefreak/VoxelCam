@@ -1,7 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.util.Util;
@@ -105,13 +104,13 @@ public final class Burst {
 	/** Arms a burst for the next blit, explaining itself if it cannot. */
 	public static void request() {
 		if (state != State.IDLE || BigScreenshot.isBusy() || ScreenshotHandler.isSaving()) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
 			return;
 		}
 
 		Minecraft client = Minecraft.getInstance();
 		if (!canCapture(client)) {
-			ChatMessages.send("voxelcam.burst.unavailable");
+			CaptureStatus.post(CaptureStatus.Kind.REFUSED, "voxelcam.burst.unavailable");
 			return;
 		}
 
@@ -125,7 +124,7 @@ public final class Burst {
 			beginBurst(length, Util.getMillis());
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to reserve names for a burst capture", t);
-			ChatMessages.send("voxelcam.burst.failed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.burst.failed");
 		}
 	}
 
@@ -188,7 +187,7 @@ public final class Burst {
 	 * {@link #MAX_IN_FLIGHT} at once), so the frame that happens to finish writing first —
 	 * usually whichever is smallest, or whichever the IO pool got to first — is not reliably the
 	 * last one issued. Announcing off the key frame's own completion, the way a single-frame
-	 * capture would, lands the "saved" chat message somewhere in the middle of the burst instead
+	 * capture would, lands the "saved" notice somewhere in the middle of the burst instead
 	 * of after it. Waiting for every issued frame to report in is what fixes that.
 	 */
 	static void frameCompleted(boolean succeeded) {
@@ -224,9 +223,9 @@ public final class Burst {
 			return;
 		}
 		if (succeededFrames > 0) {
-			ChatMessages.send("voxelcam.burst.saved", succeededFrames, names.get(0).getName());
+			CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.burst.saved", succeededFrames, names.get(0).getName());
 		} else {
-			ChatMessages.send("voxelcam.burst.failed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.burst.failed");
 		}
 	}
 

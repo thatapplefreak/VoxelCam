@@ -64,6 +64,15 @@ The quick options (burst lengths, big screenshot sizes) that appear past a wedge
 player aims far enough out.
 _Avoid_: Sub-menu
 
+**Capture status**:
+The small HUD line in the top-left corner that says what a capture is doing: saving, saved, failed
+or refused. It replaced chat as VoxelCam's capture feedback in 2.5.0.
+_Avoid_: Toast, chat message, overlay
+
+**Notice**:
+One message in the capture status, posted when something happened and gone after a few seconds.
+_Avoid_: Toast, popup, alert
+
 ### Automatic capture
 
 **Moment**:

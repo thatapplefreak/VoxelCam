@@ -3,10 +3,8 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 
 import java.io.File;
@@ -134,7 +132,7 @@ public final class ScreenshotHandler {
 	/** Takes a plain screenshot of the given frame, refusing while another save is in flight. */
 	static void captureNow(RenderTarget framebuffer) {
 		if (BigScreenshot.isBusy() || Burst.isBusy() || !beginSave(1)) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
 			return;
 		}
 		capture(framebuffer);
@@ -144,7 +142,7 @@ public final class ScreenshotHandler {
 	 * Takes the single frame an {@link AutoCapture} moment armed, tagged with what armed it.
 	 *
 	 * <p>Deliberately not {@link #captureNow(RenderTarget)}: that path answers a refusal with
-	 * {@code voxelcam.savingpleasewait} in chat, which is right for a keypress and wrong here.
+	 * a {@code voxelcam.savingpleasewait} notice, which is right for a keypress and wrong here.
 	 * Nobody asked for this screenshot, so nobody wants to be told at length why it did not happen
 	 * — the caller gets a {@code false} and drops it.
 	 *
@@ -171,7 +169,7 @@ public final class ScreenshotHandler {
 		} catch (Throwable t) {
 			endSave();
 			VoxelCamClient.LOGGER.error("Failed to read back a screenshot", t);
-			ChatMessages.send("voxelcam.savefailed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed");
 		}
 	}
 
@@ -218,9 +216,9 @@ public final class ScreenshotHandler {
 	 *
 	 * <p>{@code burst} and {@code moment} stay separate parameters rather than one bag of extras
 	 * because they are not the same kind of thing: {@code burst} carries <em>behaviour</em> — the
-	 * completion accounting {@link Burst#frameCompleted} depends on, and the chat suppression that
+	 * completion accounting {@link Burst#frameCompleted} depends on, and the notice suppression that
 	 * keeps a burst from announcing every frame — while {@code moment} carries only tags and a
-	 * different chat key. Both are null for an ordinary keypress, and never both non-null.
+	 * different notice key. Both are null for an ordinary keypress, and never both non-null.
 	 */
 	static void saveCapturedImage(NativeImage image, File target, BurstFrame burst, MomentTag moment) {
 		// Read while still on the render thread: by the time write() runs on the IO pool, the
@@ -265,15 +263,15 @@ public final class ScreenshotHandler {
 		} catch (IOException e) {
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			if (burst == null) {
-				client.execute(() -> ChatMessages.send("voxelcam.savefailed"));
+				client.execute(() -> CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed"));
 			}
 		} finally {
 			// A burst's frames stay quiet individually — one voxelcam.savedscreenshotas per
-			// frame would spam chat for what the player experienced as a single press — and
+			// frame would spam the HUD for what the player experienced as a single press — and
 			// Burst.frameCompleted is what eventually speaks for the whole group, once, only
 			// after every frame it issued has reported in this same way. This runs on
 			// Util.ioPool(), so it reaches Burst's otherwise render-thread-only state through
-			// client.execute the same way the chat messages above do.
+			// client.execute the same way the notices above do.
 			if (burst != null) {
 				boolean frameSucceeded = succeeded;
 				client.execute(() -> Burst.frameCompleted(frameSucceeded));
@@ -284,16 +282,14 @@ public final class ScreenshotHandler {
 
 	/**
 	 * An automatic capture says what caught it, not just where it landed — the file name alone
-	 * would leave the player wondering what they had just been given. Unlike most of VoxelCam's
-	 * feedback this can safely go to chat: {@code ChatMessages} is silent with no player, and every
-	 * moment trigger requires one.
+	 * would leave the player wondering what they had just been given.
 	 */
 	private static void announceSaved(File target, MomentTag moment) {
 		if (moment == null) {
-			ChatMessages.send("voxelcam.savedscreenshotas", target.getName());
+			CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.savedscreenshotas", target.getName());
 			return;
 		}
-		ChatMessages.send(Component.translatable("voxelcam.moment.saved", moment.describe(), target.getName()));
+		CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.moment.saved", moment.describe(), target.getName());
 	}
 
 	/**

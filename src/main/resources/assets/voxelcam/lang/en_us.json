@@ -3,7 +3,7 @@
 	"key.voxelcam.openscreenshotmanager": "Screenshot Manager",
 	"key.voxelcam.capturemenu": "Screenshot / Capture Menu",
 
-	"voxelcam.chat.prefix": "[VoxelCam]",
+	"voxelcam.hud.saving": "Saving screenshot…",
 
 	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
@@ -108,6 +108,8 @@
 
 	"voxelcam.settings.autocapture": "Automatic capture…",
 	"voxelcam.tooltip.autocapture": "Take a screenshot by itself at moments worth keeping",
+	"voxelcam.settings.capturehud": "Capture status",
+	"voxelcam.tooltip.capturehud": "Show what a capture is doing in the top-left corner while you play — saving, saved, or why it could not",
 
 	"voxelcam.autocapture.title": "Automatic Capture",
 	"voxelcam.autocapture.cooldown": "No more than one every %s seconds",

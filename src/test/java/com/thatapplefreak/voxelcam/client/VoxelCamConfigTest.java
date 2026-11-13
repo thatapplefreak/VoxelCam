@@ -139,6 +139,7 @@ class VoxelCamConfigTest {
 		live.autoCaptureDeath = false;
 		live.autoCaptureNewDimension = false;
 		live.autoCaptureCooldownSeconds = 42;
+		live.captureStatusHud = false;
 
 		VoxelCamConfig snapshot = VoxelCamConfig.snapshot();
 
@@ -148,6 +149,7 @@ class VoxelCamConfigTest {
 		assertFalse(snapshot.autoCaptureDeath);
 		assertFalse(snapshot.autoCaptureNewDimension);
 		assertEquals(42, snapshot.autoCaptureCooldownSeconds);
+		assertFalse(snapshot.captureStatusHud);
 	}
 
 	@Test

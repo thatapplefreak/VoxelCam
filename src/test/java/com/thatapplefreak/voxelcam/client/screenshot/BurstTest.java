@@ -95,7 +95,7 @@ class BurstTest {
 	 * announcement pinned to whichever ordering frame 0 happened to land in first, rather than
 	 * the whole group actually finishing. Neither ordering has an observable effect without a
 	 * client ({@code names} stays null outside {@link Burst#request}, which is what keeps {@code
-	 * announceCompletion} from ever reaching {@code ChatMessages.send} here), so this is a smoke
+	 * announceCompletion} from ever posting a notice here), so this is a smoke
 	 * test for the bookkeeping rather than the message itself — the gametest suite covers the
 	 * real timing end to end.
 	 */

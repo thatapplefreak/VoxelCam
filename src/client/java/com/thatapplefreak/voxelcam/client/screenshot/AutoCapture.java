@@ -113,10 +113,16 @@ public final class AutoCapture {
 	}
 
 	/**
-	 * The single entry point every trigger calls. Refuses silently — no chat, no toast: this is a
+	 * The single entry point every trigger calls. Refuses silently — no notice, no toast: this is a
 	 * capture the player did not ask for, and one that explains at length why it declined to happen
 	 * is worse company than one that simply does not.
 	 */
+	/** Armed and waiting for a frame its gate accepts; any frame while this holds may be the one
+	 * read back. */
+	static boolean isPending() {
+		return state == State.PENDING;
+	}
+
 	public static void fire(MomentTrigger trigger, String subject) {
 		long now = Util.getMillis();
 		if (!shouldArm(trigger, now)) {
