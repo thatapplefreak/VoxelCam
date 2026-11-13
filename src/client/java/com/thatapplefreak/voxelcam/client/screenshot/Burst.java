@@ -92,6 +92,14 @@ public final class Burst {
 	 * effect. */
 	private static int runningSlots;
 	private static long startMillis;
+	/**
+	 * What {@link #beforeFrame()} decided this frame's blit will do: a slot to capture, {@link
+	 * #WAIT}, {@link #DONE}, or {@link #DECIDE_AT_BLIT} for the frame a burst starts on. Decided
+	 * at the head of the frame, not at the blit, because the HUD is extracted in between: the
+	 * recording cue has to know whether this frame is read back before it draws, or it would
+	 * either burn into a captured frame or be hidden on every frame.
+	 */
+	private static int frameSlot = -1; // WAIT, declared further down
 	/** How many issued frames have finished writing, success or failure alike. Compared against
 	 * {@link #nextIndex} (which stops changing once the burst leaves {@code RUNNING}, whether by
 	 * finishing normally or by {@link #abort}) to know when nothing is left outstanding. */
@@ -116,6 +124,45 @@ public final class Burst {
 
 	public static boolean isBusy() {
 		return state != State.IDLE;
+	}
+
+	/** Whether this frame's blit is going to read back a burst frame. Valid after {@link
+	 * #beforeFrame()}; what {@code CaptureStatus} hides the HUD for. */
+	public static boolean capturesThisFrame() {
+		return state == State.RUNNING && (frameSlot >= 0 || frameSlot == DECIDE_AT_BLIT);
+	}
+
+	/** Seconds of the running burst still to come, for the recording cue; 0 when idle. */
+	public static float secondsLeft(long nowMillis) {
+		if (state != State.RUNNING) {
+			return 0F;
+		}
+		long end = startMillis + (long) runningSlots * FRAME_INTERVAL_MILLIS;
+		return Math.max(0F, (end - nowMillis) / 1000F);
+	}
+
+	/**
+	 * Head of {@code Minecraft.renderFrame}: settles which slot, if any, this frame's blit
+	 * captures. A slot that comes due between here and the blit waits for the next frame — at
+	 * most one frame late, and its offset is still stamped at the blit, so playback stays true.
+	 */
+	public static void beforeFrame() {
+		settleFrame(Util.getMillis());
+	}
+
+	/** {@link #beforeFrame()} with the clock passed in, for the unit tests. */
+	static void settleFrame(long nowMillis) {
+		if (state == State.RUNNING && frameSlot != DECIDE_AT_BLIT) {
+			frameSlot = dueSlot(nowMillis);
+		}
+	}
+
+	/** What the blit does with the frame {@link #settleFrame} decided on: the slot, or a sentinel.
+	 * Spends the decision, as {@link #beforeBlit()} does. */
+	static int takeFrameSlot(long nowMillis) {
+		int slot = frameSlot == DECIDE_AT_BLIT ? dueSlot(nowMillis) : frameSlot;
+		frameSlot = WAIT;
+		return slot;
 	}
 
 	/** Arms a burst for the next blit, explaining itself if it cannot. */
@@ -173,7 +220,8 @@ public final class Burst {
 		}
 
 		long now = Util.getMillis();
-		int slot = dueSlot(now);
+		// Spent either way: the next frame's head decides afresh.
+		int slot = takeFrameSlot(now);
 		if (slot == DONE) {
 			finishBurst();
 			return;
@@ -262,6 +310,13 @@ public final class Burst {
 	static final int WAIT = -1;
 	/** {@link #dueSlot}: the burst's time is up. */
 	static final int DONE = -2;
+	/**
+	 * The burst was armed after this frame's head — the capture menu fires from the blit — so
+	 * the head could not decide. That frame is already free of the HUD and the menu (it is the
+	 * one a plain screenshot would have used), so the key frame is taken on it, decided live.
+	 */
+	static final int DECIDE_AT_BLIT = -3;
+
 
 	static void beginBurst(int slots, long burstStartMillis) {
 		state = State.RUNNING;
@@ -269,6 +324,7 @@ public final class Burst {
 		nextSlot = 0;
 		startMillis = burstStartMillis;
 		runningSlots = slots;
+		frameSlot = DECIDE_AT_BLIT;
 		completedFrames = 0;
 		succeededFrames = 0;
 	}
@@ -308,6 +364,7 @@ public final class Burst {
 		groupId = null;
 		nextIndex = 0;
 		nextSlot = 0;
+		frameSlot = WAIT;
 		completedFrames = 0;
 		succeededFrames = 0;
 	}

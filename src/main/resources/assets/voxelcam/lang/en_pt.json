@@ -4,6 +4,7 @@
 	"key.voxelcam.capturemenu": "Chart a Map / Chartin' Wheel",
 
 	"voxelcam.hud.saving": "Stowin' th' map…",
+	"voxelcam.hud.recording": "Keepin' watch, %ss t' go",
 
 	"voxelcam.savingpleasewait": "Stowin' yer map right now, hold yer horses",
 	"voxelcam.savedscreenshotas": "Stowed th' map as: %s",

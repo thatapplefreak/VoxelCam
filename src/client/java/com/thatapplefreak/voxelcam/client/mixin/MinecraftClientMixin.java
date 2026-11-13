@@ -27,8 +27,10 @@ public class MinecraftClientMixin {
 	private void voxelcam$beforeFrame(boolean tick, CallbackInfo ci) {
 		BigScreenshot.beforeFrame();
 		CaptureMenu.beforeFrame();
-		// Last: it asks whether this frame will be read back, which both calls above can change —
-		// BigScreenshot moves into CAPTURING here, and CaptureMenu marks the frame it fires from.
+		Burst.beforeFrame();
+		// Last: it asks whether this frame will be read back, which every call above can change —
+		// BigScreenshot moves into CAPTURING here, CaptureMenu marks the frame it fires from, and
+		// Burst settles whether this frame is one of its slots.
 		// HUD extraction comes later in this same frame, before the blit that reads it.
 		CaptureStatus.beforeFrame();
 	}

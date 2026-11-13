@@ -4,6 +4,7 @@
 	"key.voxelcam.capturemenu": "Screenshot / Capture Menu",
 
 	"voxelcam.hud.saving": "Saving screenshot…",
+	"voxelcam.hud.recording": "Recording, %ss left",
 
 	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",

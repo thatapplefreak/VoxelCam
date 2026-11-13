@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Draws {@link CaptureStatus}: the ambient busy line, then the newest notices, stacked down from
@@ -36,6 +37,10 @@ public final class CaptureStatusHud {
 	private static final int ACCENT_SAVED = 0xFF5BC25B;
 	private static final int ACCENT_FAILED = 0xFFE04848;
 	private static final int ACCENT_REFUSED = 0xFFE0B040;
+	private static final int RECORDING_RED = 0xFFE03C3C;
+	/** The recording dot pulses once a second, like a camera's tally light. */
+	private static final int RECORDING_PULSE_MILLIS = 1000;
+	private static final int RECORDING_DOT = 7;
 
 	/** The spinner's box, square, centred on the row. Odd, so it has a centre pixel to orbit. */
 	private static final int SPINNER_SIZE = 9;
@@ -47,6 +52,7 @@ public final class CaptureStatusHud {
 	private static final int[][] SPINNER_DOTS = spinnerDots();
 
 	private static final String BUSY_KEY = "voxelcam.hud.saving";
+	private static final String RECORDING_KEY = "voxelcam.hud.recording";
 	private static final String BUSY_REFUSAL_KEY = "voxelcam.savingpleasewait";
 
 	private CaptureStatusHud() {
@@ -62,7 +68,13 @@ public final class CaptureStatusHud {
 		int y = MARGIN;
 
 		boolean busy = CaptureStatus.isBusyShowing();
-		if (busy) {
+		if (Burst.isBusy()) {
+			// In place of "Saving…" while a burst is still recording: it is the same busy state,
+			// and the more useful thing to say is how long is left. The HUD is already hidden on
+			// the frames the burst reads back, so this only ever shows between them.
+			extractRecordingRow(graphics, client, y, now);
+			y += ROW_HEIGHT + ROW_GAP;
+		} else if (busy) {
 			extractBusyRow(graphics, client, y, now);
 			y += ROW_HEIGHT + ROW_GAP;
 		}
@@ -77,6 +89,28 @@ public final class CaptureStatusHud {
 					notice.kind() == CaptureStatus.Kind.FAILED ? TEXT_FAILED : TEXT, notice.opacityAt(now));
 			y += ROW_HEIGHT + ROW_GAP;
 		}
+	}
+
+	/** A red accent and a pulsing dot ahead of the seconds left. */
+	private static void extractRecordingRow(GuiGraphicsExtractor graphics, Minecraft client, int y, long now) {
+		String left = String.format(Locale.ROOT, "%.1f", Burst.secondsLeft(now));
+		Component text = Component.translatable(RECORDING_KEY, left);
+		int contentLeft = MARGIN + ACCENT_WIDTH + PADDING;
+		int textLeft = contentLeft + RECORDING_DOT + SPINNER_GAP;
+		int right = Math.min(textLeft + client.font.width(text) + PADDING, graphics.guiWidth() - MARGIN);
+		graphics.fill(MARGIN, y, right, y + ROW_HEIGHT, PLATE);
+		graphics.fill(MARGIN, y, MARGIN + ACCENT_WIDTH, y + ROW_HEIGHT, RECORDING_RED);
+
+		double phase = (now % RECORDING_PULSE_MILLIS) / (double) RECORDING_PULSE_MILLIS;
+		int alpha = (int) Math.round(0x90 + 0x6F * (0.5 + 0.5 * Math.cos(phase * Math.PI * 2)));
+		int dotColor = (alpha << 24) | (RECORDING_RED & 0x00FFFFFF);
+		int top = y + (ROW_HEIGHT - RECORDING_DOT) / 2;
+		// A 7px disc from three rectangles: the extractor draws rectangles and nothing else.
+		graphics.fill(contentLeft + 2, top, contentLeft + 5, top + 7, dotColor);
+		graphics.fill(contentLeft + 1, top + 1, contentLeft + 6, top + 6, dotColor);
+		graphics.fill(contentLeft, top + 2, contentLeft + 7, top + 5, dotColor);
+
+		graphics.text(client.font, text, textLeft, y + 3, TEXT, false);
 	}
 
 	/** The notice row's plate and accent, with a spinner set in ahead of the text. */

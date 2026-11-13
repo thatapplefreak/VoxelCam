@@ -143,6 +143,10 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 			Burst.request();
 		});
 		try {
+			// Mid-burst, for a human: the recording cue between captured frames. Best-effort —
+			// Fabric's grab can land on a frame the burst reads back, which shows no HUD at all.
+			context.waitTicks(10);
+			context.takeScreenshot("burst-recording-cue");
 			context.waitFor(client -> !Burst.isBusy(), 400);
 			context.waitTicks(60);
 		} finally {
@@ -308,9 +312,12 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 		return names == null ? new HashSet<>() : new HashSet<>(Arrays.asList(names));
 	}
 
+	/** New captures only: Fabric's own test screenshots share the folder, numbered {@code 0000_}. */
 	private static List<File> newFiles(File dir, Set<String> before) {
 		Set<String> after = listing(dir);
 		after.removeAll(before);
-		return after.stream().filter(name -> name.endsWith(".png")).sorted().map(name -> new File(dir, name)).toList();
+		return after.stream()
+				.filter(name -> name.endsWith(".png") && !name.matches("\\d{4}_.*"))
+				.sorted().map(name -> new File(dir, name)).toList();
 	}
 }

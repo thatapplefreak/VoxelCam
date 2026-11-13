@@ -56,6 +56,43 @@ class BurstTest {
 	}
 
 	@Test
+	void theHudHidesOnlyOnFramesTheBurstReadsBack() {
+		Burst.beginBurst(10, 0L);
+		// Armed from the blit: that frame was decided before the burst existed, and is taken live.
+		assertTrue(Burst.capturesThisFrame(), "the frame a burst starts on is its key frame");
+		assertEquals(0, Burst.takeFrameSlot(0L));
+		Burst.claimFrame(0);
+
+		Burst.settleFrame(16L);
+		assertFalse(Burst.capturesThisFrame(), "between slots the recording cue may show");
+		assertEquals(Burst.WAIT, Burst.takeFrameSlot(16L));
+
+		Burst.settleFrame(STEP + 3);
+		assertTrue(Burst.capturesThisFrame(), "the frame that takes the next slot hides it");
+		assertEquals(1, Burst.takeFrameSlot(STEP + 20), "the blit acts on the head's decision");
+	}
+
+	@Test
+	void aSlotThatComesDueAfterTheHeadWaitsForTheNextFrame() {
+		Burst.beginBurst(10, 0L);
+		Burst.claimFrame(Burst.takeFrameSlot(0L));
+
+		Burst.settleFrame(STEP - 5);
+		assertEquals(Burst.WAIT, Burst.takeFrameSlot(STEP + 5),
+				"not due at the head: capturing anyway would put the cue in the frame");
+	}
+
+	@Test
+	void secondsLeftCountsDownToTheEndOfTheBurst() {
+		Burst.beginBurst(30, 1000L);
+		assertEquals(3F, Burst.secondsLeft(1000L), 1e-6);
+		assertEquals(0.5F, Burst.secondsLeft(3500L), 1e-6);
+		assertEquals(0F, Burst.secondsLeft(9000L), 1e-6);
+		Burst.finishBurst();
+		assertEquals(0F, Burst.secondsLeft(1000L), 1e-6, "idle has nothing left");
+	}
+
+	@Test
 	void secondsBecomeFramesAtTenASecond() {
 		assertEquals(10, Burst.FRAMES_PER_SECOND);
 		assertEquals(30, Burst.framesFor(3));
