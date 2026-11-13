@@ -196,10 +196,13 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		Set<String> before = listing(dir);
 
 		context.clickScreenButton("voxelcam.burst.exportanimation");
+		// For a human, best-effort: a test burst is small, so the export may finish first.
+		context.takeScreenshot("manager-exporting-animation");
 		context.waitFor(client -> !key.equals(VoxelCamIO.getSelectedPhoto()), 400);
 
 		Set<String> after = listing(dir);
 		after.removeAll(before);
+		after.removeIf(name -> name.matches("\\d{4}_.*")); // Fabric's own test screenshots
 		List<String> pngs = after.stream().filter(name -> name.endsWith(".png")).toList();
 		if (pngs.size() != 1 || after.size() != 2) {
 			throw new AssertionError("an export should write one APNG and its WebP copy, wrote " + after);
@@ -263,6 +266,10 @@ public class BurstCaptureTest implements FabricClientGameTest {
 
 		// The preview plays it: every frame decoded, and more than one of them shown over time.
 		context.waitFor(client -> AnimationPreview.playingFrameCount(animation) == groupSize, 200);
+		float loading = context.computeOnClient(client -> AnimationPreview.loadingProgress(animation));
+		if (loading >= 0F) {
+			throw new AssertionError("the loading bar should be gone once the animation plays, was at " + loading);
+		}
 		Set<Object> shown = new HashSet<>();
 		for (int i = 0; i < 10; i++) {
 			shown.add(context.computeOnClient(client ->

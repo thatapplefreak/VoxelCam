@@ -71,10 +71,10 @@ class SmallerShareCopyTest {
 	@Test
 	void scalingAveragesTheAreaEachPixelCovers() {
 		int[] checker = { 0xFF000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF000000 };
-		assertArrayEquals(new int[] { 0xFF808080 }, SmallerShareCopy.downscale(checker, 2, 2, 1, 1));
+		assertArrayEquals(new int[] { 0xFF808080 }, ArgbImages.downscale(checker, 2, 2, 1, 1));
 		int[] flat = new int[9 * 6];
 		java.util.Arrays.fill(flat, 0xFF336699);
-		for (int p : SmallerShareCopy.downscale(flat, 9, 6, 4, 3)) {
+		for (int p : ArgbImages.downscale(flat, 9, 6, 4, 3)) {
 			assertEquals(0xFF336699, p, "a flat colour stays exactly that colour at any ratio");
 		}
 	}

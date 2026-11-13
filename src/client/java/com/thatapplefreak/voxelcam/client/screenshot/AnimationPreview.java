@@ -41,6 +41,11 @@ public final class AnimationPreview {
 
 	private static final Object HANDOVER = new Object();
 
+	/** How far the decode for {@link #wanted} has got, for the loading bar; written by the loader
+	 * thread, read by the render thread. */
+	private static volatile int framesLoaded;
+	private static volatile int framesToLoad;
+
 	private static ExecutorService executor;
 	/** The file whose frames are loading or loaded; null when nothing is wanted. */
 	private static File wanted;
@@ -84,6 +89,19 @@ public final class AnimationPreview {
 		try (NativeImage image = NativeImage.read(png)) {
 			return image.getPixels();
 		}
+	}
+
+	/**
+	 * How far {@code file}'s frames have got, 0 to 1, while they are still being decoded for the
+	 * preview — or -1 when nothing is loading for it: playing already, not an animation, or failed.
+	 */
+	public static float loadingProgress(File file) {
+		if (file == null || !file.equals(wanted) || file.equals(failed)
+				|| (playing != null && playing.file().equals(file))) {
+			return -1F;
+		}
+		int total = framesToLoad;
+		return total <= 0 ? 0F : Math.min(1F, framesLoaded / (float) total);
 	}
 
 	/** How many frames are loaded and playing for {@code file}; 0 while loading or for a still. */
@@ -133,6 +151,8 @@ public final class AnimationPreview {
 	private static void want(File file) {
 		stopPlaying();
 		int myToken;
+		framesLoaded = 0;
+		framesToLoad = 0;
 		synchronized (HANDOVER) {
 			wanted = file;
 			myToken = ++token;
@@ -162,9 +182,12 @@ public final class AnimationPreview {
 			List<AnimatedPng.Frame> frames = AnimatedPng.splitFrames(apng);
 			PngDimensions.Dimensions size = PngDimensions.read(file);
 			delays = new int[frames.size()];
+			framesToLoad = frames.size();
 			// Every frame after the first is a patch, so the preview keeps the canvas the way a
-			// browser does and snapshots it after each one.
+			// browser does and snapshots it after each one — scaled down in Java first, so only the
+			// preview-sized pixels go through NativeImage one at a time.
 			int[] canvas = size == null ? null : new int[size.width() * size.height()];
+			int[] scaledSize = size == null ? null : previewSize(size.width(), size.height());
 			for (int i = 0; i < frames.size() && canvas != null; i++) {
 				if (!stillWanted(myToken)) {
 					break;
@@ -172,8 +195,11 @@ public final class AnimationPreview {
 				AnimatedPng.Frame frame = frames.get(i);
 				new FramePatch(frame.x(), frame.y(), frame.width(), frame.height(), argbOf(frame.png()))
 						.composite(canvas, size.width(), frame.blend());
-				images.add(scaled(imageOf(canvas, size.width(), size.height())));
+				int[] small = scaledSize[0] == size.width() ? canvas
+						: ArgbImages.downscale(canvas, size.width(), size.height(), scaledSize[0], scaledSize[1]);
+				images.add(imageOf(small, scaledSize[0], scaledSize[1]));
 				delays[i] = frame.delayMillis();
+				framesLoaded = i + 1;
 			}
 		} catch (Exception e) {
 			VoxelCamClient.LOGGER.warn("Failed to read animation {}", file, e);
@@ -207,18 +233,14 @@ public final class AnimationPreview {
 		return image;
 	}
 
-	private static NativeImage scaled(NativeImage full) {
-		int largest = Math.max(full.getWidth(), full.getHeight());
+	/** The preview's frame size: the canvas, scaled so its longer side is at most {@link
+	 * #MAX_DIMENSION}. */
+	static int[] previewSize(int width, int height) {
+		int largest = Math.max(width, height);
 		if (largest <= MAX_DIMENSION) {
-			return full;
+			return new int[] { width, height };
 		}
-		int width = Math.max(1, full.getWidth() * MAX_DIMENSION / largest);
-		int height = Math.max(1, full.getHeight() * MAX_DIMENSION / largest);
-		try (full) {
-			NativeImage small = new NativeImage(width, height, false);
-			full.resizeSubRectTo(0, 0, full.getWidth(), full.getHeight(), small);
-			return small;
-		}
+		return new int[] { Math.max(1, width * MAX_DIMENSION / largest), Math.max(1, height * MAX_DIMENSION / largest) };
 	}
 
 	/** Uploads a finished decode, on the render thread. */

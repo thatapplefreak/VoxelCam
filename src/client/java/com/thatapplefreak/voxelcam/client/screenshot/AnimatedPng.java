@@ -79,6 +79,19 @@ public final class AnimatedPng {
 	 * @param frames the key's sub-frames, in any order; capture order comes from their tags.
 	 */
 	public static Exported export(File key, List<File> frames, PixelDecoder decoder) throws IOException {
+		return export(key, frames, decoder, (done, total) -> {
+		});
+	}
+
+	/** Hears how far an export has got, from the thread doing it, after each frame. */
+	@FunctionalInterface
+	public interface Progress {
+		void framesDone(int done, int total);
+	}
+
+	/** {@link #export(File, List, PixelDecoder)}, reporting each finished frame to {@code progress}. */
+	public static Exported export(File key, List<File> frames, PixelDecoder decoder, Progress progress)
+			throws IOException {
 		List<File> files = new ArrayList<>(frames.size() + 1);
 		files.add(key);
 		files.addAll(frames);
@@ -118,6 +131,7 @@ public final class AnimatedPng {
 					if (webp != null) {
 						webp.frame(pixels, delays[i]);
 					}
+					progress.framesDone(i + 1, order.length);
 				}
 				writer.finish();
 				if (webp != null) {

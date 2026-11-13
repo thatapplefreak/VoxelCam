@@ -95,6 +95,9 @@ public class GuiScreenShotManager extends Screen {
 	private Component actionError;
 	/** An animation export is being written off the render thread; its button waits for it. */
 	private boolean exporting;
+	/** How far the export has got, written from the IO thread after each frame, for its bar. */
+	private volatile int exportFramesDone;
+	private volatile int exportFramesTotal;
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
@@ -440,12 +443,17 @@ public class GuiScreenShotManager extends Screen {
 		File key = selected;
 		List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, key);
 		exporting = true;
+		exportFramesDone = 0;
+		exportFramesTotal = frames.size() + 1;
 		actionError = null;
 		updateButtonStates();
 		Util.ioPool().execute(() -> {
 			File written;
 			try {
-				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf).apng();
+				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf, (done, total) -> {
+					exportFramesDone = done;
+					exportFramesTotal = total;
+				}).apng();
 			} catch (IOException | RuntimeException e) {
 				VoxelCamClient.LOGGER.error("Failed to export {} as an animation", key, e);
 				written = null;
@@ -670,12 +678,19 @@ public class GuiScreenShotManager extends Screen {
 			extractFilmstrip(context);
 		}
 
-		if (exporting && actionError == null) {
-			// An export decodes and re-encodes every frame for the WebP copy: seconds, for a long
-			// 1080p burst, with nothing else on screen to say it is happening.
-			context.centeredText(font, Component.translatable("voxelcam.burst.exporting").withStyle(ChatFormatting.GRAY),
-					previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
-			return;
+		// Over the image rather than in the details line, which is small, grey and easy to miss.
+		// An export takes seconds for a long burst — it decodes and re-encodes every frame twice —
+		// and so does decoding an animation's frames for the preview the first time it is shown.
+		if (exporting) {
+			extractProgress(context, Component.translatable("voxelcam.burst.exporting"),
+					exportFramesDone, exportFramesTotal, imageHeight);
+		} else if (ScreenshotMetadata.animationFrames(shown) > 0) {
+			float loading = AnimationPreview.loadingProgress(shown);
+			if (loading >= 0F) {
+				int total = ScreenshotMetadata.animationFrames(shown);
+				extractProgress(context, Component.translatable("voxelcam.animation.loading"),
+						Math.round(loading * total), total, imageHeight);
+			}
 		}
 
 		if (actionError != null) {
@@ -715,6 +730,33 @@ public class GuiScreenShotManager extends Screen {
 		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
+	}
+
+	/**
+	 * A label, a frame count and a bar, on a plate near the bottom of the preview image — over the
+	 * image, so it cannot be missed, but low enough to leave the still above it in view.
+	 */
+	private void extractProgress(GuiGraphicsExtractor context, Component label, int done, int total, int imageHeight) {
+		int plateWidth = Math.min(previewWidth - 16, 220);
+		int plateHeight = 26;
+		int left = previewX + (previewWidth - plateWidth) / 2;
+		int top = previewY + imageHeight - plateHeight - 8;
+		context.fill(left, top, left + plateWidth, top + plateHeight, 0xD0101010);
+
+		Component text = total > 0
+				? Component.translatable("voxelcam.progress.frames", label, Math.min(done, total), total)
+				: label;
+		context.centeredText(font, Component.literal(font.plainSubstrByWidth(text.getString(), plateWidth - 8)),
+				left + plateWidth / 2, top + 5, 0xFFFFFFFF);
+
+		int barLeft = left + 6;
+		int barRight = left + plateWidth - 6;
+		int barTop = top + plateHeight - 8;
+		context.fill(barLeft, barTop, barRight, barTop + 3, 0xFF404040);
+		if (total > 0) {
+			int filled = barLeft + Math.round((barRight - barLeft) * Math.min(1F, done / (float) total));
+			context.fill(barLeft, barTop, filled, barTop + 3, 0xFF5BC25B);
+		}
 	}
 
 	/**

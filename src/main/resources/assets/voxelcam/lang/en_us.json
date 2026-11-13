@@ -107,6 +107,8 @@
 	"voxelcam.burst.exportanimation": "Export Animation",
 	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
 	"voxelcam.burst.exporting": "Exporting animation…",
+	"voxelcam.animation.loading": "Loading animation…",
+	"voxelcam.progress.frames": "%s %s of %s frames",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.burst.seconds": "%ss",
