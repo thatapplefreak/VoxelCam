@@ -94,9 +94,12 @@
 	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
 	"voxelcam.burst.setaskey": "Make th' Key",
 	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
+	"voxelcam.burst.exportanimation": "Make 'Em Dance",
+	"voxelcam.burst.exportanimation.failed": "Th' maps wouldn't dance, see th' log fer why",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.tooltip.setaskey": "Show this map in th' chest instead o' th' current key",
+	"voxelcam.tooltip.exportanimation": "Lash all %s maps into one movin' picture",
 	"voxelcam.tooltip.burstscroll": "See more maps in this flurry",
 
 	"voxelcam.settings": "VoxelCam Settin's",
@@ -127,5 +130,6 @@
 	"voxelcam.tooltip.moment.death": "Snap a map th' moment ye meet Davy Jones",
 	"voxelcam.tooltip.moment.newdimension": "Snap a map th' first time ye make landfall somewhere new",
 	"voxelcam.moment.subject": "%s: %s",
-	"voxelcam.moment.saved": "%s — stowed as %s"
+	"voxelcam.moment.saved": "%s — stowed as %s",
+	"voxelcam.animation.details": "Movin' picture, %s maps"
 }

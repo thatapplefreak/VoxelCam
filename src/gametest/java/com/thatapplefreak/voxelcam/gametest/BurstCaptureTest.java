@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
@@ -11,6 +12,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -43,8 +45,9 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			context.waitTicks(20);
 
-			assertAHeldAndAimedReleaseFiresABurstAtWindowSize(context, dir);
-			assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(context, dir);
+			File key = assertAHeldAndAimedReleaseFiresABurstAtWindowSize(context, dir);
+			assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(context, dir, key);
+			assertExportAnimationWritesOneApngOfTheWholeBurst(context, dir, key);
 			assertAScreenOpeningMidBurstStopsItEarly(context, dir);
 		}
 	}
@@ -53,7 +56,7 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	 * Aimed at the third wedge's centre — the same non-boundary vector {@code CaptureMenuTest}
 	 * uses for the second, mirrored to the other side — and released.
 	 */
-	private static void assertAHeldAndAimedReleaseFiresABurstAtWindowSize(ClientGameTestContext context, File dir) {
+	private static File assertAHeldAndAimedReleaseFiresABurstAtWindowSize(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
 		int length = context.computeOnClient(client -> Burst.getLength());
@@ -83,6 +86,7 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		}
 
 		assertTagsAgree(dir, key, written);
+		return key;
 	}
 
 	/**
@@ -115,13 +119,12 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	 * Live-playtest finding: the preview's dark background panel used to render after the
 	 * widgets, painting over anything inside its bounds — including the filmstrip's Set as key
 	 * and scroll buttons — so a fully active button read identically dimmed to a disabled one.
-	 * Opens the manager on this burst's own directory (DATE_NEWEST is the default sort, and
-	 * nothing has captured anything newer since, so the key this test just captured is exactly
-	 * what a fresh selection falls back to) and screenshots it for visual confirmation.
+	 * Opens the manager on this burst's own directory with its key selected and screenshots it
+	 * for visual confirmation.
 	 */
 	private static void assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(
-			ClientGameTestContext context, File dir) {
-		context.setScreen(() -> new GuiScreenShotManager(dir));
+			ClientGameTestContext context, File dir, File key) {
+		openManagerOn(context, dir, key);
 		context.waitForScreen(GuiScreenShotManager.class);
 		// Thumbnails decode off-thread and upload on the render thread.
 		context.waitTicks(20);
@@ -131,13 +134,107 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			return selected != null && VoxelCamIO.burstFrameCount(selected) > 0;
 		});
 		if (!hasFilmstrip) {
-			throw new AssertionError("the manager's fallback selection should be this burst's own key");
+			String state = context.computeOnClient(client -> "selected " + VoxelCamIO.getSelectedPhoto()
+					+ ", listed " + VoxelCamIO.getScreenShotFiles().stream().map(File::getName).toList());
+			throw new AssertionError("the manager's fallback selection should be this burst's own key; " + state);
 		}
 
 		context.takeScreenshot("manager-with-burst-filmstrip");
 
 		context.setScreen(() -> null);
 		context.waitForScreen(null);
+	}
+
+	/**
+	 * The export button, pressed by its fixed translation key the way a player's click finds it,
+	 * on the burst this test captured for real. What only a real burst proves and {@code
+	 * AnimatedPngTest} cannot: that stb's own PNGs reframe — its IHDR, its IDAT split — and that
+	 * the count in {@code acTL} is the group's whole size as the manager sees it. Then the manager
+	 * should have moved onto the new file, which says it is an animation.
+	 */
+	private static void assertExportAnimationWritesOneApngOfTheWholeBurst(ClientGameTestContext context, File dir,
+			File key) {
+		openManagerOn(context, dir, key);
+		context.waitTicks(5);
+
+		int groupSize = context.computeOnClient(client -> VoxelCamIO.burstFrameCount(key)) + 1;
+		Set<String> before = listing(dir);
+
+		context.clickScreenButton("voxelcam.burst.exportanimation");
+		context.waitFor(client -> !key.equals(VoxelCamIO.getSelectedPhoto()), 400);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		if (after.size() != 1) {
+			throw new AssertionError("an export should write exactly one new file, wrote " + after);
+		}
+		File animation = new File(dir, after.iterator().next());
+		if (!animation.equals(context.computeOnClient(client -> VoxelCamIO.getSelectedPhoto()))) {
+			throw new AssertionError("the manager should select the animation it just wrote, " + animation.getName());
+		}
+
+		byte[] bytes;
+		try {
+			bytes = Files.readAllBytes(animation.toPath());
+		} catch (IOException e) {
+			throw new AssertionError("could not read " + animation.getName(), e);
+		}
+		int frames = actlFrameCount(bytes);
+		if (frames != groupSize) {
+			throw new AssertionError("acTL should count all " + groupSize + " frames of the burst, said " + frames);
+		}
+		if (AnimatedPng.frameCount(PngTextChunk.read(animation)) != groupSize) {
+			throw new AssertionError("the animation should carry its frame count as a tag");
+		}
+		if (!pngSize(animation).equals(pngSize(key))) {
+			throw new AssertionError("the animation should be the burst's own size, was " + pngSize(animation));
+		}
+		// A decoder that knows nothing of APNG must still open the file as its first frame.
+		try {
+			if (javax.imageio.ImageIO.read(animation) == null) {
+				throw new AssertionError("the JDK's PNG reader could not open " + animation.getName());
+			}
+		} catch (IOException e) {
+			throw new AssertionError("the JDK's PNG reader rejected " + animation.getName(), e);
+		}
+
+		context.waitTicks(5);
+		context.takeScreenshot("manager-with-exported-animation");
+		context.setScreen(() -> null);
+		context.waitForScreen(null);
+	}
+
+	/**
+	 * Selected by hand rather than left to the newest-first sort: under WSL, files written minutes
+	 * earlier have been seen carrying modification times later than the burst's, which put an
+	 * older screenshot first and selected that instead. The manager keeps a selection it can find
+	 * in the listing, so this is the burst's own key whatever the clock says.
+	 */
+	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {
+		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+	}
+
+	/** {@code acTL}'s {@code num_frames}, found by walking the chunks from the signature. */
+	private static int actlFrameCount(byte[] png) {
+		int pos = 8;
+		while (pos + 12 <= png.length) {
+			int length = readInt(png, pos);
+			String type = new String(png, pos + 4, 4, java.nio.charset.StandardCharsets.US_ASCII);
+			if (type.equals("acTL")) {
+				return readInt(png, pos + 8);
+			}
+			if (type.equals("IDAT")) {
+				break; // acTL must come before the first IDAT; after it, it does not count.
+			}
+			pos += 12 + length;
+		}
+		return -1;
+	}
+
+	private static int readInt(byte[] d, int at) {
+		return ((d[at] & 0xFF) << 24) | ((d[at + 1] & 0xFF) << 16) | ((d[at + 2] & 0xFF) << 8) | (d[at + 3] & 0xFF);
 	}
 
 	/**

@@ -304,6 +304,16 @@ mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses gro
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
 
+**Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
+`<key>_animation.png` (ADR-0014). It never decodes: every frame shares one IHDR, so frame 0's
+`IDAT`s are copied verbatim and every later frame's become `fdAT`s. Order and frame delays come from
+the `BurstFrame` tags, never from file names, since Set as Key breaks name order. The export reads
+one frame at a time on `Util.ioPool()`, writes through a temp file, and refuses frames whose IHDRs
+differ instead of writing a corrupt file. The result is tagged `voxelcam:animationframes`, which is
+the only thing that tells the manager it moves: everything else in the mod sees an ordinary PNG of
+the first frame. Set as Key and Export share one stacked column at the filmstrip's right end, so the
+second button costs the strip no cells.
+
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
 it (ADR-0002). `PngTextChunk` does the splice and the read. Two of its rules each fixed a real bug:

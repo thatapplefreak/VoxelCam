@@ -94,9 +94,12 @@
 	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
 	"voxelcam.burst.setaskey": "Set as Key",
 	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
+	"voxelcam.burst.exportanimation": "Export Animation",
+	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
+	"voxelcam.tooltip.exportanimation": "Save all %s frames as one looping animated PNG",
 	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
 
 	"voxelcam.settings": "VoxelCam Settings",
@@ -127,5 +130,6 @@
 	"voxelcam.tooltip.moment.death": "Capture the moment you die",
 	"voxelcam.tooltip.moment.newdimension": "Capture the first time you arrive in a dimension",
 	"voxelcam.moment.subject": "%s: %s",
-	"voxelcam.moment.saved": "%s — saved as %s"
+	"voxelcam.moment.saved": "%s — saved as %s",
+	"voxelcam.animation.details": "Animation, %s frames"
 }

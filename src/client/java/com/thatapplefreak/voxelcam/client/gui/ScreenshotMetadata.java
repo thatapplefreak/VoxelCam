@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
@@ -46,6 +47,7 @@ public final class ScreenshotMetadata {
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Optional<BurstFrame>> BURST_FRAMES = new HashMap<>();
 	private static final Map<File, Optional<MomentTag>> MOMENTS = new HashMap<>();
+	private static final Map<File, Integer> ANIMATION_FRAMES = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
 	private static final Map<File, String> NAMES = new HashMap<>();
 	private static final Map<File, String> SIZES = new HashMap<>();
@@ -173,7 +175,26 @@ public final class ScreenshotMetadata {
 		return tag;
 	}
 
+	/**
+	 * How many frames an exported burst animation holds, or 0 for every other screenshot. An APNG
+	 * opens as its first frame everywhere in the manager, so this is the only thing that says it
+	 * moves. Cached and read exactly as {@link #moment(File)} is, for the same details line.
+	 */
+	public static int animationFrames(File file) {
+		if (file == null) {
+			return 0;
+		}
+		Integer cached = ANIMATION_FRAMES.get(file);
+		if (cached != null) {
+			return cached;
+		}
+		int frames = AnimatedPng.frameCount(PngTextChunk.read(file));
+		ANIMATION_FRAMES.put(file, frames);
+		return frames;
+	}
+
 	public static void forgetAll() {
+		ANIMATION_FRAMES.clear();
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
 		BURST_FRAMES.clear();
@@ -208,6 +229,7 @@ public final class ScreenshotMetadata {
 	 * trusted afterwards.
 	 */
 	public static void forgetFile(File file) {
+		ANIMATION_FRAMES.remove(file);
 		DIMENSIONS.remove(file);
 		CONTEXTS.remove(file);
 		BURST_FRAMES.remove(file);
