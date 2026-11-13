@@ -19,12 +19,12 @@ import java.util.Map;
 import java.util.zip.CRC32;
 
 /**
- * Turns a burst that is already on disk into one looping APNG beside its key — harvest and
- * reframe, no decode and no re-encode. Every frame of a burst shares one IHDR, and a PNG's
- * {@code IDAT} payloads are just slices of one zlib stream, so each frame's compressed pixels
- * move across as they are: the first frame's {@code IDAT}s verbatim (making it the default
- * image every non-APNG reader shows), every later frame's as {@code fdAT}s, which are {@code
- * IDAT} payloads behind a sequence number.
+ * Turns a burst that is already on disk into one looping APNG beside its key. The first frame is
+ * stored whole, as the {@code IDAT} every non-APNG reader shows; every later frame is only a
+ * {@link FramePatch} — the rectangle that changed since the frame before, unchanged pixels inside
+ * it transparent and blended over — in {@code fdAT}s. A burst's frames are a tenth of a second
+ * apart, so a still scene costs little more than its first frame. The patches are RGBA, so the
+ * whole file is (IHDR is shared); the first frame's alpha is all 255 and compresses to nothing.
  *
  * <p>Exported from the files rather than buffered while the burst runs, for three reasons the
  * frames themselves settle: their recorded {@link BurstFrame#offsetMillis()} is the only honest
@@ -73,7 +73,8 @@ public final class AnimatedPng {
 	 * same frames beside that ({@link #webpBeside}): the APNG is what the manager lists and plays,
 	 * the WebP is what Share hands out, since Discord plays a WebP and shows an APNG as a still.
 	 * Both go under names no file has yet, and atomically: a refusal partway through (frames of
-	 * different sizes, a frame that went missing) leaves neither behind.
+	 * different sizes, a frame that went missing) leaves neither behind. Every frame is decoded
+	 * once, one at a time, and fed to both encoders.
 	 *
 	 * @param frames the key's sub-frames, in any order; capture order comes from their tags.
 	 */
@@ -101,20 +102,21 @@ public final class AnimatedPng {
 				Writer writer = null;
 				AnimatedWebp webp = null;
 				for (int i = 0; i < order.length; i++) {
-					// One frame's bytes at a time, read once and fed to both files.
 					byte[] png = Files.readAllBytes(files.get(order[i]).toPath());
+					byte[] ihdr = ihdrOf(png);
+					int width = readInt(ihdr, 0);
+					int height = readInt(ihdr, 4);
 					if (writer == null) {
-						byte[] ihdr = ihdrOf(png);
-						writer = new Writer(out, ihdr, order.length, carriedTags(tags.get(order[0]), order.length));
-						int width = readInt(ihdr, 0);
-						int height = readInt(ihdr, 4);
+						writer = new Writer(out, width, height, order.length,
+								carriedTags(tags.get(order[0]), order.length));
 						if (width <= AnimatedWebp.MAX_DIMENSION && height <= AnimatedWebp.MAX_DIMENSION) {
 							webp = new AnimatedWebp(width, height);
 						}
 					}
-					writer.frame(png, delays[i]);
+					int[] pixels = decoder.argb(png);
+					writer.frame(pixels, delays[i]);
 					if (webp != null) {
-						webp.frame(decoder.argb(png), delays[i]);
+						webp.frame(pixels, delays[i]);
 					}
 				}
 				writer.finish();
@@ -155,20 +157,21 @@ public final class AnimatedPng {
 	}
 
 	/**
-	 * Package-private seam: pure bytes in, bytes out, as {@link PngTextChunk#embed(byte[], Map)}
-	 * sits beside its file overload. Frames in display order, one delay each.
+	 * Package-private seam: pixels in, bytes out, no files. Frames in display order, ARGB, one
+	 * delay each.
 	 *
-	 * @throws IOException if the frames do not all share one IHDR — a corrupt file is never the
+	 * @throws IOException if a frame is not the canvas's size — a corrupt file is never the
 	 * fallback.
 	 */
-	static byte[] assemble(List<byte[]> framePngs, int[] delayMillis, Map<String, String> tags) throws IOException {
-		if (framePngs.isEmpty() || framePngs.size() != delayMillis.length) {
-			throw new IllegalArgumentException(framePngs.size() + " frames, " + delayMillis.length + " delays");
+	static byte[] assemble(List<int[]> frames, int width, int height, int[] delayMillis, Map<String, String> tags)
+			throws IOException {
+		if (frames.isEmpty() || frames.size() != delayMillis.length) {
+			throw new IllegalArgumentException(frames.size() + " frames, " + delayMillis.length + " delays");
 		}
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		Writer writer = new Writer(out, ihdrOf(framePngs.get(0)), framePngs.size(), tags);
-		for (int i = 0; i < framePngs.size(); i++) {
-			writer.frame(framePngs.get(i), delayMillis[i]);
+		Writer writer = new Writer(out, width, height, frames.size(), tags);
+		for (int i = 0; i < frames.size(); i++) {
+			writer.frame(frames.get(i), delayMillis[i]);
 		}
 		writer.finish();
 		return out.toByteArray();
@@ -278,19 +281,23 @@ public final class AnimatedPng {
 		}
 	}
 
-	/** One frame of an animation as a standalone PNG any decoder can read, and how long it shows. */
-	public record Frame(byte[] png, int delayMillis) {
+	/**
+	 * One frame of an animation as a standalone PNG any decoder can read, where on the canvas it
+	 * goes, whether it blends over what is there, and how long it shows.
+	 */
+	public record Frame(byte[] png, int x, int y, int width, int height, boolean blend, int delayMillis) {
 	}
 
 	/**
 	 * The reverse of {@link #assemble}: every frame of an APNG rebuilt as a plain PNG — the
-	 * shared IHDR, that frame's data as one {@code IDAT}, IEND — so {@code NativeImage}, which
-	 * only ever decodes the default image, can read each one. Pure bytes again, no decode.
+	 * shared IHDR resized to the frame's rectangle, its data as one {@code IDAT}, IEND — so {@code
+	 * NativeImage}, which only ever decodes the default image, can read each one. Pure bytes, no
+	 * decode; the caller composites (see {@link FramePatch#composite}).
 	 *
-	 * <p>Only the shape this class writes is played back: every frame covering the whole canvas,
-	 * replacing rather than blending over the last. Anything else — a foreign APNG with partial
-	 * frames, or something that is not an APNG at all — returns an empty list, and the caller
-	 * shows the still it would have shown anyway.
+	 * <p>Frames are played as long as they never dispose (the only disposal this class writes):
+	 * every patch lands on the canvas the last one left. Anything else — a foreign APNG that
+	 * disposes, a rectangle off the canvas, something that is not an APNG at all — returns an
+	 * empty list, and the caller shows the still it would have shown anyway.
 	 */
 	public static List<Frame> splitFrames(byte[] apng) {
 		try {
@@ -301,6 +308,8 @@ public final class AnimatedPng {
 			List<Frame> frames = new ArrayList<>();
 			ByteArrayOutputStream data = null;
 			int delay = 0;
+			int[] rect = null;
+			boolean blend = false;
 			boolean animated = false;
 			int pos = SIGNATURE.length;
 			while (pos + 12 <= apng.length) {
@@ -314,15 +323,23 @@ public final class AnimatedPng {
 				switch (type) {
 					case "acTL" -> animated = true;
 					case "fcTL" -> {
-						if (length != 26 || readInt(apng, dataStart + 4) != width || readInt(apng, dataStart + 8) != height
-								|| readInt(apng, dataStart + 12) != 0 || readInt(apng, dataStart + 16) != 0
-								|| apng[dataStart + 25] != 0) {
+						if (length != 26) {
+							return List.of();
+						}
+						int w = readInt(apng, dataStart + 4);
+						int h = readInt(apng, dataStart + 8);
+						int x = readInt(apng, dataStart + 12);
+						int y = readInt(apng, dataStart + 16);
+						if (w < 1 || h < 1 || x < 0 || y < 0 || (long) x + w > width || (long) y + h > height
+								|| apng[dataStart + 24] != 0 || apng[dataStart + 25] > 1 || apng[dataStart + 25] < 0) {
 							return List.of();
 						}
 						if (data != null) {
-							frames.add(new Frame(standalone(ihdr, data.toByteArray()), delay));
+							frames.add(frame(ihdr, data, rect, blend, delay));
 						}
 						data = new ByteArrayOutputStream();
+						rect = new int[] { x, y, w, h };
+						blend = apng[dataStart + 25] == 1;
 						delay = delayMillis(readShort(apng, dataStart + 20), readShort(apng, dataStart + 22));
 					}
 					// An IDAT before any fcTL is a poster outside the animation; it is skipped.
@@ -348,7 +365,7 @@ public final class AnimatedPng {
 			if (!animated || data == null) {
 				return List.of();
 			}
-			frames.add(new Frame(standalone(ihdr, data.toByteArray()), delay));
+			frames.add(frame(ihdr, data, rect, blend, delay));
 			return frames;
 		} catch (IOException e) {
 			return List.of();
@@ -359,6 +376,13 @@ public final class AnimatedPng {
 	private static int delayMillis(int numerator, int denominator) {
 		int den = denominator == 0 ? 100 : denominator;
 		return clampDelay(Math.round(numerator * 1000.0 / den));
+	}
+
+	private static Frame frame(byte[] canvasIhdr, ByteArrayOutputStream data, int[] rect, boolean blend, int delay) {
+		byte[] ihdr = canvasIhdr.clone();
+		putInt(ihdr, 0, rect[2]);
+		putInt(ihdr, 4, rect[3]);
+		return new Frame(standalone(ihdr, data.toByteArray()), rect[0], rect[1], rect[2], rect[3], blend, delay);
 	}
 
 	private static byte[] standalone(byte[] ihdr, byte[] zlib) {
@@ -411,18 +435,24 @@ public final class AnimatedPng {
 	 */
 	private static final class Writer {
 
+		/** Compressed data is cut into chunks of about this size, as a PNG's IDATs usually are. */
+		private static final int CHUNK_BYTES = 256 * 1024;
+
 		private final OutputStream out;
-		private final byte[] ihdr;
+		private final int width;
+		private final int height;
 		private final int frameCount;
 		private int framesWritten;
 		private int sequence;
+		private int[] previous;
 
-		Writer(OutputStream out, byte[] ihdr, int frameCount, Map<String, String> tags) throws IOException {
+		Writer(OutputStream out, int width, int height, int frameCount, Map<String, String> tags) throws IOException {
 			this.out = out;
-			this.ihdr = ihdr;
+			this.width = width;
+			this.height = height;
 			this.frameCount = frameCount;
 			out.write(SIGNATURE);
-			writeChunk("IHDR", ihdr);
+			writeChunk("IHDR", PngEncoder.ihdr(width, height, true));
 
 			byte[] actl = new byte[8];
 			putInt(actl, 0, frameCount);
@@ -433,56 +463,60 @@ public final class AnimatedPng {
 			}
 		}
 
-		void frame(byte[] png, int delayMillis) throws IOException {
+		void frame(int[] argb, int delayMillis) throws IOException {
 			if (framesWritten == frameCount) {
 				throw new IllegalStateException("acTL promised " + frameCount + " frames");
 			}
-			if (!Arrays.equals(ihdrOf(png), ihdr)) {
-				throw new IOException("Frame " + framesWritten + " is not the same size or format as the first");
+			if (argb.length != width * height) {
+				throw new IOException("Frame " + framesWritten + " is not the same size as the first");
 			}
-			int width = readInt(ihdr, 0);
-			int height = readInt(ihdr, 4);
+			int[] current = new int[argb.length];
+			for (int i = 0; i < argb.length; i++) {
+				current[i] = argb[i] | 0xFF000000;
+			}
+			boolean first = previous == null;
+			FramePatch patch = first ? FramePatch.whole(current, width, height)
+					: FramePatch.between(previous, current, width, height);
 
 			byte[] fctl = new byte[26];
 			putInt(fctl, 0, sequence++);
-			putInt(fctl, 4, width);
-			putInt(fctl, 8, height);
-			putInt(fctl, 12, 0); // x_offset
-			putInt(fctl, 16, 0); // y_offset
+			putInt(fctl, 4, patch.width());
+			putInt(fctl, 8, patch.height());
+			putInt(fctl, 12, patch.x());
+			putInt(fctl, 16, patch.y());
 			putShort(fctl, 20, delayMillis);
 			putShort(fctl, 22, 1000);
-			fctl[24] = 0; // dispose_op NONE: the next frame covers this one completely anyway
-			fctl[25] = 0; // blend_op SOURCE: replace, never composite over the previous frame
+			fctl[24] = 0; // dispose_op NONE: each patch lands on the canvas the last one left
+			// blend_op: SOURCE for the first frame, which replaces whatever is there; OVER for every
+			// patch after it, so its transparent pixels leave the frame before showing.
+			fctl[25] = (byte) (first ? 0 : 1);
 			writeChunk("fcTL", fctl);
 
-			boolean sawData = false;
-			int pos = SIGNATURE.length;
-			while (pos + 12 <= png.length) {
-				int length = readInt(png, pos);
-				long end = (long) pos + 12 + length;
-				if (length < 0 || end > png.length) {
-					throw new IOException("Frame " + framesWritten + " is truncated");
+			ByteArrayOutputStream pending = new ByteArrayOutputStream(CHUNK_BYTES);
+			PngEncoder.compressRows(patch.pixels(), patch.width(), patch.height(), true, (data, offset, length) -> {
+				pending.write(data, offset, length);
+				if (pending.size() >= CHUNK_BYTES) {
+					writeData(pending.toByteArray(), first);
+					pending.reset();
 				}
-				String type = type(png, pos);
-				if ("IDAT".equals(type)) {
-					sawData = true;
-					if (framesWritten == 0) {
-						out.write(png, pos, (int) (end - pos));
-					} else {
-						byte[] fdat = new byte[4 + length];
-						putInt(fdat, 0, sequence++);
-						System.arraycopy(png, pos + 8, fdat, 4, length);
-						writeChunk("fdAT", fdat);
-					}
-				} else if ("IEND".equals(type)) {
-					break;
-				}
-				pos = (int) end;
+			});
+			if (pending.size() > 0) {
+				writeData(pending.toByteArray(), first);
 			}
-			if (!sawData) {
-				throw new IOException("Frame " + framesWritten + " has no image data");
-			}
+			previous = current;
 			framesWritten++;
+		}
+
+		/** Frame 0's data is plain IDAT; every later frame's is fdAT, behind a sequence number. */
+		private void writeData(byte[] zlib, boolean first) throws IOException {
+			if (first) {
+				writeChunk("IDAT", zlib);
+				return;
+			}
+			byte[] fdat = new byte[4 + zlib.length];
+			putInt(fdat, 0, sequence++);
+			System.arraycopy(zlib, 0, fdat, 4, zlib.length);
+			writeChunk("fdAT", fdat);
 		}
 
 		void finish() throws IOException {

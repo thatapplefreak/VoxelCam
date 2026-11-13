@@ -54,20 +54,41 @@ public final class PngEncoder {
 				break;
 			}
 		}
-		int channels = opaque ? 3 : 4;
 
 		out.write(SIGNATURE);
+		writeChunk(out, "IHDR", ihdr(width, height, !opaque));
+		IdatStream idat = new IdatStream(out);
+		compressRows(argb, width, height, !opaque, idat::write);
+		idat.flush();
+		writeChunk(out, "IEND", new byte[0]);
+	}
+
+	/** An IHDR's 13 bytes: 8-bit RGB, or RGBA with {@code alpha}; no interlace. */
+	public static byte[] ihdr(int width, int height, boolean alpha) {
 		byte[] ihdr = new byte[13];
 		putInt(ihdr, 0, width);
 		putInt(ihdr, 4, height);
 		ihdr[8] = 8; // bit depth
-		ihdr[9] = (byte) (opaque ? COLOR_RGB : COLOR_RGBA);
+		ihdr[9] = (byte) (alpha ? COLOR_RGBA : COLOR_RGB);
 		// compression, filter and interlace methods: all 0
-		writeChunk(out, "IHDR", ihdr);
+		return ihdr;
+	}
 
+	/** Receives compressed bytes as they come out of the deflater. */
+	@FunctionalInterface
+	public interface Sink {
+		void write(byte[] data, int offset, int length) throws IOException;
+	}
+
+	/**
+	 * The filtered, compressed scanlines alone — one zlib stream, what an image's IDAT chunks (or
+	 * an APNG frame's fdAT chunks) carry between them, for whatever chunking the caller wants.
+	 */
+	public static void compressRows(int[] argb, int width, int height, boolean alpha, Sink sink) throws IOException {
+		int channels = alpha ? 4 : 3;
+		boolean opaque = !alpha;
 		Deflater deflater = new Deflater(DEFLATE_LEVEL);
 		try {
-			IdatStream idat = new IdatStream(out);
 			int stride = width * channels;
 			byte[] previous = new byte[stride];
 			byte[] current = new byte[stride];
@@ -87,7 +108,7 @@ public final class PngEncoder {
 				byte[] row = filterRow(current, previous, channels, candidates);
 				deflater.setInput(row, 0, stride + 1);
 				while (!deflater.needsInput()) {
-					idat.write(buffer, 0, deflater.deflate(buffer, 0, buffer.length, Deflater.NO_FLUSH));
+					sink.write(buffer, 0, deflater.deflate(buffer, 0, buffer.length, Deflater.NO_FLUSH));
 				}
 				byte[] swap = previous;
 				previous = current;
@@ -95,13 +116,11 @@ public final class PngEncoder {
 			}
 			deflater.finish();
 			while (!deflater.finished()) {
-				idat.write(buffer, 0, deflater.deflate(buffer));
+				sink.write(buffer, 0, deflater.deflate(buffer));
 			}
-			idat.flush();
 		} finally {
 			deflater.end();
 		}
-		writeChunk(out, "IEND", new byte[0]);
 	}
 
 	/**

@@ -2,7 +2,6 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -18,12 +17,12 @@ import net.minecraft.util.Util;
  * Plays an exported burst animation in the manager's preview. {@link ScreenshotImageCache} decodes
  * through {@code NativeImage}, which, like every PNG decoder that does not know APNG, sees only the
  * first frame; this splits the file back into its frames ({@link AnimatedPng#splitFrames}),
- * decodes each one, and hands out whichever frame is due.
+ * decodes each patch, composites it onto the canvas, and hands out whichever frame is due.
  *
  * <p>One animation at a time — the selected one — since only the preview plays. Its frames are
  * scaled down to {@link #MAX_DIMENSION} as they are decoded: the preview is never larger than that
- * on screen, and the full-size frames of a long 4K burst would be over 600 MiB of native memory
- * and as much VRAM, where scaled they are a few dozen MiB.
+ * on screen, and the 50 full-size frames of a five-second 4K burst would be over 1.5 GiB of native
+ * memory and as much VRAM, where scaled they are about 120 MiB of each at most.
  *
  * <p>Everything here except the decode runs on the render thread. A decode that finishes for a
  * file no longer wanted (the selection moved, or the manager closed) frees its own images.
@@ -159,14 +158,22 @@ public final class AnimationPreview {
 		List<NativeImage> images = new ArrayList<>();
 		int[] delays = null;
 		try {
-			List<AnimatedPng.Frame> frames = AnimatedPng.splitFrames(Files.readAllBytes(file.toPath()));
+			byte[] apng = Files.readAllBytes(file.toPath());
+			List<AnimatedPng.Frame> frames = AnimatedPng.splitFrames(apng);
+			PngDimensions.Dimensions size = PngDimensions.read(file);
 			delays = new int[frames.size()];
-			for (int i = 0; i < frames.size(); i++) {
+			// Every frame after the first is a patch, so the preview keeps the canvas the way a
+			// browser does and snapshots it after each one.
+			int[] canvas = size == null ? null : new int[size.width() * size.height()];
+			for (int i = 0; i < frames.size() && canvas != null; i++) {
 				if (!stillWanted(myToken)) {
 					break;
 				}
-				images.add(scaled(NativeImage.read(new ByteArrayInputStream(frames.get(i).png()))));
-				delays[i] = frames.get(i).delayMillis();
+				AnimatedPng.Frame frame = frames.get(i);
+				new FramePatch(frame.x(), frame.y(), frame.width(), frame.height(), argbOf(frame.png()))
+						.composite(canvas, size.width(), frame.blend());
+				images.add(scaled(imageOf(canvas, size.width(), size.height())));
+				delays[i] = frame.delayMillis();
 			}
 		} catch (Exception e) {
 			VoxelCamClient.LOGGER.warn("Failed to read animation {}", file, e);
@@ -188,6 +195,16 @@ public final class AnimationPreview {
 		synchronized (HANDOVER) {
 			return myToken == token;
 		}
+	}
+
+	private static NativeImage imageOf(int[] argb, int width, int height) {
+		NativeImage image = new NativeImage(width, height, false);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				image.setPixel(x, y, argb[y * width + x]);
+			}
+		}
+		return image;
 	}
 
 	private static NativeImage scaled(NativeImage full) {

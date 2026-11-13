@@ -19,16 +19,17 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Pins the APNG byte layout. Each of the first three groups is a known way an APNG goes wrong in
- * the field — a browser shows the first frame and nothing else, or nothing at all — so they
- * assert the bytes directly rather than through a decoder that might forgive them. The round
- * trip then proves the reframed pixels are the source pixels, through the JDK's own PNG decoder.
+ * Pins the APNG byte layout. Each of the first groups is a known way an APNG goes wrong in the
+ * field — a browser shows the first frame and nothing else, or nothing at all — so they assert
+ * the bytes directly rather than through a decoder that might forgive them. The round trip then
+ * proves the composited frames are the source frames, through the JDK's own PNG decoder.
  */
 class AnimatedPngTest {
 
@@ -51,34 +52,20 @@ class AnimatedPngTest {
 		return out.toByteArray();
 	}
 
-	/** The same image with its pixel data spread over {@code parts} IDAT chunks — legal, and what
-	 * a large stb-encoded screenshot looks like. Each extra chunk must cost one sequence number. */
-	private static byte[] splitIdat(byte[] png, int parts) {
-		List<Chunk> chunks = chunks(png);
-		ByteArrayOutputStream data = new ByteArrayOutputStream();
-		for (Chunk c : chunks) {
-			if (c.type.equals("IDAT")) {
-				data.writeBytes(c.data);
-			}
+	/** A solid frame with one marker pixel, as ARGB. */
+	private static int[] frame(int width, int height, int rgb, int markerX) {
+		int[] pixels = new int[width * height];
+		Arrays.fill(pixels, 0xFF000000 | rgb);
+		pixels[markerX] = 0xFFFFFFFF;
+		return pixels;
+	}
+
+	private static int[] noise(int n, Random random) {
+		int[] pixels = new int[n];
+		for (int i = 0; i < n; i++) {
+			pixels[i] = 0xFF000000 | random.nextInt(0x1000000);
 		}
-		byte[] zlib = data.toByteArray();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		out.writeBytes(Arrays.copyOf(png, 8));
-		boolean written = false;
-		for (Chunk c : chunks) {
-			if (c.type.equals("IDAT")) {
-				if (!written) {
-					int step = (zlib.length + parts - 1) / parts;
-					for (int at = 0; at < zlib.length; at += step) {
-						out.writeBytes(chunk("IDAT", Arrays.copyOfRange(zlib, at, Math.min(zlib.length, at + step))));
-					}
-					written = true;
-				}
-			} else {
-				out.writeBytes(chunk(c.type, c.data));
-			}
-		}
-		return out.toByteArray();
+		return pixels;
 	}
 
 	private record Chunk(String type, byte[] data, boolean crcOk) {
@@ -124,39 +111,58 @@ class AnimatedPngTest {
 		return ((d[at] & 0xFF) << 8) | (d[at + 1] & 0xFF);
 	}
 
-	private static byte[] assemble(List<byte[]> frames, int... delays) throws IOException {
-		return AnimatedPng.assemble(frames, delays, Map.of());
+	private static byte[] assemble(int width, int height, List<int[]> frames, int... delays) throws IOException {
+		return AnimatedPng.assemble(frames, width, height, delays, Map.of());
+	}
+
+	/** Plays the file the way a browser does: every frame's patch onto one canvas, snapshotted. */
+	private static List<int[]> play(byte[] apng, int width, int height) throws IOException {
+		List<int[]> shown = new ArrayList<>();
+		int[] canvas = new int[width * height];
+		for (AnimatedPng.Frame frame : AnimatedPng.splitFrames(apng)) {
+			BufferedImage image = ImageIO.read(new ByteArrayInputStream(frame.png()));
+			int[] patch = image.getRGB(0, 0, frame.width(), frame.height(), null, 0, frame.width());
+			new FramePatch(frame.x(), frame.y(), frame.width(), frame.height(), patch)
+					.composite(canvas, width, frame.blend());
+			shown.add(canvas.clone());
+		}
+		return shown;
 	}
 
 	// --- 1. sequence numbering --------------------------------------------------------------
 
 	@Test
 	void fcTLAndFdATShareOneCounterAndFrameZeroUsesPlainIdat() throws IOException {
-		byte[] a = png(8, 4, 0x204060, 0);
-		byte[] b = splitIdat(png(8, 4, 0x204060, 1), 3);
-		byte[] c = png(8, 4, 0x204060, 2);
+		Random random = new Random(1);
+		// Noise compresses to nothing, so a 400x400 frame spills over several data chunks — and
+		// each fdAT chunk must cost a sequence number of its own.
+		List<int[]> frames = List.of(noise(400 * 400, random), noise(400 * 400, random), frame(400, 400, 0, 3));
+		List<Chunk> out = chunks(assemble(400, 400, frames, 50, 50, 50));
 
-		List<Chunk> out = chunks(assemble(List.of(a, b, c), 50, 50, 50));
-
-		List<String> sequenceOf = new ArrayList<>();
+		List<String> types = new ArrayList<>();
 		List<Integer> numbers = new ArrayList<>();
 		for (Chunk ch : out) {
 			if (ch.type.equals("fcTL") || ch.type.equals("fdAT")) {
-				sequenceOf.add(ch.type);
+				types.add(ch.type);
 				numbers.add(readInt(ch.data, 0));
 			}
 		}
-		// Frame 0: fcTL 0 then IDAT (unnumbered). Frame 1: fcTL 1, three fdATs 2–4. Frame 2: fcTL 5, fdAT 6.
-		assertEquals(List.of("fcTL", "fcTL", "fdAT", "fdAT", "fdAT", "fcTL", "fdAT"), sequenceOf);
-		assertEquals(List.of(0, 1, 2, 3, 4, 5, 6), numbers);
+		for (int i = 0; i < numbers.size(); i++) {
+			assertEquals(i, numbers.get(i), "one shared counter, no gaps: " + types);
+		}
+		assertEquals("fcTL", types.get(0));
+		assertEquals("fcTL", types.get(1), "frame 0's data is plain IDAT, which takes no number");
+		int secondFrameData = types.indexOf("fcTL") == 0 ? types.subList(2, types.lastIndexOf("fcTL")).size() : 0;
+		assertTrue(secondFrameData > 1, "frame 1 should span several fdATs: " + types);
+		assertTrue(out.stream().filter(c -> c.type.equals("IDAT")).count() > 1, "and frame 0 several IDATs");
 	}
 
 	// --- 2. acTL placement and count --------------------------------------------------------
 
 	@Test
 	void acTLComesBeforeTheFirstIdatAndCountsEveryFrame() throws IOException {
-		byte[] a = png(8, 4, 0x102030, 0);
-		List<Chunk> out = chunks(assemble(List.of(a, a, a, a), 40, 40, 40, 40));
+		int[] a = frame(8, 4, 0x102030, 0);
+		List<Chunk> out = chunks(assemble(8, 4, List.of(a, a, a, a), 40, 40, 40, 40));
 		List<String> types = out.stream().map(Chunk::type).toList();
 
 		assertEquals("IHDR", types.get(0));
@@ -171,112 +177,99 @@ class AnimatedPngTest {
 
 	@Test
 	void theDefaultImageIsTheFirstFrameNotAPosterOutsideTheCount() throws IOException {
-		byte[] a = png(8, 4, 0x102030, 0);
-		List<String> types = chunks(assemble(List.of(a, a), 40, 40)).stream().map(Chunk::type).toList();
+		int[] a = frame(8, 4, 0x102030, 0);
+		List<String> types = chunks(assemble(8, 4, List.of(a, a), 40, 40)).stream().map(Chunk::type).toList();
 		assertTrue(types.indexOf("fcTL") < types.indexOf("IDAT"), types.toString());
 	}
 
 	@Test
-	void everyFrameControlCoversTheWholeCanvasWithItsDelay() throws IOException {
-		byte[] a = png(12, 6, 0x102030, 0);
-		List<Chunk> fctls = chunks(assemble(List.of(a, a), 16, 1234)).stream()
+	void theFirstFrameCoversTheCanvasAndEveryLaterOneOnlyWhatChanged() throws IOException {
+		int[] first = frame(12, 6, 0x102030, 0);
+		int[] second = first.clone();
+		second[3 * 12 + 7] = 0xFFFF0000; // one pixel at (7, 3)
+		List<Chunk> fctls = chunks(assemble(12, 6, List.of(first, second, second), 16, 1234, 40)).stream()
 				.filter(c -> c.type.equals("fcTL")).toList();
 
-		Chunk second = fctls.get(1);
-		assertEquals(26, second.data.length);
-		assertEquals(12, readInt(second.data, 4));
-		assertEquals(6, readInt(second.data, 8));
-		assertEquals(0, readInt(second.data, 12));
-		assertEquals(0, readInt(second.data, 16));
-		assertEquals(1234, readShort(second.data, 20));
-		assertEquals(1000, readShort(second.data, 22));
-		assertEquals(0, second.data[25], "blend SOURCE, so no frame composites over the last");
+		Chunk whole = fctls.get(0);
+		assertEquals(12, readInt(whole.data, 4));
+		assertEquals(6, readInt(whole.data, 8));
+		assertEquals(0, whole.data[25], "blend SOURCE: the first frame replaces the canvas");
+
+		Chunk patch = fctls.get(1);
+		// The change is at (7, 3); the corner rounds down to (6, 2), so the patch is 2x2.
+		assertEquals(6, readInt(patch.data, 12), "x, rounded down to even");
+		assertEquals(2, readInt(patch.data, 16), "y, rounded down to even");
+		assertEquals(2, readInt(patch.data, 4), "width, from the rounded corner to the change");
+		assertEquals(2, readInt(patch.data, 8), "height, likewise");
+		assertEquals(1234, readShort(patch.data, 20));
+		assertEquals(1000, readShort(patch.data, 22));
+		assertEquals(0, patch.data[24], "dispose NONE: the next patch lands on this canvas");
+		assertEquals(1, patch.data[25], "blend OVER: the patch's transparent pixels keep the frame before");
+
+		Chunk unchanged = fctls.get(2);
+		assertEquals(1, readInt(unchanged.data, 4), "an unchanged frame is a single pixel");
+		assertEquals(1, readInt(unchanged.data, 8));
 	}
 
 	@Test
 	void everyChunkWrittenHasAValidCrc() throws IOException {
-		byte[] a = png(8, 4, 0x102030, 0);
-		byte[] b = splitIdat(png(8, 4, 0x102030, 3), 2);
+		int[] a = frame(8, 4, 0x102030, 0);
+		int[] b = frame(8, 4, 0x102030, 3);
 		Map<String, String> tags = Map.of("voxelcam:world", "Wörld");
-		for (Chunk c : chunks(AnimatedPng.assemble(List.of(a, b), new int[] { 40, 40 }, tags))) {
+		for (Chunk c : chunks(AnimatedPng.assemble(List.of(a, b), 8, 4, new int[] { 40, 40 }, tags))) {
 			assertTrue(c.crcOk, c.type);
 		}
 	}
 
-	// --- 3. IHDR agreement ------------------------------------------------------------------
+	// --- 3. size agreement ------------------------------------------------------------------
 
 	@Test
-	void framesOfDifferentSizesAreRefusedRatherThanWrittenCorrupt() throws IOException {
-		byte[] small = png(8, 4, 0x102030, 0);
-		byte[] large = png(16, 8, 0x102030, 0);
-		assertThrows(IOException.class, () -> assemble(List.of(small, large), 40, 40));
-	}
-
-	@Test
-	void somethingThatIsNotAPngIsRefused() {
-		assertThrows(IOException.class, () -> assemble(List.of("hello".getBytes(StandardCharsets.US_ASCII)), 40));
+	void framesOfDifferentSizesAreRefusedRatherThanWrittenCorrupt() {
+		int[] small = frame(8, 4, 0x102030, 0);
+		int[] large = frame(16, 8, 0x102030, 0);
+		assertThrows(IOException.class, () -> assemble(8, 4, List.of(small, large), 40, 40));
 	}
 
 	// --- the pixels survive ----------------------------------------------------------------
 
 	@Test
-	void eachFrameDecodesBackToItsSourcePixels() throws IOException {
-		List<byte[]> sources = List.of(png(10, 5, 0x336699, 0), splitIdat(png(10, 5, 0x336699, 4), 3),
-				png(10, 5, 0x336699, 9));
-		byte[] apng = assemble(sources, 40, 40, 40);
-
-		// Rebuild each frame as a standalone PNG — IHDR, its data as IDAT, IEND — and decode that.
-		List<Chunk> out = chunks(apng);
-		Chunk ihdr = out.get(0);
-		List<ByteArrayOutputStream> frames = new ArrayList<>();
-		for (Chunk c : out) {
-			if (c.type.equals("fcTL")) {
-				frames.add(new ByteArrayOutputStream());
-			} else if (c.type.equals("IDAT")) {
-				frames.get(frames.size() - 1).writeBytes(c.data);
-			} else if (c.type.equals("fdAT")) {
-				frames.get(frames.size() - 1).writeBytes(Arrays.copyOfRange(c.data, 4, c.data.length));
+	void everyFramePlaysBackToItsSourcePixels() throws IOException {
+		Random random = new Random(4);
+		int w = 30;
+		int h = 17;
+		int[] base = noise(w * h, random);
+		List<int[]> sources = new ArrayList<>();
+		for (int f = 0; f < 6; f++) {
+			int[] next = base.clone();
+			for (int y = 2 + f; y < 6 + f; y++) {
+				for (int x = 1 + 3 * f; x < 5 + 3 * f; x++) {
+					next[y * w + x] = 0xFF000000 | (f * 0x302010);
+				}
 			}
+			sources.add(next);
 		}
-		assertEquals(sources.size(), frames.size());
-		for (int i = 0; i < sources.size(); i++) {
-			ByteArrayOutputStream standalone = new ByteArrayOutputStream();
-			standalone.writeBytes(Arrays.copyOf(apng, 8));
-			standalone.writeBytes(chunk("IHDR", ihdr.data));
-			standalone.writeBytes(chunk("IDAT", frames.get(i).toByteArray()));
-			standalone.writeBytes(chunk("IEND", new byte[0]));
+		sources.add(sources.get(5)); // and one frame that changed nothing
+		byte[] apng = assemble(w, h, sources, 40, 40, 40, 40, 40, 40, 40);
 
-			BufferedImage expected = ImageIO.read(new ByteArrayInputStream(sources.get(i)));
-			BufferedImage actual = ImageIO.read(new ByteArrayInputStream(standalone.toByteArray()));
-			for (int x = 0; x < 10; x++) {
-				assertEquals(expected.getRGB(x, 0), actual.getRGB(x, 0), "frame " + i + " pixel " + x);
-			}
+		List<int[]> shown = play(apng, w, h);
+		assertEquals(sources.size(), shown.size());
+		for (int f = 0; f < sources.size(); f++) {
+			assertArrayEquals(sources.get(f), shown.get(f), "frame " + f);
 		}
 		// And a reader that knows nothing of APNG still opens the file, as the first frame.
 		BufferedImage still = ImageIO.read(new ByteArrayInputStream(apng));
-		assertEquals(0xFFFFFFFF, still.getRGB(0, 0));
-		assertEquals(0xFF336699, still.getRGB(4, 0));
+		assertEquals(sources.get(0)[0], still.getRGB(0, 0));
 	}
 
-	// --- splitting back into frames, for the preview -------------------------------------------
-
 	@Test
-	void splittingIsTheReverseOfAssembling() throws IOException {
-		List<byte[]> sources = List.of(png(10, 5, 0x336699, 0), splitIdat(png(10, 5, 0x336699, 4), 3),
-				png(10, 5, 0x336699, 9));
-		List<AnimatedPng.Frame> frames = AnimatedPng.splitFrames(
-				AnimatedPng.assemble(sources, new int[] { 40, 1234, 25 }, Map.of("voxelcam:world", "Overworld")));
-
-		assertEquals(3, frames.size());
-		assertEquals(List.of(40, 1234, 25), frames.stream().map(AnimatedPng.Frame::delayMillis).toList());
-		for (int i = 0; i < sources.size(); i++) {
-			BufferedImage expected = ImageIO.read(new ByteArrayInputStream(sources.get(i)));
-			BufferedImage actual = ImageIO.read(new ByteArrayInputStream(frames.get(i).png()));
-			for (int x = 0; x < 10; x++) {
-				assertEquals(expected.getRGB(x, 0), actual.getRGB(x, 0), "frame " + i + " pixel " + x);
-			}
-			for (Chunk c : chunks(frames.get(i).png())) {
-				assertTrue(c.crcOk, "frame " + i + " " + c.type);
+	void splittingKeepsEachFramesDelay() throws IOException {
+		List<int[]> frames = List.of(frame(10, 5, 0x336699, 0), frame(10, 5, 0x336699, 4), frame(10, 5, 0x336699, 9));
+		List<AnimatedPng.Frame> split = AnimatedPng.splitFrames(
+				AnimatedPng.assemble(frames, 10, 5, new int[] { 40, 1234, 25 }, Map.of("voxelcam:world", "Overworld")));
+		assertEquals(List.of(40, 1234, 25), split.stream().map(AnimatedPng.Frame::delayMillis).toList());
+		for (AnimatedPng.Frame frame : split) {
+			for (Chunk c : chunks(frame.png())) {
+				assertTrue(c.crcOk, c.type);
 			}
 		}
 	}
@@ -285,24 +278,23 @@ class AnimatedPngTest {
 	void aPlainPngOrGarbageSplitsIntoNothing() throws IOException {
 		assertTrue(AnimatedPng.splitFrames(png(8, 4, 0x102030, 0)).isEmpty());
 		assertTrue(AnimatedPng.splitFrames("not a png".getBytes(StandardCharsets.US_ASCII)).isEmpty());
-		byte[] apng = assemble(List.of(png(8, 4, 0x102030, 0), png(8, 4, 0x102030, 1)), 40, 40);
+		byte[] apng = assemble(8, 4, List.of(frame(8, 4, 0x102030, 0), frame(8, 4, 0x102030, 1)), 40, 40);
 		assertTrue(AnimatedPng.splitFrames(Arrays.copyOf(apng, apng.length / 2)).size() < 2,
 				"a truncated file must not play a half-read frame as whole");
 	}
 
 	@Test
-	void aFrameThatDoesNotCoverTheWholeCanvasIsNotPlayed() throws IOException {
-		byte[] apng = assemble(List.of(png(8, 4, 0x102030, 0), png(8, 4, 0x102030, 1)), 40, 40);
-		// Shrink the second fcTL's width: a foreign, partial-frame APNG this player does not composite.
-		List<Chunk> chunks = chunks(apng);
+	void aFrameThatDisposesIsNotPlayed() throws IOException {
+		byte[] apng = assemble(8, 4, List.of(frame(8, 4, 0x102030, 0), frame(8, 4, 0x102030, 1)), 40, 40);
+		// Set the second fcTL's dispose_op: a foreign APNG this player does not reproduce.
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		out.writeBytes(Arrays.copyOf(apng, 8));
 		int fctls = 0;
-		for (Chunk c : chunks) {
+		for (Chunk c : chunks(apng)) {
 			byte[] data = c.data;
 			if (c.type.equals("fcTL") && fctls++ == 1) {
 				data = data.clone();
-				data[7] = 4;
+				data[24] = 1;
 			}
 			out.writeBytes(chunk(c.type, data));
 		}

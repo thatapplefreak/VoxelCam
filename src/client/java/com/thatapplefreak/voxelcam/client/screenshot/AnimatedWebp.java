@@ -14,10 +14,9 @@ import java.util.PriorityQueue;
  * <p>Lossless (VP8L, RFC 9649), with the parts of the format that pay for themselves on
  * Minecraft footage:
  * <ul>
- *   <li><b>Only what changed.</b> After the first, each frame is the smallest even-aligned
- *       rectangle holding every pixel that differs from the frame before, with the unchanged
- *       pixels inside it fully transparent and blended over the previous frame. A burst's frames
- *       are a tenth of a second apart, so most of each one is the frame before.</li>
+ *   <li><b>Only what changed.</b> After the first, each frame is a {@link FramePatch}: the
+ *       rectangle that differs from the frame before, unchanged pixels transparent and blended
+ *       over it.</li>
  *   <li><b>Subtract-green and predictor transforms.</b> Each 16x16 block uses whichever of the
  *       spec's fourteen predictors leaves the smallest residuals — a sky gradient becomes runs of
  *       near-zero.</li>
@@ -63,52 +62,12 @@ public final class AnimatedWebp {
 		for (int i = 0; i < argb.length; i++) {
 			current[i] = argb[i] | 0xFF000000;
 		}
-		if (previous == null) {
-			frames.add(new Frame(encodeVp8l(current, width, height), 0, 0, width, height, delay, false));
-		} else {
-			frames.add(difference(previous, current, delay));
-		}
+		boolean first = previous == null;
+		FramePatch patch = first ? FramePatch.whole(current, width, height)
+				: FramePatch.between(previous, current, width, height);
+		frames.add(new Frame(encodeVp8l(patch.pixels(), patch.width(), patch.height()),
+				patch.x(), patch.y(), patch.width(), patch.height(), delay, !first));
 		previous = current;
-	}
-
-	/**
-	 * The frame as a patch over {@code before}: the bounding box of every changed pixel, its
-	 * corner rounded down to even coordinates (ANMF stores offsets halved), with the pixels inside
-	 * it that did not change made transparent so they blend away. A frame identical to the last
-	 * is a single transparent pixel, since ANMF has no empty frame.
-	 */
-	private Frame difference(int[] before, int[] after, int delay) {
-		int minX = width;
-		int minY = height;
-		int maxX = -1;
-		int maxY = -1;
-		for (int y = 0; y < height; y++) {
-			int row = y * width;
-			for (int x = 0; x < width; x++) {
-				if (before[row + x] != after[row + x]) {
-					minX = Math.min(minX, x);
-					maxX = Math.max(maxX, x);
-					minY = Math.min(minY, y);
-					maxY = y;
-				}
-			}
-		}
-		if (maxX < 0) {
-			return new Frame(encodeVp8l(new int[] { 0 }, 1, 1), 0, 0, 1, 1, delay, true);
-		}
-		int x0 = minX & ~1;
-		int y0 = minY & ~1;
-		int w = maxX - x0 + 1;
-		int h = maxY - y0 + 1;
-		int[] patch = new int[w * h];
-		for (int y = 0; y < h; y++) {
-			int from = (y0 + y) * width + x0;
-			for (int x = 0; x < w; x++) {
-				int pixel = after[from + x];
-				patch[y * w + x] = pixel == before[from + x] ? 0 : pixel;
-			}
-		}
-		return new Frame(encodeVp8l(patch, w, h), x0, y0, w, h, delay, true);
 	}
 
 	/** The whole file: RIFF, then VP8X, ANIM, and one ANMF per frame, looping forever. */

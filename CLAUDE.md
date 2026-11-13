@@ -309,30 +309,32 @@ search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Se
 bytes, not names. Rename and delete take the whole group, with rollback.
 
 **Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
-`<key>_animation.png` (ADR-0014). It never decodes: every frame shares one IHDR, so frame 0's
-`IDAT`s are copied verbatim and every later frame's become `fdAT`s. Order and frame delays come from
-the `BurstFrame` tags, never from file names, since Set as Key breaks name order. The export reads
-one frame at a time on `Util.ioPool()`, writes through a temp file, and refuses frames whose IHDRs
-differ instead of writing a corrupt file. The result is tagged `voxelcam:animationframes`, which is
+`<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the
+even-aligned rectangle that changed, unchanged pixels transparent, written as RGBA `fdAT`s with blend
+OVER and dispose NONE. Order and frame delays come from the `BurstFrame` tags, never from file names,
+since Set as Key breaks name order. The export decodes one frame at a time on `Util.ioPool()`
+(`AnimatedPng.PixelDecoder`, `NativeImage` in game), feeds the same pixels to the APNG and WebP
+writers, writes through temp files, and refuses frames of different sizes instead of writing a
+corrupt file. The result is tagged `voxelcam:animationframes`, which is
 the only thing that tells the manager it moves: everything else in the mod sees an ordinary PNG of
 the first frame. Set as Key and Export share one stacked column at the filmstrip's right end, so the
 second button costs the strip no cells.
 
 The preview plays a tagged animation through `AnimationPreview`, because `NativeImage` (like any
 decoder that does not know APNG) only ever decodes frame 0. `AnimatedPng.splitFrames` rebuilds each
-frame as a standalone PNG, which is still pure bytes. They are decoded on one loader thread, scaled to
-at most 1024px, and uploaded as one texture per frame. Only the selected animation is held; the still
-from `ScreenshotImageCache` is drawn until its frames land, and that still is frame 0, so the switch
-is seamless. Only full-canvas, replace-blend frames (the shape `AnimatedPng` writes) are played; any
-other APNG stays a still.
+frame's patch as a standalone PNG (pure bytes); the loader thread decodes each, composites it onto a
+canvas with `FramePatch.composite`, snapshots the canvas scaled to at most 1024px, and uploads one
+texture per frame. Only the selected animation is held; the still from `ScreenshotImageCache` is drawn
+until its frames land, and that still is frame 0, so the switch is seamless. An APNG that disposes
+frames (which `AnimatedPng` never writes) stays a still.
 
 Every export also writes `<key>_animation.webp` beside the APNG, from the same frames, through
 `AnimatedWebp`: a pure-Java lossless (VP8L) encoder. Discord plays an animated WebP but shows an
 APNG as its first frame. The WebP is a sidecar, not a screenshot: the manager never lists it, and
 `AnimatedPng.webpBeside` is how rename and delete carry it along (as a group member, with
 rollback) and how `SharePopup` hands it out in the APNG's place. After the first frame, each frame
-is only the even-aligned rectangle that changed, with unchanged pixels transparent and blended, so
-a burst of a still scene costs little more than one frame. Each image gets subtract-green, a
+is the same `FramePatch` the APNG uses, so a burst of a still scene costs little more than one
+frame. Each image gets subtract-green, a
 per-16x16-block predictor, hash-chain LZ77 (distances other than left and above are sent as
 distance + 120, skipping the spec's 2D table) and a 1024-entry colour cache, but no meta prefix
 codes or colour transforms. It lands within 5–16% of libwebp's lossless size, was checked
@@ -341,8 +343,7 @@ exactly this subset; extend that decoder with any feature you add to the encoder
 
 Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
 opaque, the best of the five PNG filters per row, zlib 6. That is about 37% smaller than stb's
-output, and the exported APNG, being a byte copy of the frames, shrinks with them. Single
-captures still use the vanilla encoder.
+output. Single captures still use the vanilla encoder.
 
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
