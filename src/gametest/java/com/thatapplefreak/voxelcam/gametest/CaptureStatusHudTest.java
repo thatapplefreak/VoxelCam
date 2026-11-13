@@ -136,22 +136,29 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 	private static void assertNoBurstFrameCarriesIt(ClientGameTestContext context, File dir) {
 		postFailure(context);
 		Set<String> before = listing(dir);
-		int previousLength = context.computeOnClient(client -> Burst.getLength());
+		int previousSeconds = context.computeOnClient(client -> Burst.getSeconds());
 
 		context.runOnClient(client -> {
-			Burst.setLength(4);
+			Burst.setSeconds(Burst.MIN_SECONDS);
 			Burst.request();
 		});
 		try {
-			context.waitFor(client -> !Burst.isBusy(), 200);
-			context.waitTicks(40);
+			// Mid-burst, for a human: the recording cue between captured frames. Best-effort —
+			// Fabric's grab can land on a frame the burst reads back, which shows no HUD at all.
+			context.waitTicks(10);
+			context.takeScreenshot("burst-recording-cue");
+			context.waitFor(client -> !Burst.isBusy(), 400);
+			context.waitTicks(60);
 		} finally {
-			context.runOnClient(client -> Burst.setLength(previousLength));
+			context.runOnClient(client -> Burst.setSeconds(previousSeconds));
 		}
 
+		// A slot can be skipped when encoding falls behind, so the count is a range, not exact.
 		List<File> written = newFiles(dir, before);
-		if (written.size() != 4) {
-			throw new AssertionError("a 4-frame burst should have written 4 frames, wrote " + written);
+		int planned = Burst.framesFor(Burst.MIN_SECONDS);
+		if (written.size() < planned / 2 || written.size() > planned) {
+			throw new AssertionError("a " + Burst.MIN_SECONDS + "s burst should have written up to " + planned
+					+ " frames, wrote " + written.size());
 		}
 		for (File frame : written) {
 			if (fileShowsAccent(context, frame)) {
@@ -305,9 +312,12 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 		return names == null ? new HashSet<>() : new HashSet<>(Arrays.asList(names));
 	}
 
+	/** New captures only: Fabric's own test screenshots share the folder, numbered {@code 0000_}. */
 	private static List<File> newFiles(File dir, Set<String> before) {
 		Set<String> after = listing(dir);
 		after.removeAll(before);
-		return after.stream().filter(name -> name.endsWith(".png")).sorted().map(name -> new File(dir, name)).toList();
+		return after.stream()
+				.filter(name -> name.endsWith(".png") && !name.matches("\\d{4}_.*"))
+				.sorted().map(name -> new File(dir, name)).toList();
 	}
 }

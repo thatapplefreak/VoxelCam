@@ -1,6 +1,8 @@
 package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.gui.SharePopup;
+import com.thatapplefreak.voxelcam.client.gui.ShareSizePopup;
+import com.thatapplefreak.voxelcam.client.screenshot.SmallerShareCopy;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -56,8 +58,44 @@ public class SharePopupTest implements FabricClientGameTest {
 
 		context.takeScreenshot("share-popup");
 
+		assertAnOversizedAnimationAsksBeforeSending(context, screenshot.getParentFile());
+
 		context.setScreen(TitleScreen::new);
 		context.waitForScreen(TitleScreen.class);
+	}
+
+	/**
+	 * An animation whose WebP copy is over Discord's free limit asks first. Only Cancel is pressed:
+	 * either choice would go on to upload to the real catbox. The WebP here is filler bytes of the
+	 * right size — the popup goes by the file's size, and nothing reads it once Cancel is chosen.
+	 */
+	private static void assertAnOversizedAnimationAsksBeforeSending(ClientGameTestContext context, File dir) {
+		File animation = new File(dir, "oversized_animation.png");
+		File webp = new File(dir, "oversized_animation.webp");
+		try {
+			Files.copy(new File(dir, "share-target.png").toPath(), animation.toPath(),
+					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			Files.write(webp.toPath(), new byte[(int) (SmallerShareCopy.DISCORD_LIMIT_BYTES * 6 / 5)]);
+		} catch (IOException e) {
+			throw new AssertionError("could not write the oversized animation", e);
+		}
+
+		try {
+			context.setScreen(() -> new SharePopup(null, animation));
+			context.waitForScreen(SharePopup.class);
+			context.waitTicks(2);
+
+			context.clickScreenButton("voxelcam.share.link");
+			context.waitForScreen(ShareSizePopup.class);
+			context.waitTicks(2);
+			context.takeScreenshot("share-too-big-for-discord");
+
+			context.clickScreenButton("gui.cancel");
+			context.waitForScreen(SharePopup.class);
+		} finally {
+			webp.delete();
+			animation.delete();
+		}
 	}
 
 	private static void assertEveryTargetIsOffered(ClientGameTestContext context) {

@@ -2,15 +2,19 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimationPreview;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.SmallerShareCopy;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -43,8 +47,9 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			context.waitTicks(20);
 
-			assertAHeldAndAimedReleaseFiresABurstAtWindowSize(context, dir);
-			assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(context, dir);
+			File key = assertAHeldAndAimedReleaseFiresABurstAtWindowSize(context, dir);
+			assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(context, dir, key);
+			assertExportAnimationWritesOneApngOfTheWholeBurst(context, dir, key);
 			assertAScreenOpeningMidBurstStopsItEarly(context, dir);
 		}
 	}
@@ -53,10 +58,11 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	 * Aimed at the third wedge's centre — the same non-boundary vector {@code CaptureMenuTest}
 	 * uses for the second, mirrored to the other side — and released.
 	 */
-	private static void assertAHeldAndAimedReleaseFiresABurstAtWindowSize(ClientGameTestContext context, File dir) {
+	private static File assertAHeldAndAimedReleaseFiresABurstAtWindowSize(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
-		int length = context.computeOnClient(client -> Burst.getLength());
+		int seconds = context.computeOnClient(client -> Burst.getSeconds());
+		int planned = Burst.framesFor(seconds);
 
 		context.getInput().holdKey(InputConstants.KEY_F2);
 		try {
@@ -67,11 +73,11 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			context.getInput().releaseKey(InputConstants.KEY_F2);
 		}
 
-		context.waitFor(client -> !CaptureMenu.isCapturePending() && !Burst.isBusy(), 400);
+		context.waitFor(client -> !CaptureMenu.isCapturePending() && !Burst.isBusy(), 600);
 		// PNG encoding runs on the IO worker, and a burst has several frames queued on it.
 		context.waitTicks(60);
 
-		Set<String> written = theNewFiles(dir, before, length, "a held, aimed release at the burst wedge");
+		Set<String> written = theNewFiles(dir, before, planned, "a held, aimed release at the burst wedge");
 		File key = theKeyAmong(written, dir);
 
 		for (String name : written) {
@@ -83,6 +89,8 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		}
 
 		assertTagsAgree(dir, key, written);
+		assertTheFramesSpanTheBurstsLength(dir, written, seconds);
+		return key;
 	}
 
 	/**
@@ -112,16 +120,46 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	}
 
 	/**
+	 * The point of the timed schedule: frames spread across the burst's whole length, rather than
+	 * every frame the renderer can turn out in a fraction of a second. What the schedule guarantees
+	 * is a floor, not a spacing: frame {@code i} fills slot {@code i} or a later one, so it is never
+	 * taken before {@code i} intervals in. Two frames can still land close together — a slow frame
+	 * late in one slot, the next early in the following one — which CI's software renderer does
+	 * routinely, so the gap between neighbours is deliberately not asserted.
+	 */
+	private static void assertTheFramesSpanTheBurstsLength(File dir, Set<String> written, int seconds) {
+		List<Integer> offsets = written.stream()
+				.map(name -> BurstFrame.fromTags(PngTextChunk.read(new File(dir, name))))
+				.sorted(java.util.Comparator.comparingInt(BurstFrame::index))
+				.map(BurstFrame::offsetMillis)
+				.toList();
+		int span = offsets.get(offsets.size() - 1) - offsets.get(0);
+		int planned = (seconds * Burst.FRAMES_PER_SECOND - 1) * Burst.FRAME_INTERVAL_MILLIS;
+		if (span < planned - Burst.FRAME_INTERVAL_MILLIS || span > seconds * 1000) {
+			throw new AssertionError("a " + seconds + "s burst's frames should span about " + planned
+					+ "ms, spanned " + span + "ms: " + offsets);
+		}
+		for (int i = 0; i < offsets.size(); i++) {
+			if (offsets.get(i) < i * Burst.FRAME_INTERVAL_MILLIS) {
+				throw new AssertionError("frame " + i + " was taken at " + offsets.get(i) + "ms, ahead of its slot at "
+						+ i * Burst.FRAME_INTERVAL_MILLIS + "ms: " + offsets);
+			}
+			if (i > 0 && offsets.get(i) <= offsets.get(i - 1)) {
+				throw new AssertionError("frame " + i + " was not taken after frame " + (i - 1) + ": " + offsets);
+			}
+		}
+	}
+
+	/**
 	 * Live-playtest finding: the preview's dark background panel used to render after the
 	 * widgets, painting over anything inside its bounds — including the filmstrip's Set as key
 	 * and scroll buttons — so a fully active button read identically dimmed to a disabled one.
-	 * Opens the manager on this burst's own directory (DATE_NEWEST is the default sort, and
-	 * nothing has captured anything newer since, so the key this test just captured is exactly
-	 * what a fresh selection falls back to) and screenshots it for visual confirmation.
+	 * Opens the manager on this burst's own directory with its key selected and screenshots it
+	 * for visual confirmation.
 	 */
 	private static void assertTheManagerShowsTheFilmstripWithoutDimmingItsButtons(
-			ClientGameTestContext context, File dir) {
-		context.setScreen(() -> new GuiScreenShotManager(dir));
+			ClientGameTestContext context, File dir, File key) {
+		openManagerOn(context, dir, key);
 		context.waitForScreen(GuiScreenShotManager.class);
 		// Thumbnails decode off-thread and upload on the render thread.
 		context.waitTicks(20);
@@ -131,7 +169,9 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			return selected != null && VoxelCamIO.burstFrameCount(selected) > 0;
 		});
 		if (!hasFilmstrip) {
-			throw new AssertionError("the manager's fallback selection should be this burst's own key");
+			String state = context.computeOnClient(client -> "selected " + VoxelCamIO.getSelectedPhoto()
+					+ ", listed " + VoxelCamIO.getScreenShotFiles().stream().map(File::getName).toList());
+			throw new AssertionError("the manager's fallback selection should be this burst's own key; " + state);
 		}
 
 		context.takeScreenshot("manager-with-burst-filmstrip");
@@ -141,7 +181,170 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * A screen can appear at any point across the roughly a second a burst spans, not just
+	 * The export button, pressed by its fixed translation key the way a player's click finds it,
+	 * on the burst this test captured for real. What only a real burst proves and {@code
+	 * AnimatedPngTest} cannot: that stb's own PNGs reframe — its IHDR, its IDAT split — and that
+	 * the count in {@code acTL} is the group's whole size as the manager sees it. Then the manager
+	 * should have moved onto the new file, which says it is an animation.
+	 */
+	private static void assertExportAnimationWritesOneApngOfTheWholeBurst(ClientGameTestContext context, File dir,
+			File key) {
+		openManagerOn(context, dir, key);
+		context.waitTicks(5);
+
+		int groupSize = context.computeOnClient(client -> VoxelCamIO.burstFrameCount(key)) + 1;
+		Set<String> before = listing(dir);
+
+		context.clickScreenButton("voxelcam.burst.exportanimation");
+		// For a human, best-effort: a test burst is small, so the export may finish first.
+		context.takeScreenshot("manager-exporting-animation");
+		context.waitFor(client -> !key.equals(VoxelCamIO.getSelectedPhoto()), 400);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> name.matches("\\d{4}_.*")); // Fabric's own test screenshots
+		List<String> pngs = after.stream().filter(name -> name.endsWith(".png")).toList();
+		if (pngs.size() != 1 || after.size() != 2) {
+			throw new AssertionError("an export should write one APNG and its WebP copy, wrote " + after);
+		}
+		File animation = new File(dir, pngs.get(0));
+		File webp = AnimatedPng.webpBeside(animation);
+		if (!after.contains(webp.getName())) {
+			throw new AssertionError("the WebP copy should sit beside " + animation.getName() + ", found " + after);
+		}
+		if (!animation.equals(context.computeOnClient(client -> VoxelCamIO.getSelectedPhoto()))) {
+			throw new AssertionError("the manager should select the animation it just wrote, " + animation.getName());
+		}
+
+		byte[] bytes;
+		try {
+			bytes = Files.readAllBytes(animation.toPath());
+		} catch (IOException e) {
+			throw new AssertionError("could not read " + animation.getName(), e);
+		}
+		int frames = actlFrameCount(bytes);
+		if (frames != groupSize) {
+			throw new AssertionError("acTL should count all " + groupSize + " frames of the burst, said " + frames);
+		}
+		if (AnimatedPng.frameCount(PngTextChunk.read(animation)) != groupSize) {
+			throw new AssertionError("the animation should carry its frame count as a tag");
+		}
+		if (!pngSize(animation).equals(pngSize(key))) {
+			throw new AssertionError("the animation should be the burst's own size, was " + pngSize(animation));
+		}
+		// The copy Share hands out holds the same frames, encoded by the game's own decoder's pixels.
+		int webpFrames = anmfCount(webp);
+		if (webpFrames != groupSize) {
+			throw new AssertionError("the WebP copy should hold all " + groupSize + " frames, held " + webpFrames);
+		}
+
+		// The smaller copy for Discord, through the game's own decoder: forced here with a limit of
+		// half the real copy, since a still test world never comes near the real one.
+		try {
+			long limit = webp.length() / 2;
+			File smaller = SmallerShareCopy.make(animation, webp.length(), limit, AnimationPreview::argbOf);
+			try {
+				if (smaller.length() > limit || anmfCount(smaller) != groupSize) {
+					throw new AssertionError("the smaller copy should fit " + limit + " bytes with all " + groupSize
+							+ " frames, was " + smaller.length() + " bytes with " + anmfCount(smaller));
+				}
+			} finally {
+				SmallerShareCopy.discard(smaller);
+			}
+		} catch (IOException e) {
+			throw new AssertionError("could not make a smaller copy of " + animation.getName(), e);
+		}
+
+		// A decoder that knows nothing of APNG must still open the file as its first frame.
+		try {
+			if (javax.imageio.ImageIO.read(animation) == null) {
+				throw new AssertionError("the JDK's PNG reader could not open " + animation.getName());
+			}
+		} catch (IOException e) {
+			throw new AssertionError("the JDK's PNG reader rejected " + animation.getName(), e);
+		}
+
+		// The preview plays it: every frame decoded, and more than one of them shown over time.
+		context.waitFor(client -> AnimationPreview.playingFrameCount(animation) == groupSize, 200);
+		float loading = context.computeOnClient(client -> AnimationPreview.loadingProgress(animation));
+		if (loading >= 0F) {
+			throw new AssertionError("the loading bar should be gone once the animation plays, was at " + loading);
+		}
+		Set<Object> shown = new HashSet<>();
+		for (int i = 0; i < 10; i++) {
+			shown.add(context.computeOnClient(client ->
+					AnimationPreview.frameAt(animation, net.minecraft.util.Util.getMillis()).id()));
+			context.waitTicks(1);
+		}
+		if (shown.size() < 2) {
+			throw new AssertionError("the preview should cycle through the animation's frames, showed " + shown);
+		}
+
+		context.takeScreenshot("manager-with-exported-animation");
+		context.setScreen(() -> null);
+		context.waitForScreen(null);
+	}
+
+	/**
+	 * Selected by hand rather than left to the newest-first sort: under WSL, files written minutes
+	 * earlier have been seen carrying modification times later than the burst's, which put an
+	 * older screenshot first and selected that instead. The manager keeps a selection it can find
+	 * in the listing, so this is the burst's own key whatever the clock says.
+	 */
+	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {
+		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+	}
+
+	/** How many ANMF chunks a WebP's RIFF holds: one per frame. */
+	private static int anmfCount(File webp) {
+		byte[] data;
+		try {
+			data = Files.readAllBytes(webp.toPath());
+		} catch (IOException e) {
+			throw new AssertionError("could not read " + webp.getName(), e);
+		}
+		String riff = new String(data, 0, 4, java.nio.charset.StandardCharsets.US_ASCII)
+				+ new String(data, 8, 4, java.nio.charset.StandardCharsets.US_ASCII);
+		if (!riff.equals("RIFFWEBP")) {
+			throw new AssertionError(webp.getName() + " is not a WebP: " + riff);
+		}
+		int count = 0;
+		for (int pos = 12; pos + 8 <= data.length; ) {
+			int size = (data[pos + 4] & 0xFF) | ((data[pos + 5] & 0xFF) << 8) | ((data[pos + 6] & 0xFF) << 16)
+					| ((data[pos + 7] & 0xFF) << 24);
+			if (new String(data, pos, 4, java.nio.charset.StandardCharsets.US_ASCII).equals("ANMF")) {
+				count++;
+			}
+			pos += 8 + ((size + 1) & ~1);
+		}
+		return count;
+	}
+
+	/** {@code acTL}'s {@code num_frames}, found by walking the chunks from the signature. */
+	private static int actlFrameCount(byte[] png) {
+		int pos = 8;
+		while (pos + 12 <= png.length) {
+			int length = readInt(png, pos);
+			String type = new String(png, pos + 4, 4, java.nio.charset.StandardCharsets.US_ASCII);
+			if (type.equals("acTL")) {
+				return readInt(png, pos + 8);
+			}
+			if (type.equals("IDAT")) {
+				break; // acTL must come before the first IDAT; after it, it does not count.
+			}
+			pos += 12 + length;
+		}
+		return -1;
+	}
+
+	private static int readInt(byte[] d, int at) {
+		return ((d[at] & 0xFF) << 24) | ((d[at + 1] & 0xFF) << 16) | ((d[at + 2] & 0xFF) << 8) | (d[at + 3] & 0xFF);
+	}
+
+	/**
+	 * A screen can appear at any point across the seconds a burst spans, not just
 	 * between the request and the very next frame the way {@code BigScreenshot} has to guard
 	 * against — {@code Burst.beforeBlit()} re-checks the gate on every frame it issues rather
 	 * than only once at the start.
@@ -166,13 +369,13 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			throw new AssertionError("a burst overtaken by a screen should have stopped, not hung");
 		}
 
-		int length = context.computeOnClient(client -> Burst.getLength());
+		int planned = context.computeOnClient(client -> Burst.framesFor(Burst.getSeconds()));
 		Set<String> after = listing(dir);
 		after.removeAll(before);
 		after.removeIf(name -> !name.endsWith(".png"));
-		if (after.size() >= length) {
+		if (after.size() >= planned) {
 			throw new AssertionError("a burst stopped by a screen should have written fewer than "
-					+ length + " frames, wrote " + after.size());
+					+ planned + " frames, wrote " + after.size());
 		}
 
 		context.setScreen(() -> null);
@@ -196,12 +399,14 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		return names == null ? new HashSet<>() : new HashSet<>(Arrays.asList(names));
 	}
 
-	private static Set<String> theNewFiles(File dir, Set<String> before, int expectedCount, String what) {
+	/** Up to {@code planned} frames, and at least half: a slot can be skipped while every
+	 * in-flight frame is still encoding, but a burst that skipped most of them is broken. */
+	private static Set<String> theNewFiles(File dir, Set<String> before, int planned, String what) {
 		Set<String> after = listing(dir);
 		after.removeAll(before);
 		after.removeIf(name -> !name.endsWith(".png"));
-		if (after.size() != expectedCount) {
-			throw new AssertionError(what + " should have written exactly " + expectedCount
+		if (after.size() > planned || after.size() < planned / 2) {
+			throw new AssertionError(what + " should have written up to " + planned
 					+ " frames, wrote " + after.size() + ": " + after);
 		}
 		return after;

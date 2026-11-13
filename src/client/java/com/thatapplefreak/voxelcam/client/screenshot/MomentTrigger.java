@@ -16,7 +16,7 @@ import java.util.function.Predicate;
  * readable and stable the way the four settings before these are; the lambdas are what buy uniform
  * iteration back on top of them. The same trick {@link SortMode} plays with its key extractors.
  *
- * <p>Unlike {@code Burst.getLength()} or {@code BigScreenshot.getSize()}, these have no
+ * <p>Unlike {@code Burst.getSeconds()} or {@code BigScreenshot.getSize()}, these have no
  * session-static holder to mirror — like {@code favoritesOnly}, the config <em>is</em> where they
  * live, so {@link #isEnabled()} reads {@link VoxelCamConfig#current()} directly instead of keeping
  * a second copy that could drift.
@@ -63,7 +63,7 @@ public enum MomentTrigger {
 
 	/**
 	 * Writes straight onto {@link VoxelCamConfig#current()}. Deliberately does not save — the same
-	 * split {@code Burst.setLength} and {@code SortMode.setCurrent} keep, so that nothing here
+	 * split {@code Burst.setSeconds} and {@code SortMode.setCurrent} keep, so that nothing here
 	 * reaches {@code FabricLoader} from a no-client unit suite. The settings screen calls {@code
 	 * VoxelCamConfig.saveCurrent()} itself, which is where a change actually happens at the
 	 * player's hand.

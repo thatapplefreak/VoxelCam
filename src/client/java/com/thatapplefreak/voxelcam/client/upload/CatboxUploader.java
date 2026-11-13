@@ -1,5 +1,7 @@
 package com.thatapplefreak.voxelcam.client.upload;
 
+import com.thatapplefreak.voxelcam.client.share.NativeShare;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -38,7 +40,8 @@ public final class CatboxUploader {
 	 */
 	static CompletableFuture<String> upload(File image, URI endpoint) {
 		MultipartBody multipart = new MultipartBody().addField("reqtype", "fileupload");
-		MultipartBody.Streamed framing = multipart.streamFile("fileToUpload", image.getName(), "image/png");
+		String contentType = "webp".equals(NativeShare.extensionOf(image)) ? "image/webp" : "image/png";
+		MultipartBody.Streamed framing = multipart.streamFile("fileToUpload", image.getName(), contentType);
 
 		// The image is published straight from disk rather than read here: an oversized
 		// capture is tens of megabytes, and this runs on the thread that pressed the

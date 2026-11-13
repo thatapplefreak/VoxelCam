@@ -7,8 +7,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.util.Util;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -254,7 +257,9 @@ public final class ScreenshotHandler {
 		Minecraft client = Minecraft.getInstance();
 		boolean succeeded = false;
 		try (image) {
-			writeOrDiscard(target, image::writeToFile);
+			// A burst writes dozens of frames at a time, so its frames go through VoxelCam's own
+			// encoder, about a third smaller than stb's; a single capture keeps the vanilla path.
+			writeOrDiscard(target, burst != null ? file -> writeCompressed(image, file) : image::writeToFile);
 			succeeded = true;
 			embedMetadata(target, context, burst, moment);
 			if (burst == null) {
@@ -311,6 +316,12 @@ public final class ScreenshotHandler {
 				target.delete();
 			}
 			throw e;
+		}
+	}
+
+	private static void writeCompressed(NativeImage image, File target) throws IOException {
+		try (OutputStream out = new BufferedOutputStream(new FileOutputStream(target))) {
+			PngEncoder.encode(image.getPixels(), image.getWidth(), image.getHeight(), out);
 		}
 	}
 

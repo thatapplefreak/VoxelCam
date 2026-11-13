@@ -4,6 +4,7 @@
 	"key.voxelcam.capturemenu": "Chart a Map / Chartin' Wheel",
 
 	"voxelcam.hud.saving": "Stowin' th' map…",
+	"voxelcam.hud.recording": "Keepin' watch, %ss t' go",
 
 	"voxelcam.savingpleasewait": "Stowin' yer map right now, hold yer horses",
 	"voxelcam.savedscreenshotas": "Stowed th' map as: %s",
@@ -37,6 +38,7 @@
 	"voxelcam.share.savecopy": "Stow a copy…",
 	"voxelcam.share.savecopy.title": "Stow th' map",
 	"voxelcam.share.png": "PNG map",
+	"voxelcam.share.webp": "Movin' picture",
 	"voxelcam.share.reveal": "Show in th' chest keeper",
 	"voxelcam.share.copypath": "Copy th' map's route",
 	"voxelcam.share.link": "Get a tradin' link",
@@ -50,6 +52,14 @@
 	"voxelcam.share.uploading.link": "Sendin' it off…",
 	"voxelcam.share.linkfailed": "Couldn't get a tradin' link",
 	"voxelcam.share.uploaded": "Sent off — link copied t' yer parchment",
+	"voxelcam.share.toobig.title": "Too heavy fer th’ Discord",
+	"voxelcam.share.toobig.message": "This movin’ picture weighs %s MB; th’ free hold takes but %s MB.",
+	"voxelcam.share.toobig.smaller": "A smaller copy fer Discord (wise)",
+	"voxelcam.share.toobig.full": "Full size, arr",
+	"voxelcam.tooltip.toobig.smaller": "Shrunk till it fits, so it dances right in th’ chat",
+	"voxelcam.tooltip.toobig.full": "Send it as she be, fer Nitro or other ports",
+	"voxelcam.share.shrinking": "Shrinkin’ th’ picture…",
+	"voxelcam.share.shrinkfailed": "Couldn’t shrink th’ picture",
 
 	"voxelcam.tooltip.rename": "Re-christen th' chosen map (F2)",
 	"voxelcam.tooltip.delete": "Scuttle th' chosen map (Del)",
@@ -64,8 +74,8 @@
 	"voxelcam.tooltip.favoritesonly": "Show only th' maps marked with an X",
 	"voxelcam.tooltip.openmanager": "Open th' VoxelCam map chest",
 	"voxelcam.tooltip.settings": "VoxelCam settin's",
-	"voxelcam.tooltip.burstlengthdown": "Fewer maps per flurry",
-	"voxelcam.tooltip.burstlengthup": "More maps per flurry",
+	"voxelcam.tooltip.burstlengthdown": "Shorter flurries",
+	"voxelcam.tooltip.burstlengthup": "Longer flurries",
 	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big map preset",
 
 	"voxelcam.delete.title": "Scuttle th' map?",
@@ -94,16 +104,23 @@
 	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
 	"voxelcam.burst.setaskey": "Make th' Key",
 	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
+	"voxelcam.burst.exportanimation": "Make 'Em Dance",
+	"voxelcam.burst.exportanimation.failed": "Th' maps wouldn't dance, see th' log fer why",
+	"voxelcam.burst.exporting": "Teachin' th' maps t' dance…",
+	"voxelcam.animation.loading": "Unrollin’ th’ picture…",
+	"voxelcam.progress.frames": "%s %s o’ %s maps",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
+	"voxelcam.burst.seconds": "%ss",
 	"voxelcam.tooltip.setaskey": "Show this map in th' chest instead o' th' current key",
+	"voxelcam.tooltip.exportanimation": "Lash all %s maps into one movin' picture",
 	"voxelcam.tooltip.burstscroll": "See more maps in this flurry",
 
 	"voxelcam.settings": "VoxelCam Settin's",
 	"voxelcam.settings.gear": "⚙",
 	"voxelcam.settings.burstlengthminus": "-",
 	"voxelcam.settings.burstlengthplus": "+",
-	"voxelcam.settings.burstlength": "Flurry size: %s",
+	"voxelcam.settings.burstlength": "Flurry length: %s seconds",
 	"voxelcam.settings.bigscreenshotsize": "Big map size: %s",
 
 	"voxelcam.settings.autocapture": "Maps by themselves…",
@@ -127,5 +144,6 @@
 	"voxelcam.tooltip.moment.death": "Snap a map th' moment ye meet Davy Jones",
 	"voxelcam.tooltip.moment.newdimension": "Snap a map th' first time ye make landfall somewhere new",
 	"voxelcam.moment.subject": "%s: %s",
-	"voxelcam.moment.saved": "%s — stowed as %s"
+	"voxelcam.moment.saved": "%s — stowed as %s",
+	"voxelcam.animation.details": "Movin' picture, %s maps"
 }

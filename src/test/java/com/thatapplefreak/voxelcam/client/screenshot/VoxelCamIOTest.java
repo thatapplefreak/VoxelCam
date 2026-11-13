@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -330,6 +331,47 @@ class VoxelCamIOTest {
 		VoxelCamIO.selectPhoto(dir.resolve("filtered-out.png").toFile());
 
 		assertNull(VoxelCamIO.selectionFor(List.of(), null));
+	}
+
+	@Test
+	void anAnimationsWebpCopyIsRenamedWithIt() throws IOException {
+		File animation = shot("shot_animation.png", 1_000L);
+		File webp = dir.resolve("shot_animation.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1, 2, 3 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "jump");
+
+		assertEquals("jump.png", renamed.getName());
+		assertTrue(dir.resolve("jump.webp").toFile().isFile(), "the WebP copy should follow its animation");
+		assertFalse(webp.exists());
+	}
+
+	@Test
+	void aRenameWhoseWebpNameIsTakenIsRefusedWholesale() throws IOException {
+		File animation = shot("shot_animation.png", 1_000L);
+		Files.write(dir.resolve("shot_animation.webp"), new byte[] { 1 });
+		Files.write(dir.resolve("jump.webp"), new byte[] { 2 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "jump"));
+		assertTrue(animation.exists(), "nothing should move when any target is taken");
+		assertArrayEquals(new byte[] { 2 }, Files.readAllBytes(dir.resolve("jump.webp")));
+	}
+
+	@Test
+	void deletingAnAnimationDeletesItsWebpCopy() throws IOException {
+		File animation = shot("shot_animation.png", 1_000L);
+		File webp = dir.resolve("shot_animation.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		assertTrue(VoxelCamIO.delete());
+		assertFalse(animation.exists());
+		assertFalse(webp.exists(), "an orphaned WebP would be invisible in the manager and never cleaned up");
 	}
 
 	@Test

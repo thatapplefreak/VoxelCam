@@ -142,7 +142,7 @@ public final class PngTextChunk {
 		return SIGNATURE.length + 4 + 4 + dataLength + 4;
 	}
 
-	private static byte[] iTXtChunk(String keyword, String text) {
+	static byte[] iTXtChunk(String keyword, String text) {
 		byte[] keywordBytes = keyword.getBytes(StandardCharsets.US_ASCII);
 		byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
 

@@ -57,7 +57,7 @@ public final class ScreenshotNamer {
 	 * folder, which is the exact thing that method exists to prevent. Serialising captures ({@code
 	 * Burst.isBusy()} in every capture guard) is what closes the race instead.
 	 *
-	 * <p>Bounded by {@code Burst.MAX_LENGTH}: at most a handful of extra {@code File.exists()}
+	 * <p>Bounded by {@code Burst.MAX_FRAMES}: at most a handful of extra {@code File.exists()}
 	 * probes, paid once per burst on the render thread, not per frame and not per row.
 	 */
 	public static List<File> reserveBurstNames(File screenshotsDir, int count) {

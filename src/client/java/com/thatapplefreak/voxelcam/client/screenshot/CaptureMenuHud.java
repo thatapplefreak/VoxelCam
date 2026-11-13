@@ -228,7 +228,8 @@ public final class CaptureMenuHud {
 		return switch (mode) {
 			case SCREENSHOT -> List.of();
 			case BIG_SCREENSHOT -> BigScreenshotSize.DIAL_OPTIONS.stream().map(BigScreenshotSize::token).toList();
-			case BURST -> Arrays.stream(Burst.DIAL_OPTIONS).mapToObj(String::valueOf).toList();
+			case BURST -> Arrays.stream(Burst.DIAL_OPTIONS)
+					.mapToObj(seconds -> Component.translatable("voxelcam.burst.seconds", seconds).getString()).toList();
 		};
 	}
 

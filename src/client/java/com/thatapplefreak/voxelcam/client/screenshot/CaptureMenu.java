@@ -298,7 +298,7 @@ public final class CaptureMenu {
 				// unreachable — kept only so the switch stays exhaustive without a default.
 			}
 			case BIG_SCREENSHOT -> BigScreenshot.setSize(BigScreenshotSize.DIAL_OPTIONS.get(option));
-			case BURST -> Burst.setLength(Burst.DIAL_OPTIONS[option]);
+			case BURST -> Burst.setSeconds(Burst.DIAL_OPTIONS[option]);
 		}
 		// Unreachable from the unit suite: crossing into OPEN (where this is called from) already
 		// needs a real client, same as the busy-guard refusal and firing either mode do.

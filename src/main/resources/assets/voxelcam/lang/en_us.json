@@ -4,6 +4,7 @@
 	"key.voxelcam.capturemenu": "Screenshot / Capture Menu",
 
 	"voxelcam.hud.saving": "Saving screenshot…",
+	"voxelcam.hud.recording": "Recording, %ss left",
 
 	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
@@ -37,6 +38,7 @@
 	"voxelcam.share.savecopy": "Save a copy…",
 	"voxelcam.share.savecopy.title": "Save screenshot",
 	"voxelcam.share.png": "PNG image",
+	"voxelcam.share.webp": "Animated WebP image",
 	"voxelcam.share.reveal": "Show in file manager",
 	"voxelcam.share.copypath": "Copy file path",
 	"voxelcam.share.link": "Get a share link",
@@ -50,6 +52,14 @@
 	"voxelcam.share.uploading.link": "Uploading…",
 	"voxelcam.share.linkfailed": "Could not get a share link",
 	"voxelcam.share.uploaded": "Uploaded — link copied to clipboard",
+	"voxelcam.share.toobig.title": "Too big for Discord",
+	"voxelcam.share.toobig.message": "This animation is %s MB; Discord’s free upload limit is %s MB.",
+	"voxelcam.share.toobig.smaller": "Smaller copy for Discord (recommended)",
+	"voxelcam.share.toobig.full": "Full resolution",
+	"voxelcam.tooltip.toobig.smaller": "Scaled down until it fits, so it plays right in the chat",
+	"voxelcam.tooltip.toobig.full": "Send it as it is, for Discord Nitro or anywhere without the limit",
+	"voxelcam.share.shrinking": "Making a smaller copy…",
+	"voxelcam.share.shrinkfailed": "Could not make a smaller copy",
 
 	"voxelcam.tooltip.rename": "Rename the selected screenshot (F2)",
 	"voxelcam.tooltip.delete": "Delete the selected screenshot (Del)",
@@ -64,8 +74,8 @@
 	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
 	"voxelcam.tooltip.settings": "VoxelCam settings",
-	"voxelcam.tooltip.burstlengthdown": "Fewer frames per burst",
-	"voxelcam.tooltip.burstlengthup": "More frames per burst",
+	"voxelcam.tooltip.burstlengthdown": "Shorter bursts",
+	"voxelcam.tooltip.burstlengthup": "Longer bursts",
 	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big screenshot preset",
 
 	"voxelcam.delete.title": "Delete screenshot?",
@@ -94,16 +104,23 @@
 	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
 	"voxelcam.burst.setaskey": "Set as Key",
 	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
+	"voxelcam.burst.exportanimation": "Export Animation",
+	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
+	"voxelcam.burst.exporting": "Exporting animation…",
+	"voxelcam.animation.loading": "Loading animation…",
+	"voxelcam.progress.frames": "%s %s of %s frames",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
+	"voxelcam.burst.seconds": "%ss",
 	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
+	"voxelcam.tooltip.exportanimation": "Save all %s frames as one looping animation, with a WebP copy for sharing",
 	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
 
 	"voxelcam.settings": "VoxelCam Settings",
 	"voxelcam.settings.gear": "⚙",
 	"voxelcam.settings.burstlengthminus": "-",
 	"voxelcam.settings.burstlengthplus": "+",
-	"voxelcam.settings.burstlength": "Burst length: %s",
+	"voxelcam.settings.burstlength": "Burst length: %s seconds",
 	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s",
 
 	"voxelcam.settings.autocapture": "Automatic capture…",
@@ -127,5 +144,6 @@
 	"voxelcam.tooltip.moment.death": "Capture the moment you die",
 	"voxelcam.tooltip.moment.newdimension": "Capture the first time you arrive in a dimension",
 	"voxelcam.moment.subject": "%s: %s",
-	"voxelcam.moment.saved": "%s — saved as %s"
+	"voxelcam.moment.saved": "%s — saved as %s",
+	"voxelcam.animation.details": "Animation, %s frames"
 }

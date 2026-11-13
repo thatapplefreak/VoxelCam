@@ -236,24 +236,25 @@ public final class CaptureStatus {
 	 *   <li>an oversized capture that has resized and is waiting for this blit;</li>
 	 *   <li>a capture-menu selection waiting for its first clean frame — whatever mode it fires, a
 	 *       plain shot and a burst's key frame are both taken from this very blit;</li>
-	 *   <li>a running burst, which may issue a frame on any blit it gets a slot on;</li>
+	 *   <li>a burst frame this frame's head settled on — only those, so the recording cue can
+	 *       show on every frame in between;</li>
 	 *   <li>an automatic moment, armed and waiting for the frame its gate accepts.</li>
 	 * </ul>
 	 * Over-hiding costs a frame of a notice; under-hiding puts it in a PNG. So each term errs wide.
 	 */
 	static boolean capturesFrame(boolean bigScreenshotCapturing, boolean menuCapturePending,
-			boolean burstRunning, boolean momentPending) {
-		return bigScreenshotCapturing || menuCapturePending || burstRunning || momentPending;
+			boolean burstCapturing, boolean momentPending) {
+		return bigScreenshotCapturing || menuCapturePending || burstCapturing || momentPending;
 	}
 
 	/**
 	 * Head of {@code Minecraft.renderFrame}, after every capture path's own {@code beforeFrame} —
-	 * {@code BigScreenshot} moves into its capturing state there, and {@code CaptureMenu} marks the
-	 * frame it will fire from.
+	 * {@code BigScreenshot} moves into its capturing state there, {@code CaptureMenu} marks the
+	 * frame it will fire from, and {@code Burst} settles whether this frame is one of its slots.
 	 */
 	public static void beforeFrame() {
 		frameIsCaptured = capturesFrame(BigScreenshot.isCapturing(), CaptureMenu.capturesThisFrame(),
-				Burst.isBusy(), AutoCapture.isPending());
+				Burst.capturesThisFrame(), AutoCapture.isPending());
 
 		long now = Util.getMillis();
 		boolean nowBusy = busyAt(ScreenshotHandler.savesInFlight(), BigScreenshot.isBusy(), Burst.isBusy());

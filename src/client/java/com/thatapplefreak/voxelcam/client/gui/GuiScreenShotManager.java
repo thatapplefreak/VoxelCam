@@ -1,7 +1,10 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
+import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.share.NativeShare;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimationPreview;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
@@ -22,6 +25,7 @@ import net.minecraft.util.Util;
 import com.mojang.blaze3d.platform.InputConstants;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -52,7 +56,12 @@ public class GuiScreenShotManager extends Screen {
 	private static final int FILMSTRIP_CELL_SIZE = 34;
 	private static final int FILMSTRIP_GAP = 3;
 	private static final int FILMSTRIP_SCROLL_BUTTON_WIDTH = 16;
-	private static final int SET_AS_KEY_WIDTH = 88;
+	/** Set as key and Export animation share one column at the strip's right end, stacked, so a
+	 * second burst action costs the strip no cells; wide enough for the longer of the two labels. */
+	private static final int FILMSTRIP_ACTION_WIDTH = 96;
+	/** Two of these plus their gap fill the 40px band; the search row's controls are this tall too. */
+	private static final int FILMSTRIP_ACTION_HEIGHT = 18;
+	private static final int FILMSTRIP_ACTION_GAP = 2;
 	/** The key badge's fill colour — the same gold the star badge and star icon use, so "this
 	 * marks something about the file" reads as one visual language rather than two. */
 	private static final int KEY_BADGE_COLOR = 0xEEFFD700;
@@ -67,6 +76,7 @@ public class GuiScreenShotManager extends Screen {
 	private Button deleteButton;
 	private Button shareButton;
 	private Button setAsKeyButton;
+	private Button exportAnimationButton;
 	private Button filmstripScrollLeftButton;
 	private Button filmstripScrollRightButton;
 
@@ -83,6 +93,11 @@ public class GuiScreenShotManager extends Screen {
 	private int filmstripScroll;
 	/** A failed file action, shown in place of the details line until the selection moves. */
 	private Component actionError;
+	/** An animation export is being written off the render thread; its button waits for it. */
+	private boolean exporting;
+	/** How far the export has got, written from the IO thread after each frame, for its bar. */
+	private volatile int exportFramesDone;
+	private volatile int exportFramesTotal;
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
@@ -191,17 +206,23 @@ public class GuiScreenShotManager extends Screen {
 		// can change without a rebuild, from clicking a different row in the list.
 		int filmstripTop = previewY + previewHeight - FILMSTRIP_HEIGHT;
 		int filmstripButtonY = filmstripTop + (FILMSTRIP_HEIGHT - BUTTON_HEIGHT) / 2;
+		int actionX = previewX + previewWidth - FILMSTRIP_ACTION_WIDTH;
+		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
 		setAsKeyButton = addRenderableWidget(button("voxelcam.burst.setaskey", "voxelcam.tooltip.setaskey",
-				b -> setSelectedFrameAsKey(),
-				previewX + previewWidth - SET_AS_KEY_WIDTH,
-				filmstripButtonY,
-				SET_AS_KEY_WIDTH));
+				b -> setSelectedFrameAsKey(), actionX, actionTop, FILMSTRIP_ACTION_WIDTH));
+		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
+		// A fixed label, with the frame count in the tooltip: a label that changed with the burst
+		// would be one a test (and clickScreenButton) could never find by its translation.
+		exportAnimationButton = addRenderableWidget(button("voxelcam.burst.exportanimation",
+				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
+				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, FILMSTRIP_ACTION_WIDTH));
+		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		filmstripScrollLeftButton = addRenderableWidget(button("voxelcam.burst.scrollleft",
 				"voxelcam.tooltip.burstscroll", b -> scrollFilmstrip(-1),
 				previewX, filmstripButtonY, FILMSTRIP_SCROLL_BUTTON_WIDTH));
 		filmstripScrollRightButton = addRenderableWidget(button("voxelcam.burst.scrollright",
 				"voxelcam.tooltip.burstscroll", b -> scrollFilmstrip(1),
-				previewX + previewWidth - SET_AS_KEY_WIDTH - GAP - FILMSTRIP_SCROLL_BUTTON_WIDTH,
+				actionX - GAP - FILMSTRIP_SCROLL_BUTTON_WIDTH,
 				filmstripButtonY, FILMSTRIP_SCROLL_BUTTON_WIDTH));
 
 		int leftWidth = Math.round((listWidth - GAP) / 2F);
@@ -338,6 +359,12 @@ public class GuiScreenShotManager extends Screen {
 		// is a no-op VoxelCamIO.setAsKey already refuses, so the button starts disabled instead
 		// of accepting a click that does nothing.
 		setAsKeyButton.active = hasFilmstrip && previewFrame != null;
+		exportAnimationButton.visible = hasFilmstrip;
+		exportAnimationButton.active = hasFilmstrip && !exporting;
+		if (hasFilmstrip) {
+			exportAnimationButton.setTooltip(Tooltip.create(Component.translatable(
+					"voxelcam.tooltip.exportanimation", VoxelCamIO.burstFrameCount(selected) + 1)));
+		}
 
 		// The key plus its frames — burstFrameCount is already the free, cached count from the
 		// listing pass, so this clamps without a second directory read the way filmstripCells()
@@ -403,6 +430,60 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	/**
+	 * Writes the selected burst out as one looping APNG beside it, plus the WebP copy Share hands
+	 * out, then selects the APNG, so the player lands on the thing they just made with Share one
+	 * click away. All of it runs on {@code Util.ioPool()}: the APNG is a byte copy of a hundred-odd
+	 * megabytes for a long 4K burst, and the WebP decodes and re-encodes every frame — neither is
+	 * a render-thread job. See {@link AnimatedPng}.
+	 */
+	private void exportSelectedAnimation() {
+		if (selected == null || exporting || VoxelCamIO.burstFrameCount(selected) == 0) {
+			return;
+		}
+		File key = selected;
+		List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, key);
+		exporting = true;
+		exportFramesDone = 0;
+		exportFramesTotal = frames.size() + 1;
+		actionError = null;
+		updateButtonStates();
+		Util.ioPool().execute(() -> {
+			File written;
+			try {
+				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf, (done, total) -> {
+					exportFramesDone = done;
+					exportFramesTotal = total;
+				}).apng();
+			} catch (IOException | RuntimeException e) {
+				VoxelCamClient.LOGGER.error("Failed to export {} as an animation", key, e);
+				written = null;
+			}
+			File result = written;
+			minecraft.execute(() -> exportFinished(key, result));
+		});
+	}
+
+	private void exportFinished(File key, File written) {
+		exporting = false;
+		if (minecraft.gui.screen() != this) {
+			// Closed meanwhile: the file is on disk and the next open lists it; nothing to show.
+			return;
+		}
+		if (written == null) {
+			if (Objects.equals(selected, key)) {
+				actionError = Component.translatable("voxelcam.burst.exportanimation.failed");
+			}
+			updateButtonStates();
+			return;
+		}
+		selected = written;
+		VoxelCamIO.selectPhoto(written);
+		// The new file has to be listed before it can be selected; init() keeps VoxelCamIO's
+		// selection when the rebuilt list contains it.
+		rebuildWidgets();
+	}
+
+	/**
 	 * The cells a burst's filmstrip draws and hit-tests, ordered by original capture index
 	 * rather than by which path currently holds the key. Shared between drawing and click
 	 * handling so the two can never compute different geometry for the same row.
@@ -433,11 +514,12 @@ public class GuiScreenShotManager extends Screen {
 		return frame != null ? frame.index() : 0;
 	}
 
-	/** How many cells the strip has room for between its two scroll buttons and the Set as key
-	 * button — a burst longer than this needs {@link #filmstripScroll} to reach the rest. */
+	/** How many cells the strip has room for between its two scroll buttons and the column holding
+	 * Set as key and Export animation — a burst longer than this needs {@link #filmstripScroll} to
+	 * reach the rest. */
 	private int maxFilmstripCells() {
 		int scrollButtons = (FILMSTRIP_SCROLL_BUTTON_WIDTH + GAP) * 2;
-		int available = previewWidth - SET_AS_KEY_WIDTH - GAP - scrollButtons;
+		int available = previewWidth - FILMSTRIP_ACTION_WIDTH - GAP - scrollButtons;
 		return Math.max(1, (available + FILMSTRIP_GAP) / (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP));
 	}
 
@@ -564,7 +646,18 @@ public class GuiScreenShotManager extends Screen {
 		// filmstrip to have highlighted anything else in.
 		File shown = previewFrame != null ? previewFrame : selected;
 
-		ScreenshotImageCache.Loaded image = ScreenshotImageCache.get(shown, false);
+		// An exported animation plays here; until its frames are decoded, and for everything
+		// else, the still below is drawn — for an animation that is its first frame, so the
+		// switch to playing is seamless.
+		ScreenshotImageCache.Loaded image = null;
+		if (ScreenshotMetadata.animationFrames(shown) > 0) {
+			image = AnimationPreview.frameAt(shown, Util.getMillis());
+		} else {
+			AnimationPreview.showNothing();
+		}
+		if (image == null) {
+			image = ScreenshotImageCache.get(shown, false);
+		}
 		if (image == null) {
 			Component status = ScreenshotImageCache.hasFailed(shown, false)
 					? Component.translatable("voxelcam.loadfailed")
@@ -585,6 +678,21 @@ public class GuiScreenShotManager extends Screen {
 			extractFilmstrip(context);
 		}
 
+		// Over the image rather than in the details line, which is small, grey and easy to miss.
+		// An export takes seconds for a long burst — it decodes and re-encodes every frame twice —
+		// and so does decoding an animation's frames for the preview the first time it is shown.
+		if (exporting) {
+			extractProgress(context, Component.translatable("voxelcam.burst.exporting"),
+					exportFramesDone, exportFramesTotal, imageHeight);
+		} else if (ScreenshotMetadata.animationFrames(shown) > 0) {
+			float loading = AnimationPreview.loadingProgress(shown);
+			if (loading >= 0F) {
+				int total = ScreenshotMetadata.animationFrames(shown);
+				extractProgress(context, Component.translatable("voxelcam.animation.loading"),
+						Math.round(loading * total), total, imageHeight);
+			}
+		}
+
 		if (actionError != null) {
 			// The details line is the only row free at every GUI scale, and it sits under
 			// the preview of the file the failure is about.
@@ -596,7 +704,14 @@ public class GuiScreenShotManager extends Screen {
 		// The list row already carries the capture time, so this line stays short
 		// enough not to be trimmed: the filename (which the row may show as a
 		// friendly time instead) plus the facts the row has no space for.
-		StringBuilder details = new StringBuilder(selected.getName());
+		StringBuilder details = new StringBuilder();
+		// First, ahead of even the name: an animation previews as its first frame, so this is the
+		// one fact about it the image above cannot show, and the line is trimmed from the end.
+		int animationFrames = ScreenshotMetadata.animationFrames(selected);
+		if (animationFrames > 0) {
+			details.append(Component.translatable("voxelcam.animation.details", animationFrames).getString()).append("  ·  ");
+		}
+		details.append(selected.getName());
 		ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(selected);
 		if (size != null) {
 			details.append("  ·  ").append(size.width()).append('×').append(size.height());
@@ -615,6 +730,33 @@ public class GuiScreenShotManager extends Screen {
 		context.centeredText(font,
 				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
+	}
+
+	/**
+	 * A label, a frame count and a bar, on a plate near the bottom of the preview image — over the
+	 * image, so it cannot be missed, but low enough to leave the still above it in view.
+	 */
+	private void extractProgress(GuiGraphicsExtractor context, Component label, int done, int total, int imageHeight) {
+		int plateWidth = Math.min(previewWidth - 16, 220);
+		int plateHeight = 26;
+		int left = previewX + (previewWidth - plateWidth) / 2;
+		int top = previewY + imageHeight - plateHeight - 8;
+		context.fill(left, top, left + plateWidth, top + plateHeight, 0xD0101010);
+
+		Component text = total > 0
+				? Component.translatable("voxelcam.progress.frames", label, Math.min(done, total), total)
+				: label;
+		context.centeredText(font, Component.literal(font.plainSubstrByWidth(text.getString(), plateWidth - 8)),
+				left + plateWidth / 2, top + 5, 0xFFFFFFFF);
+
+		int barLeft = left + 6;
+		int barRight = left + plateWidth - 6;
+		int barTop = top + plateHeight - 8;
+		context.fill(barLeft, barTop, barRight, barTop + 3, 0xFF404040);
+		if (total > 0) {
+			int filled = barLeft + Math.round((barRight - barLeft) * Math.min(1F, done / (float) total));
+			context.fill(barLeft, barTop, filled, barTop + 3, 0xFF5BC25B);
+		}
 	}
 
 	/**
@@ -683,6 +825,7 @@ public class GuiScreenShotManager extends Screen {
 	@Override
 	public void onClose() {
 		ScreenshotImageCache.releaseAll();
+		AnimationPreview.releaseAll();
 		ScreenshotMetadata.forgetAll();
 		minecraft.setScreenAndShow(null);
 	}
