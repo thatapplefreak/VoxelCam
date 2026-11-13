@@ -11,25 +11,39 @@ import java.util.PriorityQueue;
  * The manager keeps the APNG ({@link AnimatedPng}); this exists because Discord, where these get
  * posted, shows only the first frame of an APNG but plays an animated WebP.
  *
- * <p>Deliberately the simple end of what lossless WebP (VP8L, RFC 9649) allows, and nothing that
- * trades correctness for size: one subtract-green transform, one set of prefix codes per frame, no
- * colour cache, and backward references only to the previous pixel and the pixel above — which is
- * what a Minecraft sky, a hotbar or a flat field is made of. Each frame is encoded whole. Smarter
- * compression (predictor transforms, a real LZ77 search, coding only what changed between frames)
- * is a follow-up, not a correctness question.
+ * <p>Lossless (VP8L, RFC 9649), with the parts of the format that pay for themselves on
+ * Minecraft footage:
+ * <ul>
+ *   <li><b>Only what changed.</b> After the first, each frame is the smallest even-aligned
+ *       rectangle holding every pixel that differs from the frame before, with the unchanged
+ *       pixels inside it fully transparent and blended over the previous frame. A burst's frames
+ *       are a tenth of a second apart, so most of each one is the frame before.</li>
+ *   <li><b>Subtract-green and predictor transforms.</b> Each 16x16 block uses whichever of the
+ *       spec's fourteen predictors leaves the smallest residuals — a sky gradient becomes runs of
+ *       near-zero.</li>
+ *   <li><b>LZ77 with a hash chain</b>, plus the two short-distance codes for "left" and "above".</li>
+ *   <li><b>A colour cache</b>, so a colour seen recently costs an index rather than four
+ *       symbols.</li>
+ * </ul>
+ * One prefix-code group per image; meta prefix codes and the colour-indexing and cross-colour
+ * transforms are left out.
  *
- * <p>Pixels are ARGB ints, the same packing {@code NativeImage.getPixel} returns. Alpha is
- * dropped: a screenshot is opaque, and an opaque file is what every viewer handles the same way.
+ * <p>Pixels are ARGB ints, the packing {@code NativeImage.getPixels()} returns. Alpha is forced
+ * opaque on the way in: a screenshot is opaque, and transparency is reserved for "unchanged".
  */
 public final class AnimatedWebp {
 
 	/** VP8L stores each dimension minus one in 14 bits. */
 	public static final int MAX_DIMENSION = 1 << 14;
 
+	private record Frame(byte[] vp8l, int x, int y, int width, int height, int delayMillis, boolean blend) {
+	}
+
 	private final int width;
 	private final int height;
-	private final List<byte[]> frames = new ArrayList<>();
-	private final List<Integer> delays = new ArrayList<>();
+	private final List<Frame> frames = new ArrayList<>();
+	/** The canvas as the last frame left it, for the next frame's difference. */
+	private int[] previous;
 
 	public AnimatedWebp(int width, int height) {
 		if (width < 1 || height < 1 || width > MAX_DIMENSION || height > MAX_DIMENSION) {
@@ -44,8 +58,57 @@ public final class AnimatedWebp {
 		if (argb.length != width * height) {
 			throw new IllegalArgumentException("Frame has " + argb.length + " pixels, the canvas " + width * height);
 		}
-		frames.add(encodeVp8l(argb, width, height));
-		delays.add(Math.max(0, Math.min(0xFFFFFF, delayMillis)));
+		int delay = Math.max(0, Math.min(0xFFFFFF, delayMillis));
+		int[] current = new int[argb.length];
+		for (int i = 0; i < argb.length; i++) {
+			current[i] = argb[i] | 0xFF000000;
+		}
+		if (previous == null) {
+			frames.add(new Frame(encodeVp8l(current, width, height), 0, 0, width, height, delay, false));
+		} else {
+			frames.add(difference(previous, current, delay));
+		}
+		previous = current;
+	}
+
+	/**
+	 * The frame as a patch over {@code before}: the bounding box of every changed pixel, its
+	 * corner rounded down to even coordinates (ANMF stores offsets halved), with the pixels inside
+	 * it that did not change made transparent so they blend away. A frame identical to the last
+	 * is a single transparent pixel, since ANMF has no empty frame.
+	 */
+	private Frame difference(int[] before, int[] after, int delay) {
+		int minX = width;
+		int minY = height;
+		int maxX = -1;
+		int maxY = -1;
+		for (int y = 0; y < height; y++) {
+			int row = y * width;
+			for (int x = 0; x < width; x++) {
+				if (before[row + x] != after[row + x]) {
+					minX = Math.min(minX, x);
+					maxX = Math.max(maxX, x);
+					minY = Math.min(minY, y);
+					maxY = y;
+				}
+			}
+		}
+		if (maxX < 0) {
+			return new Frame(encodeVp8l(new int[] { 0 }, 1, 1), 0, 0, 1, 1, delay, true);
+		}
+		int x0 = minX & ~1;
+		int y0 = minY & ~1;
+		int w = maxX - x0 + 1;
+		int h = maxY - y0 + 1;
+		int[] patch = new int[w * h];
+		for (int y = 0; y < h; y++) {
+			int from = (y0 + y) * width + x0;
+			for (int x = 0; x < w; x++) {
+				int pixel = after[from + x];
+				patch[y * w + x] = pixel == before[from + x] ? 0 : pixel;
+			}
+		}
+		return new Frame(encodeVp8l(patch, w, h), x0, y0, w, h, delay, true);
 	}
 
 	/** The whole file: RIFF, then VP8X, ANIM, and one ANMF per frame, looping forever. */
@@ -57,25 +120,30 @@ public final class AnimatedWebp {
 		body.writeBytes(ascii("WEBP"));
 
 		byte[] vp8x = new byte[10];
-		vp8x[0] = 0x02; // animation; no alpha, ICC, EXIF or XMP
+		// Animation, and alpha: the patches use transparency for "unchanged", even though the
+		// composited canvas is always opaque.
+		vp8x[0] = 0x02 | 0x10;
 		put24(vp8x, 4, width - 1);
 		put24(vp8x, 7, height - 1);
 		writeChunk(body, "VP8X", vp8x);
 
-		byte[] anim = new byte[6]; // background colour 0 (unused: every frame covers the canvas), loop forever
+		byte[] anim = new byte[6]; // background colour 0 (the first frame covers it), loop forever
 		writeChunk(body, "ANIM", anim);
 
-		for (int i = 0; i < frames.size(); i++) {
+		for (Frame frame : frames) {
 			ByteArrayOutputStream anmf = new ByteArrayOutputStream();
 			byte[] header = new byte[16];
-			put24(header, 0, 0); // x / 2
-			put24(header, 3, 0); // y / 2
-			put24(header, 6, width - 1);
-			put24(header, 9, height - 1);
-			put24(header, 12, delays.get(i));
-			header[15] = 0x02; // do not blend: each frame replaces the last; no disposal
+			put24(header, 0, frame.x() / 2);
+			put24(header, 3, frame.y() / 2);
+			put24(header, 6, frame.width() - 1);
+			put24(header, 9, frame.height() - 1);
+			put24(header, 12, frame.delayMillis());
+			// Bit 1 set means "do not blend": the first frame replaces whatever is there; every
+			// patch after it blends, so its transparent pixels leave the frame before showing.
+			// Never dispose, so each patch lands on the canvas the last one left.
+			header[15] = (byte) (frame.blend() ? 0x00 : 0x02);
 			anmf.writeBytes(header);
-			writeChunk(anmf, "VP8L", frames.get(i));
+			writeChunk(anmf, "VP8L", frame.vp8l());
 			writeChunk(body, "ANMF", anmf.toByteArray());
 		}
 
@@ -89,74 +157,338 @@ public final class AnimatedWebp {
 
 	// --- VP8L -----------------------------------------------------------------------------------
 
-	private static final int GREEN_ALPHABET = 256 + 24; // literals, then length prefixes; no colour cache
+	private static final int LITERAL_GREEN = 256;
+	private static final int LENGTH_PREFIXES = 24;
 	private static final int DISTANCE_ALPHABET = 40;
 	private static final int MAX_CODE_LENGTH = 15;
 	private static final int MAX_CODE_LENGTH_CODE_LENGTH = 7;
 	private static final int MIN_MATCH = 3;
 	private static final int MAX_MATCH = 4096;
+	/** The largest distance a distance code can carry once the 120 short codes are skipped. */
+	private static final int MAX_DISTANCE = (1 << 20) - 120;
 	/** The VP8L distance codes for "the pixel above" and "the previous pixel" — the first two
-	 * entries of the spec's 2D distance map, (0,1) and (1,0). */
+	 * entries of the spec's 2D distance map, (0,1) and (1,0). Any other distance is sent as itself
+	 * plus 120, which every decoder reads the same way, rather than through the rest of the map. */
 	private static final int DISTANCE_CODE_ABOVE = 1;
 	private static final int DISTANCE_CODE_PREVIOUS = 2;
 	private static final int[] CODE_LENGTH_ORDER = { 17, 18, 0, 1, 2, 3, 4, 5, 16, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
 
-	/** Package-private seam: one frame as a bare VP8L bitstream, the payload of a {@code VP8L} chunk. */
+	/** 16x16 blocks: one predictor mode per block, small enough to follow a horizon. */
+	static final int PREDICTOR_BITS = 4;
+	static final int PREDICTOR_MODES = 14;
+	/** A 1024-colour cache. */
+	static final int CACHE_BITS = 10;
+	private static final int HASH_BITS = 16;
+	/** How many earlier positions with the same two-pixel hash the match search tries. */
+	private static final int CHAIN_LIMIT = 24;
+
+	private static final int TRANSFORM_PREDICTOR = 0;
+	private static final int TRANSFORM_SUBTRACT_GREEN = 2;
+
+	/** Package-private seam: one image as a bare VP8L bitstream, the payload of a {@code VP8L} chunk. */
 	static byte[] encodeVp8l(int[] argb, int width, int height) {
 		int n = width * height;
+		boolean alphaUsed = false;
 		int[] pixels = new int[n];
 		for (int i = 0; i < n; i++) {
 			// Subtract green: red and blue usually track green, so the differences cluster near 0.
 			int p = argb[i];
+			alphaUsed |= (p >>> 24) != 0xFF;
 			int g = (p >>> 8) & 0xFF;
 			int r = (((p >>> 16) & 0xFF) - g) & 0xFF;
 			int b = ((p & 0xFF) - g) & 0xFF;
-			pixels[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+			pixels[i] = (p & 0xFF00FF00) | (r << 16) | b;
 		}
 
-		// Tokens: a literal pixel, or (length, distance code) copying from earlier in the frame.
-		int[] tokens = new int[n * 2];
-		int tokenCount = 0;
-		int[] green = new int[GREEN_ALPHABET];
+		BitWriter out = new BitWriter(n + 64);
+		out.put(0x2F, 8);
+		out.put(width - 1, 14);
+		out.put(height - 1, 14);
+		out.put(alphaUsed ? 1 : 0, 1);
+		out.put(0, 3); // version
+
+		// Transforms are written in the order they were applied; the decoder undoes them in
+		// reverse, so it predicts first and adds green back last.
+		out.put(1, 1);
+		out.put(TRANSFORM_SUBTRACT_GREEN, 2);
+
+		int[] modes = choosePredictors(pixels, width, height);
+		int blocksWide = subSampled(width, PREDICTOR_BITS);
+		int blocksHigh = subSampled(height, PREDICTOR_BITS);
+		int[] modeImage = new int[modes.length];
+		for (int i = 0; i < modes.length; i++) {
+			modeImage[i] = 0xFF000000 | (modes[i] << 8);
+		}
+		out.put(1, 1);
+		out.put(TRANSFORM_PREDICTOR, 2);
+		out.put(PREDICTOR_BITS - 2, 3);
+		writeImage(out, modeImage, blocksWide, false, 0);
+
+		out.put(0, 1); // no more transforms
+		writeImage(out, residuals(pixels, width, height, modes), width, true, CACHE_BITS);
+		return out.toByteArray();
+	}
+
+	private static int subSampled(int size, int bits) {
+		return (size + (1 << bits) - 1) >> bits;
+	}
+
+	// --- predictors -----------------------------------------------------------------------------
+
+	/** Per block, the mode whose residuals have the smallest total magnitude. */
+	static int[] choosePredictors(int[] pixels, int width, int height) {
+		int blocksWide = subSampled(width, PREDICTOR_BITS);
+		int blocksHigh = subSampled(height, PREDICTOR_BITS);
+		int[] modes = new int[blocksWide * blocksHigh];
+		int size = 1 << PREDICTOR_BITS;
+		long[] cost = new long[PREDICTOR_MODES];
+		for (int by = 0; by < blocksHigh; by++) {
+			for (int bx = 0; bx < blocksWide; bx++) {
+				Arrays.fill(cost, 0);
+				int yEnd = Math.min(height, (by + 1) * size);
+				int xEnd = Math.min(width, (bx + 1) * size);
+				for (int y = by * size; y < yEnd; y++) {
+					for (int x = bx * size; x < xEnd; x++) {
+						if (x == 0 || y == 0) {
+							continue; // the edges ignore the mode
+						}
+						int i = y * width + x;
+						int pixel = pixels[i];
+						for (int mode = 0; mode < PREDICTOR_MODES; mode++) {
+							cost[mode] += magnitude(subtract(pixel, predict(mode, pixels, i, width)));
+						}
+					}
+				}
+				int best = 0;
+				for (int mode = 1; mode < PREDICTOR_MODES; mode++) {
+					if (cost[mode] < cost[best]) {
+						best = mode;
+					}
+				}
+				modes[by * blocksWide + bx] = best;
+			}
+		}
+		return modes;
+	}
+
+	/** The image the decoder sees before it undoes the predictor: each pixel minus its prediction,
+	 * with the spec's fixed rules for the first row and column. */
+	static int[] residuals(int[] pixels, int width, int height, int[] modes) {
+		int blocksWide = subSampled(width, PREDICTOR_BITS);
+		int[] out = new int[pixels.length];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int i = y * width + x;
+				int prediction;
+				if (i == 0) {
+					prediction = 0xFF000000;
+				} else if (y == 0) {
+					prediction = pixels[i - 1];
+				} else if (x == 0) {
+					prediction = pixels[i - width];
+				} else {
+					int mode = modes[(y >> PREDICTOR_BITS) * blocksWide + (x >> PREDICTOR_BITS)];
+					prediction = predict(mode, pixels, i, width);
+				}
+				out[i] = subtract(pixels[i], prediction);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * The fourteen predictors of RFC 9649 §4.1, for a pixel not on the first row or column. TR of
+	 * the rightmost column is the first pixel of the current row, which is what {@code i - width
+	 * + 1} addresses there anyway.
+	 */
+	static int predict(int mode, int[] p, int i, int width) {
+		int l = p[i - 1];
+		int t = p[i - width];
+		int tl = p[i - width - 1];
+		int tr = p[i - width + 1];
+		return switch (mode) {
+			case 0 -> 0xFF000000;
+			case 1 -> l;
+			case 2 -> t;
+			case 3 -> tr;
+			case 4 -> tl;
+			case 5 -> average2(average2(l, tr), t);
+			case 6 -> average2(l, tl);
+			case 7 -> average2(l, t);
+			case 8 -> average2(tl, t);
+			case 9 -> average2(t, tr);
+			case 10 -> average2(average2(l, tl), average2(t, tr));
+			case 11 -> select(l, t, tl);
+			case 12 -> clampAddSubtractFull(l, t, tl);
+			case 13 -> clampAddSubtractHalf(average2(l, t), tl);
+			default -> throw new IllegalArgumentException("predictor mode " + mode);
+		};
+	}
+
+	private static int average2(int a, int b) {
+		return (((a ^ b) & 0xFEFEFEFE) >>> 1) + (a & b);
+	}
+
+	private static int select(int l, int t, int tl) {
+		int pL = 0;
+		int pT = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			int cl = (l >>> shift) & 0xFF;
+			int ct = (t >>> shift) & 0xFF;
+			int ctl = (tl >>> shift) & 0xFF;
+			int estimate = cl + ct - ctl;
+			pL += Math.abs(estimate - cl);
+			pT += Math.abs(estimate - ct);
+		}
+		return pL < pT ? l : t;
+	}
+
+	private static int clampAddSubtractFull(int a, int b, int c) {
+		int out = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			int v = ((a >>> shift) & 0xFF) + ((b >>> shift) & 0xFF) - ((c >>> shift) & 0xFF);
+			out |= Math.clamp(v, 0, 255) << shift;
+		}
+		return out;
+	}
+
+	private static int clampAddSubtractHalf(int a, int b) {
+		int out = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			int ca = (a >>> shift) & 0xFF;
+			int cb = (b >>> shift) & 0xFF;
+			out |= Math.clamp(ca + (ca - cb) / 2, 0, 255) << shift;
+		}
+		return out;
+	}
+
+	/** Per channel, {@code a - b} modulo 256. */
+	private static int subtract(int a, int b) {
+		int out = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			out |= ((((a >>> shift) & 0xFF) - ((b >>> shift) & 0xFF)) & 0xFF) << shift;
+		}
+		return out;
+	}
+
+	/** How far a residual is from zero, each channel read as a signed byte. */
+	private static int magnitude(int residual) {
+		return Math.abs((byte) residual) + Math.abs((byte) (residual >>> 8))
+				+ Math.abs((byte) (residual >>> 16)) + Math.abs((byte) (residual >>> 24));
+	}
+
+	// --- entropy-coded images -------------------------------------------------------------------
+
+	/**
+	 * One image's colour-cache header, its five prefix codes and its LZ77 token stream. {@code
+	 * main} adds the meta-prefix bit the spec gives only the ARGB image itself (always "none"
+	 * here); the predictor's mode image has no such bit.
+	 */
+	private static void writeImage(BitWriter out, int[] pixels, int width, boolean main, int cacheBits) {
+		int n = pixels.length;
+		int cacheSize = cacheBits > 0 ? 1 << cacheBits : 0;
+		if (cacheBits > 0) {
+			out.put(1, 1);
+			out.put(cacheBits, 4);
+		} else {
+			out.put(0, 1);
+		}
+		if (main) {
+			out.put(0, 1); // no meta prefix codes: one group for the whole image
+		}
+
+		// Tokens, three ints each: kind, then two values. A literal is (pixel), a cache hit
+		// (index), a copy (length, distance code).
+		int[] kinds = new int[n];
+		int[] first = new int[n];
+		int[] second = new int[n];
+		int count = 0;
+		int[] green = new int[LITERAL_GREEN + LENGTH_PREFIXES + cacheSize];
 		int[] red = new int[256];
 		int[] blue = new int[256];
 		int[] alpha = new int[256];
 		int[] distance = new int[DISTANCE_ALPHABET];
-		for (int i = 0; i < n; ) {
-			int previous = i >= 1 ? matchLength(pixels, i, i - 1, n) : 0;
-			int above = i >= width ? matchLength(pixels, i, i - width, n) : 0;
-			int length = Math.max(previous, above);
-			if (length >= MIN_MATCH) {
-				int code = above >= previous ? DISTANCE_CODE_ABOVE : DISTANCE_CODE_PREVIOUS;
-				tokens[tokenCount++] = -length; // negative marks a copy
-				tokens[tokenCount++] = code;
-				green[256 + prefixOf(length)]++;
-				distance[prefixOf(code)]++;
-				i += length;
-			} else {
-				// Without its alpha byte, which is always 0xFF here: with it every literal would be
-				// negative, which is how a copy is marked.
-				int p = pixels[i] & 0x00FFFFFF;
-				tokens[tokenCount++] = p;
-				green[(p >>> 8) & 0xFF]++;
-				red[(p >>> 16) & 0xFF]++;
-				blue[p & 0xFF]++;
-				alpha[0xFF]++;
-				i++;
-			}
-		}
 
-		BitWriter out = new BitWriter(n / 2 + 64);
-		out.put(0x2F, 8);
-		out.put(width - 1, 14);
-		out.put(height - 1, 14);
-		out.put(0, 1); // alpha_is_used
-		out.put(0, 3); // version
-		out.put(1, 1); // a transform follows
-		out.put(2, 2); // SUBTRACT_GREEN
-		out.put(0, 1); // no more transforms
-		out.put(0, 1); // no colour cache
-		out.put(0, 1); // no meta prefix codes: one group for the whole frame
+		int[] cache = cacheSize > 0 ? new int[cacheSize] : null;
+		int[] head = new int[1 << HASH_BITS];
+		Arrays.fill(head, -1);
+		int[] chain = new int[n];
+
+		for (int i = 0; i < n; ) {
+			int bestLength = 0;
+			int bestDistance = 0;
+			// The two cheapest distances first: they have codes of their own.
+			if (i >= 1) {
+				bestLength = matchLength(pixels, i, i - 1, n);
+				bestDistance = 1;
+			}
+			if (i >= width) {
+				int length = matchLength(pixels, i, i - width, n);
+				if (length > bestLength) {
+					bestLength = length;
+					bestDistance = width;
+				}
+			}
+			if (i + 1 < n && bestLength < MAX_MATCH) {
+				int tries = 0;
+				for (int candidate = head[hash(pixels, i)]; candidate >= 0 && tries < CHAIN_LIMIT;
+						candidate = chain[candidate], tries++) {
+					int d = i - candidate;
+					if (d > MAX_DISTANCE) {
+						break;
+					}
+					int length = matchLength(pixels, i, candidate, n);
+					if (length > bestLength) {
+						bestLength = length;
+						bestDistance = d;
+						if (length == MAX_MATCH) {
+							break;
+						}
+					}
+				}
+			}
+
+			int advance;
+			if (bestLength >= MIN_MATCH) {
+				int code = distanceCode(bestDistance, width);
+				kinds[count] = 2;
+				first[count] = bestLength;
+				second[count++] = code;
+				green[LITERAL_GREEN + prefixOf(bestLength)]++;
+				distance[prefixOf(code)]++;
+				advance = bestLength;
+			} else {
+				int pixel = pixels[i];
+				int key = cache != null ? cacheKey(pixel, cacheBits) : -1;
+				if (cache != null && cache[key] == pixel) {
+					kinds[count] = 1;
+					first[count++] = key;
+					green[LITERAL_GREEN + LENGTH_PREFIXES + key]++;
+				} else {
+					kinds[count] = 0;
+					first[count++] = pixel;
+					green[(pixel >>> 8) & 0xFF]++;
+					red[(pixel >>> 16) & 0xFF]++;
+					blue[pixel & 0xFF]++;
+					alpha[pixel >>> 24]++;
+				}
+				advance = 1;
+			}
+			// The decoder adds every pixel it produces to the cache, copied ones included, so
+			// the encoder's cache has to see exactly the same sequence.
+			for (int k = 0; k < advance; k++) {
+				int at = i + k;
+				if (cache != null) {
+					cache[cacheKey(pixels[at], cacheBits)] = pixels[at];
+				}
+				if (at + 1 < n) {
+					int h = hash(pixels, at);
+					chain[at] = head[h];
+					head[h] = at;
+				}
+			}
+			i += advance;
+		}
 
 		PrefixCode greenCode = writeCode(out, green);
 		PrefixCode redCode = writeCode(out, red);
@@ -164,25 +496,49 @@ public final class AnimatedWebp {
 		PrefixCode alphaCode = writeCode(out, alpha);
 		PrefixCode distanceCode = writeCode(out, distance);
 
-		for (int t = 0; t < tokenCount; t++) {
-			int token = tokens[t];
-			if (token < 0) {
-				int length = -token;
-				int code = tokens[++t];
-				int lengthPrefix = prefixOf(length);
-				greenCode.write(out, 256 + lengthPrefix);
-				out.put(extraValueOf(length), extraBitsOf(lengthPrefix));
-				int distancePrefix = prefixOf(code);
-				distanceCode.write(out, distancePrefix);
-				out.put(extraValueOf(code), extraBitsOf(distancePrefix));
-			} else {
-				greenCode.write(out, (token >>> 8) & 0xFF);
-				redCode.write(out, (token >>> 16) & 0xFF);
-				blueCode.write(out, token & 0xFF);
-				alphaCode.write(out, 0xFF);
+		for (int t = 0; t < count; t++) {
+			switch (kinds[t]) {
+				case 0 -> {
+					int pixel = first[t];
+					greenCode.write(out, (pixel >>> 8) & 0xFF);
+					redCode.write(out, (pixel >>> 16) & 0xFF);
+					blueCode.write(out, pixel & 0xFF);
+					alphaCode.write(out, pixel >>> 24);
+				}
+				case 1 -> greenCode.write(out, LITERAL_GREEN + LENGTH_PREFIXES + first[t]);
+				default -> {
+					int length = first[t];
+					int code = second[t];
+					int lengthPrefix = prefixOf(length);
+					greenCode.write(out, LITERAL_GREEN + lengthPrefix);
+					out.put(extraValueOf(length), extraBitsOf(lengthPrefix));
+					int distancePrefix = prefixOf(code);
+					distanceCode.write(out, distancePrefix);
+					out.put(extraValueOf(code), extraBitsOf(distancePrefix));
+				}
 			}
 		}
-		return out.toByteArray();
+	}
+
+	/** The spec's colour-cache hash: a multiplicative hash, top bits. */
+	static int cacheKey(int argb, int cacheBits) {
+		return (0x1E35A7BD * argb) >>> (32 - cacheBits);
+	}
+
+	private static int hash(int[] pixels, int i) {
+		int h = pixels[i] * 0x9E3779B1 ^ pixels[i + 1] * 0x85EBCA77;
+		return h >>> (32 - HASH_BITS);
+	}
+
+	/** Left and above have short codes of their own; everything else is its distance plus 120. */
+	static int distanceCode(int distance, int width) {
+		if (distance == 1) {
+			return DISTANCE_CODE_PREVIOUS;
+		}
+		if (distance == width) {
+			return DISTANCE_CODE_ABOVE;
+		}
+		return distance + 120;
 	}
 
 	private static int matchLength(int[] pixels, int at, int from, int n) {

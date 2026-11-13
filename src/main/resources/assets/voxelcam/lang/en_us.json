@@ -97,6 +97,7 @@
 	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
 	"voxelcam.burst.exportanimation": "Export Animation",
 	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
+	"voxelcam.burst.exporting": "Exporting animation…",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.burst.seconds": "%ss",

@@ -670,6 +670,14 @@ public class GuiScreenShotManager extends Screen {
 			extractFilmstrip(context);
 		}
 
+		if (exporting && actionError == null) {
+			// An export decodes and re-encodes every frame for the WebP copy: seconds, for a long
+			// 1080p burst, with nothing else on screen to say it is happening.
+			context.centeredText(font, Component.translatable("voxelcam.burst.exporting").withStyle(ChatFormatting.GRAY),
+					previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
+			return;
+		}
+
 		if (actionError != null) {
 			// The details line is the only row free at every GUI scale, and it sits under
 			// the preview of the file the failure is about.

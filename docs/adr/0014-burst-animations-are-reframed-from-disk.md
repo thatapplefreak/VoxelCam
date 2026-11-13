@@ -39,5 +39,7 @@ when quantised down to that.
   out. It is a sidecar rather than a replacement: everything in the manager (listing, thumbnails,
   stars, tags, the preview) reads PNG, and the game cannot decode WebP. Rename and delete carry
   the sidecar with its APNG. The WebP does need a real encode, unlike the APNG: `AnimatedWebp` is
-  a minimal pure-Java VP8L encoder, since a mod cannot reasonably ship libwebp's native builds.
-  Its files are large; better compression is tracked in #70.
+  a pure-Java VP8L encoder, since a mod cannot reasonably ship libwebp's native builds. It codes
+  only the rectangle that changed between frames, which makes a burst of a still scene almost free;
+  a burst where the camera moves stays large, because lossless coding of a changing frame cannot
+  be much smaller than the frame.

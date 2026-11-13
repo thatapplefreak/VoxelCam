@@ -97,6 +97,7 @@
 	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
 	"voxelcam.burst.exportanimation": "Make 'Em Dance",
 	"voxelcam.burst.exportanimation.failed": "Th' maps wouldn't dance, see th' log fer why",
+	"voxelcam.burst.exporting": "Teachin' th' maps t' dance…",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.burst.seconds": "%ss",

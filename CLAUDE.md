@@ -330,10 +330,19 @@ Every export also writes `<key>_animation.webp` beside the APNG, from the same f
 `AnimatedWebp`: a pure-Java lossless (VP8L) encoder. Discord plays an animated WebP but shows an
 APNG as its first frame. The WebP is a sidecar, not a screenshot: the manager never lists it, and
 `AnimatedPng.webpBeside` is how rename and delete carry it along (as a group member, with
-rollback) and how `SharePopup` hands it out in the APNG's place. The encoder is deliberately
-minimal (subtract-green, one prefix-code group, copies only from the previous pixel or the one
-above), so files are large; it was checked bit-exact against libwebp, and `AnimatedWebpTest`
-keeps that honest with a decoder for exactly that subset.
+rollback) and how `SharePopup` hands it out in the APNG's place. After the first frame, each frame
+is only the even-aligned rectangle that changed, with unchanged pixels transparent and blended, so
+a burst of a still scene costs little more than one frame. Each image gets subtract-green, a
+per-16x16-block predictor, hash-chain LZ77 (distances other than left and above are sent as
+distance + 120, skipping the spec's 2D table) and a 1024-entry colour cache, but no meta prefix
+codes or colour transforms. It lands within 5–16% of libwebp's lossless size, was checked
+bit-exact against libwebp, and `AnimatedWebpTest` keeps that honest with its own decoder for
+exactly this subset; extend that decoder with any feature you add to the encoder.
+
+Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
+opaque, the best of the five PNG filters per row, zlib 6. That is about 37% smaller than stb's
+output, and the exported APNG, being a byte copy of the frames, shrinks with them. Single
+captures still use the vanilla encoder.
 
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
