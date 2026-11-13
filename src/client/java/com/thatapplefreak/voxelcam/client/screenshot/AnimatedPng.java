@@ -161,8 +161,25 @@ public final class AnimatedPng {
 	}
 
 	/**
-	 * The WebP sharing copy that belongs to an exported animation: the same name, {@code .webp}.
-	 * Rename, delete and Share all look for it here, so it travels with its APNG.
+	 * The WebP sharing copy that travels with {@code png}, or null when it has none. Rename, delete
+	 * and Share all ask here, so the copy moves, goes and is sent with its APNG.
+	 *
+	 * <p>The name alone is not enough: players keep their own {@code .webp} beside a screenshot
+	 * (a converter's output, say), and delete cannot be undone. Only a file this mod exported
+	 * carries {@link #FRAMES_KEY}, so the tag is what makes a same-named WebP ours. The cheap
+	 * existence check goes first, since reading the tag reads the whole PNG.
+	 */
+	public static File sharingCopyOf(File png) {
+		File webp = webpBeside(png);
+		if (!webp.isFile() || frameCount(PngTextChunk.read(png)) == 0) {
+			return null;
+		}
+		return webp;
+	}
+
+	/**
+	 * Where an exported animation's WebP sharing copy goes: the same name, {@code .webp}. Says
+	 * nothing about whether the file there is one — {@link #sharingCopyOf} does.
 	 */
 	public static File webpBeside(File png) {
 		String name = png.getName();

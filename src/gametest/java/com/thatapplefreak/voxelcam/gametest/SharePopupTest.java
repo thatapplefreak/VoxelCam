@@ -2,12 +2,15 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.gui.SharePopup;
 import com.thatapplefreak.voxelcam.client.gui.ShareSizePopup;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import com.thatapplefreak.voxelcam.client.screenshot.SmallerShareCopy;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
@@ -58,6 +61,7 @@ public class SharePopupTest implements FabricClientGameTest {
 
 		context.takeScreenshot("share-popup");
 
+		assertAPlayersOwnWebpIsNotSharedInstead(context, screenshot.getParentFile());
 		assertAnOversizedAnimationAsksBeforeSending(context, screenshot.getParentFile());
 
 		context.setScreen(TitleScreen::new);
@@ -69,12 +73,42 @@ public class SharePopupTest implements FabricClientGameTest {
 	 * either choice would go on to upload to the real catbox. The WebP here is filler bytes of the
 	 * right size — the popup goes by the file's size, and nothing reads it once Cancel is chosen.
 	 */
+	/**
+	 * A WebP beside a screenshot is only the sharing copy when the PNG is an animation VoxelCam
+	 * exported. Otherwise it is the player's own file and the popup acts on the PNG; Copy file path
+	 * is the button that shows which file that is without sending anything anywhere.
+	 */
+	private static void assertAPlayersOwnWebpIsNotSharedInstead(ClientGameTestContext context, File dir) {
+		File png = new File(dir, "converted.png");
+		File webp = new File(dir, "converted.webp");
+		try {
+			Files.copy(new File(dir, "share-target.png").toPath(), png.toPath(),
+					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			Files.write(webp.toPath(), new byte[] { 1, 2, 3 });
+		} catch (IOException e) {
+			throw new AssertionError("could not write the screenshot and its WebP", e);
+		}
+
+		try {
+			context.setScreen(() -> new SharePopup(null, png));
+			context.waitForScreen(SharePopup.class);
+			context.waitTicks(2);
+			assertCopyPathReachesTheClipboard(context, png);
+		} finally {
+			webp.delete();
+			png.delete();
+		}
+	}
+
 	private static void assertAnOversizedAnimationAsksBeforeSending(ClientGameTestContext context, File dir) {
 		File animation = new File(dir, "oversized_animation.png");
 		File webp = new File(dir, "oversized_animation.webp");
 		try {
 			Files.copy(new File(dir, "share-target.png").toPath(), animation.toPath(),
 					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			// The tag export writes is what makes the WebP beside it the animation's sharing copy.
+			// Without it this is a plain screenshot, and the link button would upload it for real.
+			PngTextChunk.embed(animation, Map.of(AnimatedPng.FRAMES_KEY, "2"));
 			Files.write(webp.toPath(), new byte[(int) (SmallerShareCopy.DISCORD_LIMIT_BYTES * 6 / 5)]);
 		} catch (IOException e) {
 			throw new AssertionError("could not write the oversized animation", e);
@@ -84,6 +118,9 @@ public class SharePopupTest implements FabricClientGameTest {
 			context.setScreen(() -> new SharePopup(null, animation));
 			context.waitForScreen(SharePopup.class);
 			context.waitTicks(2);
+			// Before the link button: if the popup took this for a plain screenshot, pressing it would
+			// upload to catbox instead of asking. Copy file path names the file it would send.
+			assertCopyPathReachesTheClipboard(context, webp);
 
 			context.clickScreenButton("voxelcam.share.link");
 			context.waitForScreen(ShareSizePopup.class);

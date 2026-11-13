@@ -226,8 +226,8 @@ public final class VoxelCamIO {
 
 		// An exported animation's WebP copy travels with it, checked and rolled back like a frame:
 		// left behind, Share would lose it, and the old name would no longer be free to reuse.
-		File webp = AnimatedPng.webpBeside(selected);
-		if (webp.exists()) {
+		File webp = AnimatedPng.sharingCopyOf(selected);
+		if (webp != null) {
 			File webpTarget = AnimatedPng.webpBeside(target);
 			if (fileCollides(webpTarget, webp)) {
 				return null;
@@ -381,8 +381,8 @@ public final class VoxelCamIO {
 		File dir = selected.getParentFile();
 		List<File> frames = new ArrayList<>(burstFrames(dir, selected));
 		// An exported animation's WebP copy goes with it, first, for the same reason frames do.
-		File webp = AnimatedPng.webpBeside(selected);
-		if (webp.exists()) {
+		File webp = AnimatedPng.sharingCopyOf(selected);
+		if (webp != null) {
 			frames.add(webp);
 		}
 		for (File frame : frames) {

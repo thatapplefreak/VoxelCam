@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +56,13 @@ class VoxelCamIOTest {
 
 		File file = dir.resolve(name).toFile();
 		Files.write(file.toPath(), out.toByteArray());
+		return file;
+	}
+
+	/** A PNG carrying the tag export writes, which is what makes a WebP beside it its sharing copy. */
+	private File exportedAnimation(String name) throws IOException {
+		File file = realPng(name);
+		PngTextChunk.embed(file, Map.of(AnimatedPng.FRAMES_KEY, "3"));
 		return file;
 	}
 
@@ -335,7 +343,7 @@ class VoxelCamIOTest {
 
 	@Test
 	void anAnimationsWebpCopyIsRenamedWithIt() throws IOException {
-		File animation = shot("shot_animation.png", 1_000L);
+		File animation = exportedAnimation("shot_animation.png");
 		File webp = dir.resolve("shot_animation.webp").toFile();
 		Files.write(webp.toPath(), new byte[] { 1, 2, 3 });
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
@@ -350,7 +358,7 @@ class VoxelCamIOTest {
 
 	@Test
 	void aRenameWhoseWebpNameIsTakenIsRefusedWholesale() throws IOException {
-		File animation = shot("shot_animation.png", 1_000L);
+		File animation = exportedAnimation("shot_animation.png");
 		Files.write(dir.resolve("shot_animation.webp"), new byte[] { 1 });
 		Files.write(dir.resolve("jump.webp"), new byte[] { 2 });
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
@@ -363,7 +371,7 @@ class VoxelCamIOTest {
 
 	@Test
 	void deletingAnAnimationDeletesItsWebpCopy() throws IOException {
-		File animation = shot("shot_animation.png", 1_000L);
+		File animation = exportedAnimation("shot_animation.png");
 		File webp = dir.resolve("shot_animation.webp").toFile();
 		Files.write(webp.toPath(), new byte[] { 1 });
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
@@ -372,6 +380,45 @@ class VoxelCamIOTest {
 		assertTrue(VoxelCamIO.delete());
 		assertFalse(animation.exists());
 		assertFalse(webp.exists(), "an orphaned WebP would be invisible in the manager and never cleaned up");
+	}
+
+	@Test
+	void deletingAPlainScreenshotLeavesASameNamedWebpAlone() throws IOException {
+		File screenshot = realPng("trip.png");
+		File webp = dir.resolve("trip.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(screenshot);
+
+		assertTrue(VoxelCamIO.delete());
+		assertFalse(screenshot.exists());
+		assertTrue(webp.isFile(), "a WebP the player made is theirs, and a delete cannot be undone");
+	}
+
+	@Test
+	void renamingAPlainScreenshotLeavesASameNamedWebpAlone() throws IOException {
+		File screenshot = realPng("trip.png");
+		File webp = dir.resolve("trip.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(screenshot);
+
+		assertEquals("jump.png", VoxelCamIO.rename(dir.toFile(), "jump").getName());
+		assertTrue(webp.isFile(), "only an exported animation's WebP travels with it");
+		assertFalse(dir.resolve("jump.webp").toFile().exists());
+	}
+
+	@Test
+	void aPlainScreenshotIsNotRefusedForATakenWebpName() throws IOException {
+		realPng("trip.png");
+		Files.write(dir.resolve("trip.webp"), new byte[] { 1 });
+		Files.write(dir.resolve("jump.webp"), new byte[] { 2 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(dir.resolve("trip.png").toFile());
+
+		assertEquals("jump.png", VoxelCamIO.rename(dir.toFile(), "jump").getName());
+		assertArrayEquals(new byte[] { 1 }, Files.readAllBytes(dir.resolve("trip.webp")));
+		assertArrayEquals(new byte[] { 2 }, Files.readAllBytes(dir.resolve("jump.webp")));
 	}
 
 	@Test

@@ -57,8 +57,8 @@ public class SharePopup extends Screen {
 		super(Component.translatable("voxelcam.share"));
 		this.parent = parent;
 		this.source = screenshot;
-		File webp = AnimatedPng.webpBeside(screenshot);
-		this.screenshot = webp.isFile() ? webp : screenshot;
+		File webp = AnimatedPng.sharingCopyOf(screenshot);
+		this.screenshot = webp != null ? webp : screenshot;
 	}
 
 	@Override
