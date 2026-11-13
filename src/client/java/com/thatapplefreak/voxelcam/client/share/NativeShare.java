@@ -16,6 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -86,7 +87,7 @@ public final class NativeShare {
 		CompletableFuture<String> chosen = new CompletableFuture<>();
 
 		ByteBuffer filterName = MemoryUtil.memUTF8(filterDescription);
-		ByteBuffer filterPattern = MemoryUtil.memUTF8("png");
+		ByteBuffer filterPattern = MemoryUtil.memUTF8(extensionOf(screenshot));
 		ByteBuffer location = MemoryUtil.memUTF8(screenshot.getAbsolutePath());
 		SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.calloc(1);
 		filters.get(0).set(filterName, filterPattern);
@@ -124,14 +125,24 @@ public final class NativeShare {
 	 * headless mode, and now answers through an SDL callback besides.
 	 */
 	static Path copyTo(File screenshot, String chosen) throws IOException {
-		Path target = targetPath(chosen);
+		Path target = targetPath(chosen, extensionOf(screenshot));
 		Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
 		return target;
 	}
 
 	/** The dialog does not enforce the filter's extension on every platform. */
 	static Path targetPath(String chosen) {
-		return chosen.toLowerCase().endsWith(".png") ? Path.of(chosen) : Path.of(chosen + ".png");
+		return targetPath(chosen, "png");
+	}
+
+	static Path targetPath(String chosen, String extension) {
+		String suffix = "." + extension;
+		return chosen.toLowerCase(Locale.ROOT).endsWith(suffix) ? Path.of(chosen) : Path.of(chosen + suffix);
+	}
+
+	/** {@code png}, or {@code webp} for an animation's sharing copy — the only two kinds shared. */
+	public static String extensionOf(File file) {
+		return file.getName().toLowerCase(Locale.ROOT).endsWith(".webp") ? "webp" : "png";
 	}
 
 	/** What a reveal actually managed to put on screen. */

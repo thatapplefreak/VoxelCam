@@ -45,8 +45,9 @@ Making a different frame the key frame of its burst.
 _Avoid_: Promote, make cover
 
 **Animation**:
-One looping animated PNG made from a whole burst, written beside its key frame. Each frame stays up
-until the next one was captured, so it plays at the speed it happened.
+One looping animated PNG made from a whole burst, written beside its key frame, with an animated
+WebP copy for sharing. Each frame stays up until the next one was captured, so it plays at the speed
+it happened.
 _Avoid_: GIF, video, clip
 
 **Capture menu**:

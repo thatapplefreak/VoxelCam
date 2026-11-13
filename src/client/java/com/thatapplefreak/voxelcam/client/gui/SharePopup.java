@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
 import com.thatapplefreak.voxelcam.client.share.NativeShare;
 import com.thatapplefreak.voxelcam.client.upload.CatboxUploader;
 import java.io.File;
@@ -28,6 +29,9 @@ public class SharePopup extends Screen {
 	private static final int GAP = 4;
 
 	private final GuiScreenShotManager parent;
+	/** What every button acts on: the screenshot itself, or for an exported animation its WebP
+	 * copy — Discord plays an animated WebP but shows an APNG as a still, and a link pasted
+	 * there is where most of these end up. */
 	private final File screenshot;
 
 	private Button saveButton;
@@ -40,7 +44,8 @@ public class SharePopup extends Screen {
 	public SharePopup(GuiScreenShotManager parent, File screenshot) {
 		super(Component.translatable("voxelcam.share"));
 		this.parent = parent;
-		this.screenshot = screenshot;
+		File webp = AnimatedPng.webpBeside(screenshot);
+		this.screenshot = webp.isFile() ? webp : screenshot;
 	}
 
 	@Override
@@ -74,7 +79,8 @@ public class SharePopup extends Screen {
 		setStatus("voxelcam.share.choosing", false);
 		NativeShare.saveCopy(screenshot,
 						Component.translatable("voxelcam.share.savecopy.title").getString(),
-						Component.translatable("voxelcam.share.png").getString())
+						Component.translatable("webp".equals(NativeShare.extensionOf(screenshot))
+								? "voxelcam.share.webp" : "voxelcam.share.png").getString())
 				.whenComplete((saved, error) -> minecraft.execute(() -> {
 					saveButton.active = true;
 					if (error != null) {

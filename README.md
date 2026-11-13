@@ -25,7 +25,9 @@ Features
 * Capture a burst of consecutive frames in one go. The manager lists a burst as
   a single entry you can expand, and any frame in it can be promoted to the one
   that represents the group. **Export Animation** turns the whole burst into one
-  looping animated PNG, at full quality and at the speed it was captured.
+  looping animation, at full quality and at the speed it was captured, that plays
+  right in the manager. Sharing it hands out an animated WebP copy, which plays
+  on Discord.
 * Let VoxelCam catch the moments you would have missed: it takes a screenshot
   by itself when you earn an advancement, when a boss bar empties, when you
   die, and the first time you arrive in a dimension. All four are on by

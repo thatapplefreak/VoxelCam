@@ -166,10 +166,15 @@ public class BurstCaptureTest implements FabricClientGameTest {
 
 		Set<String> after = listing(dir);
 		after.removeAll(before);
-		if (after.size() != 1) {
-			throw new AssertionError("an export should write exactly one new file, wrote " + after);
+		List<String> pngs = after.stream().filter(name -> name.endsWith(".png")).toList();
+		if (pngs.size() != 1 || after.size() != 2) {
+			throw new AssertionError("an export should write one APNG and its WebP copy, wrote " + after);
 		}
-		File animation = new File(dir, after.iterator().next());
+		File animation = new File(dir, pngs.get(0));
+		File webp = AnimatedPng.webpBeside(animation);
+		if (!after.contains(webp.getName())) {
+			throw new AssertionError("the WebP copy should sit beside " + animation.getName() + ", found " + after);
+		}
 		if (!animation.equals(context.computeOnClient(client -> VoxelCamIO.getSelectedPhoto()))) {
 			throw new AssertionError("the manager should select the animation it just wrote, " + animation.getName());
 		}
@@ -190,6 +195,12 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		if (!pngSize(animation).equals(pngSize(key))) {
 			throw new AssertionError("the animation should be the burst's own size, was " + pngSize(animation));
 		}
+		// The copy Share hands out holds the same frames, encoded by the game's own decoder's pixels.
+		int webpFrames = anmfCount(webp);
+		if (webpFrames != groupSize) {
+			throw new AssertionError("the WebP copy should hold all " + groupSize + " frames, held " + webpFrames);
+		}
+
 		// A decoder that knows nothing of APNG must still open the file as its first frame.
 		try {
 			if (javax.imageio.ImageIO.read(animation) == null) {
@@ -226,6 +237,31 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
 		context.setScreen(() -> new GuiScreenShotManager(dir));
 		context.waitForScreen(GuiScreenShotManager.class);
+	}
+
+	/** How many ANMF chunks a WebP's RIFF holds: one per frame. */
+	private static int anmfCount(File webp) {
+		byte[] data;
+		try {
+			data = Files.readAllBytes(webp.toPath());
+		} catch (IOException e) {
+			throw new AssertionError("could not read " + webp.getName(), e);
+		}
+		String riff = new String(data, 0, 4, java.nio.charset.StandardCharsets.US_ASCII)
+				+ new String(data, 8, 4, java.nio.charset.StandardCharsets.US_ASCII);
+		if (!riff.equals("RIFFWEBP")) {
+			throw new AssertionError(webp.getName() + " is not a WebP: " + riff);
+		}
+		int count = 0;
+		for (int pos = 12; pos + 8 <= data.length; ) {
+			int size = (data[pos + 4] & 0xFF) | ((data[pos + 5] & 0xFF) << 8) | ((data[pos + 6] & 0xFF) << 16)
+					| ((data[pos + 7] & 0xFF) << 24);
+			if (new String(data, pos, 4, java.nio.charset.StandardCharsets.US_ASCII).equals("ANMF")) {
+				count++;
+			}
+			pos += 8 + ((size + 1) & ~1);
+		}
+		return count;
 	}
 
 	/** {@code acTL}'s {@code num_frames}, found by walking the chunks from the signature. */

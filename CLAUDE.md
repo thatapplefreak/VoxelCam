@@ -322,6 +322,15 @@ from `ScreenshotImageCache` is drawn until its frames land, and that still is fr
 is seamless. Only full-canvas, replace-blend frames (the shape `AnimatedPng` writes) are played; any
 other APNG stays a still.
 
+Every export also writes `<key>_animation.webp` beside the APNG, from the same frames, through
+`AnimatedWebp`: a pure-Java lossless (VP8L) encoder. Discord plays an animated WebP but shows an
+APNG as its first frame. The WebP is a sidecar, not a screenshot: the manager never lists it, and
+`AnimatedPng.webpBeside` is how rename and delete carry it along (as a group member, with
+rollback) and how `SharePopup` hands it out in the APNG's place. The encoder is deliberately
+minimal (subtract-green, one prefix-code group, copies only from the previous pixel or the one
+above), so files are large; it was checked bit-exact against libwebp, and `AnimatedWebpTest`
+keeps that honest with a decoder for exactly that subset.
+
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
 it (ADR-0002). `PngTextChunk` does the splice and the read. Two of its rules each fixed a real bug:

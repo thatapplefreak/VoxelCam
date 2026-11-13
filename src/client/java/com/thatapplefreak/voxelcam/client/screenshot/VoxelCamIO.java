@@ -139,7 +139,12 @@ public final class VoxelCamIO {
 	 * and the rename would fail anyway.
 	 */
 	public static boolean nameCollides(File screenshotsDir, String newName, File currentFile) {
-		File candidate = new File(screenshotsDir, newName + ".png");
+		return fileCollides(new File(screenshotsDir, newName + ".png"), currentFile);
+	}
+
+	/** {@link #nameCollides} for any target file, so an animation's WebP copy is checked the
+	 * same way as the PNG it travels with. */
+	private static boolean fileCollides(File candidate, File currentFile) {
 		if (!candidate.exists()) {
 			return false;
 		}
@@ -219,13 +224,26 @@ public final class VoxelCamIO {
 			frameTargets.add(new File(screenshotsDir, newName + suffix + ".png"));
 		}
 
+		// An exported animation's WebP copy travels with it, checked and rolled back like a frame:
+		// left behind, Share would lose it, and the old name would no longer be free to reuse.
+		File webp = AnimatedPng.webpBeside(selected);
+		if (webp.exists()) {
+			File webpTarget = AnimatedPng.webpBeside(target);
+			if (fileCollides(webpTarget, webp)) {
+				return null;
+			}
+			frames = new ArrayList<>(frames);
+			frames.add(webp);
+			frameTargets.add(webpTarget);
+		}
+
 		List<File> movedFrom = new ArrayList<>();
 		List<File> movedTo = new ArrayList<>();
 		for (int i = 0; i < frames.size(); i++) {
 			File from = frames.get(i);
 			File to = frameTargets.get(i);
 			if (!from.renameTo(to)) {
-				VoxelCamClient.LOGGER.error("Failed to rename burst frame {} to {}; rolling back", from, to);
+				VoxelCamClient.LOGGER.error("Failed to rename {} to {} along with its group; rolling back", from, to);
 				rollbackRename(movedFrom, movedTo);
 				return null;
 			}
@@ -361,12 +379,17 @@ public final class VoxelCamIO {
 			return false;
 		}
 		File dir = selected.getParentFile();
-		List<File> frames = burstFrames(dir, selected);
+		List<File> frames = new ArrayList<>(burstFrames(dir, selected));
+		// An exported animation's WebP copy goes with it, first, for the same reason frames do.
+		File webp = AnimatedPng.webpBeside(selected);
+		if (webp.exists()) {
+			frames.add(webp);
+		}
 		for (File frame : frames) {
 			try {
 				Files.delete(frame.toPath());
 			} catch (IOException e) {
-				VoxelCamClient.LOGGER.error("Failed to delete burst frame {}", frame, e);
+				VoxelCamClient.LOGGER.error("Failed to delete {} along with its group", frame, e);
 				return false;
 			}
 			ScreenshotImageCache.release(frame);

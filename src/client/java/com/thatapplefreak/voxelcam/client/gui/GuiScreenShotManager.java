@@ -427,10 +427,11 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	/**
-	 * Writes the selected burst out as one looping APNG beside it, then selects that file, so the
-	 * player lands on the thing they just made with Share one click away. The frames are read and
-	 * written on {@code Util.ioPool()}: a long 4K burst is a hundred-odd megabytes of PNG to copy,
-	 * which is not a render-thread job. No re-encode happens — see {@link AnimatedPng}.
+	 * Writes the selected burst out as one looping APNG beside it, plus the WebP copy Share hands
+	 * out, then selects the APNG, so the player lands on the thing they just made with Share one
+	 * click away. All of it runs on {@code Util.ioPool()}: the APNG is a byte copy of a hundred-odd
+	 * megabytes for a long 4K burst, and the WebP decodes and re-encodes every frame — neither is
+	 * a render-thread job. See {@link AnimatedPng}.
 	 */
 	private void exportSelectedAnimation() {
 		if (selected == null || exporting || VoxelCamIO.burstFrameCount(selected) == 0) {
@@ -444,7 +445,7 @@ public class GuiScreenShotManager extends Screen {
 		Util.ioPool().execute(() -> {
 			File written;
 			try {
-				written = AnimatedPng.export(key, frames);
+				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf).apng();
 			} catch (IOException | RuntimeException e) {
 				VoxelCamClient.LOGGER.error("Failed to export {} as an animation", key, e);
 				written = null;

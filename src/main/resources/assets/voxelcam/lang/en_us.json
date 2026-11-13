@@ -37,6 +37,7 @@
 	"voxelcam.share.savecopy": "Save a copy…",
 	"voxelcam.share.savecopy.title": "Save screenshot",
 	"voxelcam.share.png": "PNG image",
+	"voxelcam.share.webp": "Animated WebP image",
 	"voxelcam.share.reveal": "Show in file manager",
 	"voxelcam.share.copypath": "Copy file path",
 	"voxelcam.share.link": "Get a share link",
@@ -99,7 +100,7 @@
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
 	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
-	"voxelcam.tooltip.exportanimation": "Save all %s frames as one looping animated PNG",
+	"voxelcam.tooltip.exportanimation": "Save all %s frames as one looping animation, with a WebP copy for sharing",
 	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
 
 	"voxelcam.settings": "VoxelCam Settings",

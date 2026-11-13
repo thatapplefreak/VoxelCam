@@ -384,7 +384,8 @@ class AnimatedPngTest {
 		File f1 = writeFrame("shot_burst01.png", 1, 40, 1);
 		File f2 = writeFrame("shot_burst02.png", 2, 90, 2);
 
-		File out = AnimatedPng.export(key, List.of(f2, f1));
+		AnimatedPng.Exported exported = AnimatedPng.export(key, List.of(f2, f1), AnimatedPngTest::argbOf);
+		File out = exported.apng();
 
 		assertEquals("shot_animation.png", out.getName());
 		byte[] bytes = Files.readAllBytes(out.toPath());
@@ -395,7 +396,14 @@ class AnimatedPngTest {
 				.map(c -> readShort(c.data, 20)).toList();
 		assertEquals(List.of(40, 50, 45), delays);
 		assertEquals(PngDimensions.read(key), PngDimensions.read(out));
-		assertOnlyPngsLeft();
+
+		// And its sharing copy beside it: the same frames, in the same order, for as long each.
+		assertEquals("shot_animation.webp", exported.webp().getName());
+		byte[] webp = Files.readAllBytes(exported.webp().toPath());
+		assertEquals("RIFF", new String(webp, 0, 4, StandardCharsets.US_ASCII));
+		assertEquals("WEBP", new String(webp, 8, 4, StandardCharsets.US_ASCII));
+		assertEquals(List.of(40, 50, 45), anmfDurations(webp));
+		assertOnlyExportsLeft();
 	}
 
 	@Test
@@ -405,10 +413,10 @@ class AnimatedPngTest {
 		Files.write(odd, png(4, 4, 0, 0));
 		PngTextChunk.embed(odd.toFile(), new BurstFrame("g", 1, 40).toTags());
 
-		assertThrows(IOException.class, () -> AnimatedPng.export(key, List.of(odd.toFile())));
-		assertFalse(AnimatedPng.targetFor(key).getName().endsWith("_2.png"));
+		assertThrows(IOException.class, () -> AnimatedPng.export(key, List.of(odd.toFile()), AnimatedPngTest::argbOf));
 		assertFalse(Files.exists(dir.resolve("shot_animation.png")));
-		assertOnlyPngsLeft();
+		assertFalse(Files.exists(dir.resolve("shot_animation.webp")));
+		assertOnlyExportsLeft();
 	}
 
 	private File writeFrame(String name, int index, int offset, int marker) throws IOException {
@@ -420,9 +428,38 @@ class AnimatedPngTest {
 		return path.toFile();
 	}
 
-	private void assertOnlyPngsLeft() throws IOException {
+	@Test
+	void theTargetNameIsSkippedWhenOnlyItsWebpNameIsTaken() throws IOException {
+		File key = dir.resolve("shot.png").toFile();
+		Files.write(dir.resolve("shot_animation.webp"), new byte[0]);
+		assertEquals("shot_animation_2.png", AnimatedPng.targetFor(key).getName());
+		assertEquals("shot_animation_2.webp", AnimatedPng.webpBeside(AnimatedPng.targetFor(key)).getName());
+	}
+
+	private void assertOnlyExportsLeft() throws IOException {
 		try (var files = Files.list(dir)) {
-			assertTrue(files.allMatch(p -> p.getFileName().toString().endsWith(".png")), "a temp file was left");
+			assertTrue(files.allMatch(p -> p.getFileName().toString().matches(".*\\.(png|webp)")),
+					"a temp file was left");
 		}
+	}
+
+	/** The JDK's decoder standing in for NativeImage, which needs a running client. */
+	private static int[] argbOf(byte[] png) throws IOException {
+		BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+		return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+	}
+
+	private static List<Integer> anmfDurations(byte[] webp) {
+		List<Integer> durations = new ArrayList<>();
+		for (int pos = 12; pos < webp.length; ) {
+			int size = (webp[pos + 4] & 0xFF) | ((webp[pos + 5] & 0xFF) << 8) | ((webp[pos + 6] & 0xFF) << 16)
+					| ((webp[pos + 7] & 0xFF) << 24);
+			if (new String(webp, pos, 4, StandardCharsets.US_ASCII).equals("ANMF")) {
+				int at = pos + 8 + 12;
+				durations.add((webp[at] & 0xFF) | ((webp[at + 1] & 0xFF) << 8) | ((webp[at + 2] & 0xFF) << 16));
+			}
+			pos += 8 + ((size + 1) & ~1);
+		}
+		return durations;
 	}
 }

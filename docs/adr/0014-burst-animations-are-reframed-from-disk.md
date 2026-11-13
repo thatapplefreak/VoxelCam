@@ -33,5 +33,10 @@ when quantised down to that.
   inconsistently. The last frame holds for the average gap so the loop has no stutter.
 - Frames of different sizes are refused, never resampled. A burst resized mid-capture cannot be
   exported.
-- Discord shows only the first frame of an APNG. Animated WebP is the format that animates there,
-  and it would need a real encoder rather than this byte splice. That is a separate decision.
+- Discord shows only the first frame of an APNG, and that is where most of these get shared. So
+  every export also writes a lossless animated WebP beside the APNG, which is what Share hands
+  out. It is a sidecar rather than a replacement: everything in the manager (listing, thumbnails,
+  stars, tags, the preview) reads PNG, and the game cannot decode WebP. Rename and delete carry
+  the sidecar with its APNG. The WebP does need a real encode, unlike the APNG: `AnimatedWebp` is
+  a minimal pure-Java VP8L encoder, since a mod cannot reasonably ship libwebp's native builds.
+  Its files are large; better compression is tracked in #70.

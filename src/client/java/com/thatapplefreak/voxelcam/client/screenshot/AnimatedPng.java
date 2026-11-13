@@ -56,15 +56,28 @@ public final class AnimatedPng {
 	private AnimatedPng() {
 	}
 
+	/** Turns one frame's PNG bytes into ARGB pixels, row by row — {@code NativeImage} in the game,
+	 * the JDK's decoder in tests, so this class never needs a running client. */
+	@FunctionalInterface
+	public interface PixelDecoder {
+		int[] argb(byte[] png) throws IOException;
+	}
+
+	/** What an export wrote: the APNG the manager lists, and the WebP beside it for sharing — null
+	 * only for a burst too large for WebP's 16384-pixel limit. */
+	public record Exported(File apng, File webp) {
+	}
+
 	/**
-	 * Writes the burst under {@code key} as a new APNG next to it, under a name no file has yet.
-	 * Atomic: a refusal partway through (frames of different sizes, a frame that went missing)
-	 * leaves nothing behind.
+	 * Writes the burst under {@code key} as a new APNG next to it, and an animated WebP of the
+	 * same frames beside that ({@link #webpBeside}): the APNG is what the manager lists and plays,
+	 * the WebP is what Share hands out, since Discord plays a WebP and shows an APNG as a still.
+	 * Both go under names no file has yet, and atomically: a refusal partway through (frames of
+	 * different sizes, a frame that went missing) leaves neither behind.
 	 *
 	 * @param frames the key's sub-frames, in any order; capture order comes from their tags.
-	 * @return the file written.
 	 */
-	public static File export(File key, List<File> frames) throws IOException {
+	public static Exported export(File key, List<File> frames, PixelDecoder decoder) throws IOException {
 		List<File> files = new ArrayList<>(frames.size() + 1);
 		files.add(key);
 		files.addAll(frames);
@@ -78,26 +91,67 @@ public final class AnimatedPng {
 		int[] delays = offsets != null ? delaysFor(offsets) : uniformDelays(order.length);
 
 		File target = targetFor(key);
-		Path tmp = Files.createTempFile(key.toPath().toAbsolutePath().getParent(), "voxelcam-", ".png.tmp");
+		File webpTarget = webpBeside(target);
+		Path dir = key.toPath().toAbsolutePath().getParent();
+		Path tmp = Files.createTempFile(dir, "voxelcam-", ".png.tmp");
+		Path webpTmp = Files.createTempFile(dir, "voxelcam-", ".webp.tmp");
+		boolean webpWritten = false;
 		try {
 			try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(tmp))) {
 				Writer writer = null;
+				AnimatedWebp webp = null;
 				for (int i = 0; i < order.length; i++) {
+					// One frame's bytes at a time, read once and fed to both files.
 					byte[] png = Files.readAllBytes(files.get(order[i]).toPath());
 					if (writer == null) {
-						writer = new Writer(out, ihdrOf(png), order.length, carriedTags(tags.get(order[0]), order.length));
+						byte[] ihdr = ihdrOf(png);
+						writer = new Writer(out, ihdr, order.length, carriedTags(tags.get(order[0]), order.length));
+						int width = readInt(ihdr, 0);
+						int height = readInt(ihdr, 4);
+						if (width <= AnimatedWebp.MAX_DIMENSION && height <= AnimatedWebp.MAX_DIMENSION) {
+							webp = new AnimatedWebp(width, height);
+						}
 					}
 					writer.frame(png, delays[i]);
+					if (webp != null) {
+						webp.frame(decoder.argb(png), delays[i]);
+					}
 				}
 				writer.finish();
+				if (webp != null) {
+					Files.write(webpTmp, webp.finish());
+					webpWritten = true;
+				}
 			}
-			// No REPLACE_EXISTING: targetFor() picked a free name, and if something took it since,
-			// failing is better than overwriting a file the player made.
-			Files.move(tmp, target.toPath(), StandardCopyOption.ATOMIC_MOVE);
+			// No REPLACE_EXISTING: targetFor() picked names that were free, and if something took
+			// one since, failing is better than overwriting a file the player made. The WebP goes
+			// first so that a failure leaves no APNG claiming a sharing copy it does not have.
+			if (webpWritten) {
+				Files.move(webpTmp, webpTarget.toPath(), StandardCopyOption.ATOMIC_MOVE);
+			}
+			try {
+				Files.move(tmp, target.toPath(), StandardCopyOption.ATOMIC_MOVE);
+			} catch (IOException e) {
+				if (webpWritten) {
+					Files.deleteIfExists(webpTarget.toPath());
+				}
+				throw e;
+			}
 		} finally {
 			Files.deleteIfExists(tmp);
+			Files.deleteIfExists(webpTmp);
 		}
-		return target;
+		return new Exported(target, webpWritten ? webpTarget : null);
+	}
+
+	/**
+	 * The WebP sharing copy that belongs to an exported animation: the same name, {@code .webp}.
+	 * Rename, delete and Share all look for it here, so it travels with its APNG.
+	 */
+	public static File webpBeside(File png) {
+		String name = png.getName();
+		String base = name.toLowerCase(Locale.ROOT).endsWith(".png") ? name.substring(0, name.length() - 4) : name;
+		return new File(png.getAbsoluteFile().getParentFile(), base + ".webp");
 	}
 
 	/**
@@ -202,13 +256,14 @@ public final class AnimatedPng {
 		return carried;
 	}
 
-	/** {@code holiday.png} → {@code holiday_animation.png}, then {@code _animation_2} and up. */
+	/** {@code holiday.png} → {@code holiday_animation.png}, then {@code _animation_2} and up — the
+	 * first name free for both the APNG and its WebP. */
 	static File targetFor(File key) {
 		String name = key.getName();
 		String base = name.toLowerCase(Locale.ROOT).endsWith(".png") ? name.substring(0, name.length() - 4) : name;
 		File dir = key.getAbsoluteFile().getParentFile();
 		File candidate = new File(dir, base + SUFFIX + ".png");
-		for (int n = 2; candidate.exists(); n++) {
+		for (int n = 2; candidate.exists() || webpBeside(candidate).exists(); n++) {
 			candidate = new File(dir, base + SUFFIX + "_" + n + ".png");
 		}
 		return candidate;

@@ -76,6 +76,17 @@ public final class AnimationPreview {
 				nowMillis - playing.startedAtMillis()));
 	}
 
+	/**
+	 * One PNG's pixels as ARGB, row by row — the {@link AnimatedPng.PixelDecoder} the export hands
+	 * its WebP encoder. {@code NativeImage} because it is the decoder the game ships, and this runs
+	 * on the export's IO thread, never the render thread.
+	 */
+	public static int[] argbOf(byte[] png) throws java.io.IOException {
+		try (NativeImage image = NativeImage.read(png)) {
+			return image.getPixels();
+		}
+	}
+
 	/** How many frames are loaded and playing for {@code file}; 0 while loading or for a still. */
 	public static int playingFrameCount(File file) {
 		return playing != null && playing.file().equals(file) ? playing.frames().size() : 0;

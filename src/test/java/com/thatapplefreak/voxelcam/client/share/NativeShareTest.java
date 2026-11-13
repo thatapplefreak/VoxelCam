@@ -308,4 +308,12 @@ class NativeShareTest {
 	void explorersExitStatusIsIgnored() {
 		assertTrue(NativeShare.revealed(new String[] { "explorer.exe", "/select,C:\\shot.png" }, 1));
 	}
+
+	@Test
+	void anAnimationsWebpCopyIsSavedAsWebp() {
+		assertEquals(Path.of("/tmp/jump.webp"), NativeShare.targetPath("/tmp/jump", "webp"));
+		assertEquals(Path.of("/tmp/jump.WEBP"), NativeShare.targetPath("/tmp/jump.WEBP", "webp"));
+		assertEquals("webp", NativeShare.extensionOf(new java.io.File("a_animation.webp")));
+		assertEquals("png", NativeShare.extensionOf(new java.io.File("a_animation.png")));
+	}
 }
