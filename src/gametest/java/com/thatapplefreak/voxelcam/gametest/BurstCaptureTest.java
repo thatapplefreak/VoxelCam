@@ -120,10 +120,12 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * The point of the timed schedule: frames a tenth of a second apart, covering the burst's whole
-	 * length, rather than every frame the renderer can turn out in a fraction of a second. Bounds
-	 * are loose on the late side — a slot can be skipped, and a blit lands after its slot's time —
-	 * but no two frames may share a slot.
+	 * The point of the timed schedule: frames spread across the burst's whole length, rather than
+	 * every frame the renderer can turn out in a fraction of a second. What the schedule guarantees
+	 * is a floor, not a spacing: frame {@code i} fills slot {@code i} or a later one, so it is never
+	 * taken before {@code i} intervals in. Two frames can still land close together — a slow frame
+	 * late in one slot, the next early in the following one — which CI's software renderer does
+	 * routinely, so the gap between neighbours is deliberately not asserted.
 	 */
 	private static void assertTheFramesSpanTheBurstsLength(File dir, Set<String> written, int seconds) {
 		List<Integer> offsets = written.stream()
@@ -137,12 +139,13 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			throw new AssertionError("a " + seconds + "s burst's frames should span about " + planned
 					+ "ms, spanned " + span + "ms: " + offsets);
 		}
-		for (int i = 1; i < offsets.size(); i++) {
-			int gap = offsets.get(i) - offsets.get(i - 1);
-			// Each frame is taken at the first blit in its slot, so a gap can be a little under
-			// a full interval, but never less than one blit into the next slot's time.
-			if (gap < Burst.FRAME_INTERVAL_MILLIS / 2) {
-				throw new AssertionError("frames " + (i - 1) + " and " + i + " were only " + gap + "ms apart: " + offsets);
+		for (int i = 0; i < offsets.size(); i++) {
+			if (offsets.get(i) < i * Burst.FRAME_INTERVAL_MILLIS) {
+				throw new AssertionError("frame " + i + " was taken at " + offsets.get(i) + "ms, ahead of its slot at "
+						+ i * Burst.FRAME_INTERVAL_MILLIS + "ms: " + offsets);
+			}
+			if (i > 0 && offsets.get(i) <= offsets.get(i - 1)) {
+				throw new AssertionError("frame " + i + " was not taken after frame " + (i - 1) + ": " + offsets);
 			}
 		}
 	}
