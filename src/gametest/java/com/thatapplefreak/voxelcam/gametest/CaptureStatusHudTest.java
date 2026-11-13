@@ -55,6 +55,7 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 			assertANoticeIsDrawnUnderF1(context);
 			assertTheSwitchHidesIt(context);
 			assertAMenuScreenshotDoesNotCarryIt(context, dir);
+			assertAGrabbedScreenshotDoesNotCarryIt(context, dir);
 			assertNoBurstFrameCarriesIt(context, dir);
 			assertABigScreenshotShowsTheSavingLine(context);
 			assertABigScreenshotIsAnnouncedWithoutChat(context, dir);
@@ -125,6 +126,31 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 		List<File> written = newFiles(dir, before);
 		if (written.size() != 1) {
 			throw new AssertionError("a tap should have written one screenshot, wrote " + written);
+		}
+		if (fileShowsAccent(context, written.get(0))) {
+			throw new AssertionError(written.get(0).getName() + " has the capture status HUD burnt into it");
+		}
+	}
+
+	/**
+	 * The route a press takes when it never goes through the menu: F2 over a screen, F2 with the
+	 * menu moved to another key, or another mod calling {@code Screenshot.grab}. It arrives with
+	 * the HUD already in the presented frame, so it has to wait for the next one, as a tap does.
+	 */
+	private static void assertAGrabbedScreenshotDoesNotCarryIt(ClientGameTestContext context, File dir) {
+		postFailure(context);
+		if (!presentedFrameShowsAccent(context)) {
+			throw new AssertionError("precondition: the notice should be on screen before the capture");
+		}
+		Set<String> before = listing(dir);
+
+		context.runOnClient(client ->
+				Screenshot.grab(client.gameDirectory, client.gameRenderer.mainRenderTarget(), message -> { }));
+		context.waitTicks(40);
+
+		List<File> written = newFiles(dir, before);
+		if (written.size() != 1) {
+			throw new AssertionError("Screenshot.grab should have written one screenshot, wrote " + written);
 		}
 		if (fileShowsAccent(context, written.get(0))) {
 			throw new AssertionError(written.get(0).getName() + " has the capture status HUD burnt into it");

@@ -44,7 +44,17 @@ public class SharePopup extends Screen {
 	private final File source;
 	/** A smaller WebP made for Discord this session, reused for a second send, or null. */
 	private File smallCopy;
+	/*
+	 * What is still running. Kept here rather than read off the buttons: init() rebuilds every
+	 * button on the way back from the size popup, which would forget a save dialog or upload that
+	 * is still in flight and offer to start a second one.
+	 */
 	private boolean shrinking;
+	private boolean saving;
+	private boolean uploading;
+	private boolean revealing;
+	/** Set once the player backs out. Anything that finishes after this must not start something new. */
+	private boolean closed;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -57,8 +67,8 @@ public class SharePopup extends Screen {
 		super(Component.translatable("voxelcam.share"));
 		this.parent = parent;
 		this.source = screenshot;
-		File webp = AnimatedPng.webpBeside(screenshot);
-		this.screenshot = webp.isFile() ? webp : screenshot;
+		File webp = AnimatedPng.sharingCopyOf(screenshot);
+		this.screenshot = webp != null ? webp : screenshot;
 	}
 
 	@Override
@@ -77,8 +87,13 @@ public class SharePopup extends Screen {
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
 		// init() runs again on the way back from the size popup, with fresh buttons.
-		saveButton.active = !shrinking;
-		linkButton.active = !shrinking;
+		refreshButtons();
+	}
+
+	private void refreshButtons() {
+		saveButton.active = !shrinking && !saving;
+		linkButton.active = !shrinking && !uploading;
+		revealButton.active = !revealing;
 	}
 
 	/**
@@ -109,8 +124,7 @@ public class SharePopup extends Screen {
 			return;
 		}
 		shrinking = true;
-		saveButton.active = false;
-		linkButton.active = false;
+		refreshButtons();
 		setStatus("voxelcam.share.shrinking", false);
 		long fullSize = screenshot.length();
 		CompletableFuture.supplyAsync(() -> {
@@ -122,8 +136,13 @@ public class SharePopup extends Screen {
 			}
 		}, Util.ioPool()).whenComplete((made, error) -> minecraft.execute(() -> {
 			shrinking = false;
-			saveButton.active = true;
-			linkButton.active = true;
+			if (closed) {
+				// Backing out while the copy was being made is backing out of the send: nothing is
+				// uploaded and no Save dialog opens over the game.
+				SmallerShareCopy.discard(made);
+				return;
+			}
+			refreshButtons();
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Making a smaller copy of {} failed", source, error);
 				setStatus("voxelcam.share.shrinkfailed", true);
@@ -149,7 +168,8 @@ public class SharePopup extends Screen {
 	private void saveCopyOf(File file) {
 		// The native dialog answers asynchronously (ADR-0012); keep the button from being
 		// pressed again while one is already open.
-		saveButton.active = false;
+		saving = true;
+		refreshButtons();
 		setStatus("voxelcam.share.choosing", false);
 		// A smaller copy lives in a temp folder; the dialog opens beside the animation instead.
 		File suggested = file.equals(smallCopy) ? new File(source.getAbsoluteFile().getParentFile(), file.getName()) : file;
@@ -158,7 +178,9 @@ public class SharePopup extends Screen {
 						Component.translatable("webp".equals(NativeShare.extensionOf(file))
 								? "voxelcam.share.webp" : "voxelcam.share.png").getString())
 				.whenComplete((saved, error) -> minecraft.execute(() -> {
-					saveButton.active = true;
+					saving = false;
+					refreshButtons();
+					discardSmallCopyIfDone();
 					if (error != null) {
 						VoxelCamClient.LOGGER.warn("Saving a copy of {} failed", file, error);
 						setStatus("voxelcam.share.savefailed", true);
@@ -174,9 +196,11 @@ public class SharePopup extends Screen {
 	private void reveal() {
 		// The command is waited on off-thread, so the outcome arrives later; keep the
 		// button from queueing a second file manager window in the meantime.
-		revealButton.active = false;
+		revealing = true;
+		refreshButtons();
 		NativeShare.revealInFileManager(screenshot).whenComplete((outcome, error) -> minecraft.execute(() -> {
-			revealButton.active = true;
+			revealing = false;
+			refreshButtons();
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Revealing {} failed", screenshot, error);
 				setStatus("voxelcam.share.revealfailed", true);
@@ -204,10 +228,13 @@ public class SharePopup extends Screen {
 	}
 
 	private void uploadToCatbox(File file) {
-		linkButton.active = false;
+		uploading = true;
+		refreshButtons();
 		setStatus("voxelcam.share.uploading.link", false);
 		CatboxUploader.upload(file).whenComplete((link, error) -> minecraft.execute(() -> {
-			linkButton.active = true;
+			uploading = false;
+			refreshButtons();
+			discardSmallCopyIfDone();
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
 				setStatus("voxelcam.share.linkfailed", true);
@@ -250,10 +277,20 @@ public class SharePopup extends Screen {
 
 	@Override
 	public void onClose() {
-		// Not while a save dialog may still be copying it; deleteOnExit covers that case.
-		if (saveButton == null || saveButton.active) {
-			SmallerShareCopy.discard(smallCopy);
-		}
+		closed = true;
+		discardSmallCopyIfDone();
 		minecraft.setScreenAndShow(parent);
+	}
+
+	/**
+	 * Deletes the smaller copy once the popup is closed and nothing is still reading it. A save
+	 * dialog or an upload that was already under way when the player backed out still finishes;
+	 * the copy goes when the last of them does, rather than out from under it.
+	 */
+	private void discardSmallCopyIfDone() {
+		if (closed && !saving && !uploading && smallCopy != null) {
+			SmallerShareCopy.discard(smallCopy);
+			smallCopy = null;
+		}
 	}
 }

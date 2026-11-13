@@ -49,10 +49,11 @@ public final class ScreenshotHandler {
 	 * involved the decision belongs to {@link CaptureMenu}, which makes it on release — capturing
 	 * here as well would take a second, unwanted screenshot on every hold.
 	 *
-	 * <p>Everything else still captures on the spot. {@code Screenshot.grab} is public API that
-	 * other mods and code paths call, and a press brief enough that the tick-based edge detector
-	 * never sees the key down never reaches {@link CaptureMenu} at all — swallowing those would
-	 * lose screenshots VoxelCam used to take.
+	 * <p>Everything else still captures. {@code Screenshot.grab} is public API that other mods and
+	 * code paths call, and a press brief enough that the tick-based edge detector never sees the
+	 * key down never reaches {@link CaptureMenu} at all — swallowing those would lose screenshots
+	 * VoxelCam used to take. They are taken from the next frame rather than on the spot, though
+	 * ({@link CaptureMenu#queueScreenshot}): the frame on screen now has the capture status HUD in it.
 	 *
 	 * @return true, always, so vanilla's own save is cancelled.
 	 */
@@ -71,7 +72,13 @@ public final class ScreenshotHandler {
 			return true;
 		}
 
-		captureNow(framebuffer);
+		if (framebuffer != Minecraft.getInstance().gameRenderer.mainRenderTarget()) {
+			// Another mod's own target: the HUD was never drawn into it, and the next frame's
+			// blit would read the main target instead of the one it asked for.
+			captureNow(framebuffer);
+			return true;
+		}
+		CaptureMenu.queueScreenshot();
 		return true;
 	}
 
