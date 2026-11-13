@@ -22,9 +22,9 @@ Features
   the menu's outer ring, the settings screen, or `/bigscreenshot` (or `/bs`),
   which takes presets like `4k` and `imax`, a multiple of your window such as
   `4x`, or exact dimensions like `3840x2160`.
-* Capture a burst of consecutive frames in one go. The manager lists a burst as
-  a single entry you can expand, and any frame in it can be promoted to the one
-  that represents the group. **Export Animation** turns the whole burst into one
+* Capture a burst: two to five seconds of play at ten frames a second. The
+  manager lists a burst as a single entry you can expand, and any frame in it
+  can be promoted to the one that represents the group. **Export Animation** turns the whole burst into one
   looping animation, at full quality and at the speed it was captured, that plays
   right in the manager. Sharing it hands out an animated WebP copy, which plays
   on Discord.

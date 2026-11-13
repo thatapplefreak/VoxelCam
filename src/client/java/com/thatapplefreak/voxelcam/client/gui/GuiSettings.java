@@ -92,10 +92,10 @@ public class GuiSettings extends Screen {
 		updateBurstButtons();
 	}
 
-	/** {@code Burst.setLength} clamps on its own, but the buttons disable at the edges too
+	/** {@code Burst.setSeconds} clamps on its own, but the buttons disable at the edges too
 	 * rather than leaving a click that silently does nothing. */
 	private void adjustBurstLength(int delta) {
-		Burst.setLength(Burst.getLength() + delta);
+		Burst.setSeconds(Burst.getSeconds() + delta);
 		VoxelCamConfig.saveCurrent();
 		updateBurstButtons();
 	}
@@ -106,8 +106,8 @@ public class GuiSettings extends Screen {
 	}
 
 	private void updateBurstButtons() {
-		burstMinusButton.active = Burst.getLength() > 1;
-		burstPlusButton.active = Burst.getLength() < Burst.MAX_LENGTH;
+		burstMinusButton.active = Burst.getSeconds() > Burst.MIN_SECONDS;
+		burstPlusButton.active = Burst.getSeconds() < Burst.MAX_SECONDS;
 	}
 
 	private void cycleBigScreenshotSize() {
@@ -132,7 +132,7 @@ public class GuiSettings extends Screen {
 		super.extractRenderState(context, mouseX, mouseY, delta);
 
 		context.centeredText(font, title, width / 2, 14, 0xFFFFFFFF);
-		context.centeredText(font, Component.translatable("voxelcam.settings.burstlength", Burst.getLength()),
+		context.centeredText(font, Component.translatable("voxelcam.settings.burstlength", Burst.getSeconds()),
 				width / 2, burstRowY + 6, 0xFFFFFFFF);
 	}
 

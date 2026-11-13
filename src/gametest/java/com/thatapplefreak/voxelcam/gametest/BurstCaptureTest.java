@@ -60,7 +60,8 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	private static File assertAHeldAndAimedReleaseFiresABurstAtWindowSize(ClientGameTestContext context, File dir) {
 		Dimensions window = windowSize(context);
 		Set<String> before = listing(dir);
-		int length = context.computeOnClient(client -> Burst.getLength());
+		int seconds = context.computeOnClient(client -> Burst.getSeconds());
+		int planned = Burst.framesFor(seconds);
 
 		context.getInput().holdKey(InputConstants.KEY_F2);
 		try {
@@ -71,11 +72,11 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			context.getInput().releaseKey(InputConstants.KEY_F2);
 		}
 
-		context.waitFor(client -> !CaptureMenu.isCapturePending() && !Burst.isBusy(), 400);
+		context.waitFor(client -> !CaptureMenu.isCapturePending() && !Burst.isBusy(), 600);
 		// PNG encoding runs on the IO worker, and a burst has several frames queued on it.
 		context.waitTicks(60);
 
-		Set<String> written = theNewFiles(dir, before, length, "a held, aimed release at the burst wedge");
+		Set<String> written = theNewFiles(dir, before, planned, "a held, aimed release at the burst wedge");
 		File key = theKeyAmong(written, dir);
 
 		for (String name : written) {
@@ -87,6 +88,7 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		}
 
 		assertTagsAgree(dir, key, written);
+		assertTheFramesSpanTheBurstsLength(dir, written, seconds);
 		return key;
 	}
 
@@ -112,6 +114,34 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			}
 			if (frame.offsetMillis() <= 0) {
 				throw new AssertionError(name + " should be offset after the key, was " + frame.offsetMillis() + "ms");
+			}
+		}
+	}
+
+	/**
+	 * The point of the timed schedule: frames a tenth of a second apart, covering the burst's whole
+	 * length, rather than every frame the renderer can turn out in a fraction of a second. Bounds
+	 * are loose on the late side — a slot can be skipped, and a blit lands after its slot's time —
+	 * but no two frames may share a slot.
+	 */
+	private static void assertTheFramesSpanTheBurstsLength(File dir, Set<String> written, int seconds) {
+		List<Integer> offsets = written.stream()
+				.map(name -> BurstFrame.fromTags(PngTextChunk.read(new File(dir, name))))
+				.sorted(java.util.Comparator.comparingInt(BurstFrame::index))
+				.map(BurstFrame::offsetMillis)
+				.toList();
+		int span = offsets.get(offsets.size() - 1) - offsets.get(0);
+		int planned = (seconds * Burst.FRAMES_PER_SECOND - 1) * Burst.FRAME_INTERVAL_MILLIS;
+		if (span < planned - Burst.FRAME_INTERVAL_MILLIS || span > seconds * 1000) {
+			throw new AssertionError("a " + seconds + "s burst's frames should span about " + planned
+					+ "ms, spanned " + span + "ms: " + offsets);
+		}
+		for (int i = 1; i < offsets.size(); i++) {
+			int gap = offsets.get(i) - offsets.get(i - 1);
+			// Each frame is taken at the first blit in its slot, so a gap can be a little under
+			// a full interval, but never less than one blit into the next slot's time.
+			if (gap < Burst.FRAME_INTERVAL_MILLIS / 2) {
+				throw new AssertionError("frames " + (i - 1) + " and " + i + " were only " + gap + "ms apart: " + offsets);
 			}
 		}
 	}
@@ -286,7 +316,7 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * A screen can appear at any point across the roughly a second a burst spans, not just
+	 * A screen can appear at any point across the seconds a burst spans, not just
 	 * between the request and the very next frame the way {@code BigScreenshot} has to guard
 	 * against — {@code Burst.beforeBlit()} re-checks the gate on every frame it issues rather
 	 * than only once at the start.
@@ -311,13 +341,13 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			throw new AssertionError("a burst overtaken by a screen should have stopped, not hung");
 		}
 
-		int length = context.computeOnClient(client -> Burst.getLength());
+		int planned = context.computeOnClient(client -> Burst.framesFor(Burst.getSeconds()));
 		Set<String> after = listing(dir);
 		after.removeAll(before);
 		after.removeIf(name -> !name.endsWith(".png"));
-		if (after.size() >= length) {
+		if (after.size() >= planned) {
 			throw new AssertionError("a burst stopped by a screen should have written fewer than "
-					+ length + " frames, wrote " + after.size());
+					+ planned + " frames, wrote " + after.size());
 		}
 
 		context.setScreen(() -> null);
@@ -341,12 +371,14 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		return names == null ? new HashSet<>() : new HashSet<>(Arrays.asList(names));
 	}
 
-	private static Set<String> theNewFiles(File dir, Set<String> before, int expectedCount, String what) {
+	/** Up to {@code planned} frames, and at least half: a slot can be skipped while every
+	 * in-flight frame is still encoding, but a burst that skipped most of them is broken. */
+	private static Set<String> theNewFiles(File dir, Set<String> before, int planned, String what) {
 		Set<String> after = listing(dir);
 		after.removeAll(before);
 		after.removeIf(name -> !name.endsWith(".png"));
-		if (after.size() != expectedCount) {
-			throw new AssertionError(what + " should have written exactly " + expectedCount
+		if (after.size() > planned || after.size() < planned / 2) {
+			throw new AssertionError(what + " should have written up to " + planned
 					+ " frames, wrote " + after.size() + ": " + after);
 		}
 		return after;

@@ -136,22 +136,25 @@ public class CaptureStatusHudTest implements FabricClientGameTest {
 	private static void assertNoBurstFrameCarriesIt(ClientGameTestContext context, File dir) {
 		postFailure(context);
 		Set<String> before = listing(dir);
-		int previousLength = context.computeOnClient(client -> Burst.getLength());
+		int previousSeconds = context.computeOnClient(client -> Burst.getSeconds());
 
 		context.runOnClient(client -> {
-			Burst.setLength(4);
+			Burst.setSeconds(Burst.MIN_SECONDS);
 			Burst.request();
 		});
 		try {
-			context.waitFor(client -> !Burst.isBusy(), 200);
-			context.waitTicks(40);
+			context.waitFor(client -> !Burst.isBusy(), 400);
+			context.waitTicks(60);
 		} finally {
-			context.runOnClient(client -> Burst.setLength(previousLength));
+			context.runOnClient(client -> Burst.setSeconds(previousSeconds));
 		}
 
+		// A slot can be skipped when encoding falls behind, so the count is a range, not exact.
 		List<File> written = newFiles(dir, before);
-		if (written.size() != 4) {
-			throw new AssertionError("a 4-frame burst should have written 4 frames, wrote " + written);
+		int planned = Burst.framesFor(Burst.MIN_SECONDS);
+		if (written.size() < planned / 2 || written.size() > planned) {
+			throw new AssertionError("a " + Burst.MIN_SECONDS + "s burst should have written up to " + planned
+					+ " frames, wrote " + written.size());
 		}
 		for (File frame : written) {
 			if (fileShowsAccent(context, frame)) {

@@ -9,8 +9,9 @@ reader shows. Every later frame's payloads become `fdAT` chunks behind a sequenc
 Buffering frames in memory during the burst was the alternative, and the saved files beat it on
 three counts:
 
-- **Timing.** A burst is paced by `MAX_IN_FLIGHT`, not by a timer, so its frames are not evenly
-  spaced. The `burstoffset` tag records when each frame was actually taken, and that is the only
+- **Timing.** A burst aims for one frame every 100 ms, but skips any slot it cannot make while
+  `MAX_IN_FLIGHT` frames are still encoding, and each frame lands on the first rendered frame in
+  its slot, so frames are not evenly spaced. The `burstoffset` tag records when each frame was actually taken, and that is the only
   honest source of frame delays.
 - **Memory.** Every buffered frame is a full-resolution `NativeImage` allocated off-heap. Twenty
   frames at 4K is over 600 MiB, and running out of native memory crashes the game instead of

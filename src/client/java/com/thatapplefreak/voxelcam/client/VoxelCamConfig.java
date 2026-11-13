@@ -23,13 +23,13 @@ import java.nio.file.Path;
  * be a deliberate choice with nothing worth remembering; the outer ring is what changed that.
  *
  * <p>{@link #favoritesOnly} is the odd field out. The other three mirror an existing
- * session-static holder ({@link Burst#getLength()}, {@link BigScreenshot#getSize()}, {@link
+ * session-static holder ({@link Burst#getSeconds()}, {@link BigScreenshot#getSize()}, {@link
  * SortMode#current()}), but favourites-only has always lived as a plain instance field on {@code
  * GuiScreenShotManager} — this is its only persistent home, and the manager reads and writes it
  * directly (see {@code GuiScreenShotManager.init()}/{@code toggleFavoritesOnly()}) rather than
  * keeping a second copy in sync.
  *
- * <p>Deliberately does not save itself from {@link Burst#setLength}, {@link
+ * <p>Deliberately does not save itself from {@link Burst#setSeconds}, {@link
  * BigScreenshot#setSize}, or {@link SortMode#setCurrent}: those three stay side-effect-free and
  * unit-testable with no client the way they already were. {@link #saveCurrent()} is called
  * explicitly from every place a setting actually changes at the player's hand instead — the
@@ -42,7 +42,9 @@ public final class VoxelCamConfig {
 
 	private static volatile VoxelCamConfig current = new VoxelCamConfig();
 
-	public int burstLength = Burst.DEFAULT_LENGTH;
+	/** Seconds, under a new key: the old key {@code burstLength} counted frames, and reading an old
+	 * frame count as seconds would be wrong, so an old file falls back to the default instead. */
+	public int burstSeconds = Burst.DEFAULT_SECONDS;
 	public String bigScreenshotSize = BigScreenshotSize.DEFAULT.token();
 	public String sortMode = SortMode.DATE_NEWEST.name();
 	public boolean favoritesOnly = false;
@@ -68,7 +70,7 @@ public final class VoxelCamConfig {
 	 */
 	public static void load() {
 		current = load(configPath());
-		Burst.setLength(current.burstLength);
+		Burst.setSeconds(current.burstSeconds);
 		BigScreenshotSize size = BigScreenshotSize.parse(current.bigScreenshotSize);
 		if (size != null) {
 			BigScreenshot.setSize(size);
@@ -124,7 +126,7 @@ public final class VoxelCamConfig {
 	 */
 	static VoxelCamConfig snapshot() {
 		VoxelCamConfig snapshot = new VoxelCamConfig();
-		snapshot.burstLength = Burst.getLength();
+		snapshot.burstSeconds = Burst.getSeconds();
 		snapshot.bigScreenshotSize = BigScreenshot.getSize().token();
 		snapshot.sortMode = SortMode.current().name();
 		snapshot.favoritesOnly = current.favoritesOnly;

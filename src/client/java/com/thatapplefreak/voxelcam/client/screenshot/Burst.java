@@ -9,19 +9,22 @@ import java.io.File;
 import java.util.List;
 
 /**
- * A run of plain-size captures fired across consecutive frames, sharing one group id so the
- * manager can list the first as a key and fold the rest under it (see {@link BurstFrame},
- * {@code VoxelCamIO}'s collapse).
+ * A few seconds of play captured at {@link #FRAMES_PER_SECOND}, sharing one group id so the
+ * manager can list the first frame as a key and fold the rest under it (see {@link BurstFrame},
+ * {@code VoxelCamIO}'s collapse), and export them as an animation that plays back for as long as
+ * the moment lasted.
  *
- * <p>The capture spans as many frames as the in-flight cap lets it, rather than a fixed
- * schedule:
+ * <p>A burst is a length of time, not a number of frames:
  * <ol>
- *   <li>{@link #request()} arms it (from the capture menu) and reserves every frame's name up
+ *   <li>{@link #request()} arms it (from the capture menu) and reserves every slot's name up
  *       front, synchronously, so no two overlapping captures can ever resolve the same one.</li>
- *   <li>{@link #beforeBlit()} issues one frame per call, throttled by {@link
- *       ScreenshotHandler#beginSave} rather than by a timer — the in-flight cap {@code
- *       MAX_IN_FLIGHT} <em>is</em> the schedule, since each in-flight frame is a full-res {@code
- *       NativeImage} held until {@code Util.ioPool()} finishes encoding it.</li>
+ *   <li>{@link #beforeBlit()} issues a frame on the first blit at or after each slot's time —
+ *       one every {@link #FRAME_INTERVAL_MILLIS}. A slot is also gated by {@link
+ *       ScreenshotHandler#beginSave}: each in-flight frame is a full-res {@code NativeImage} held
+ *       until {@code Util.ioPool()} finishes encoding it, so {@code MAX_IN_FLIGHT} bounds memory.
+ *       A slot that passes while the cap is full is <em>skipped</em>, never caught up: catching
+ *       up would bunch frames together, and every frame records its real offset, so playback
+ *       stays true to time with one frame fewer rather than stuttering.</li>
  *   <li>{@link #frameCompleted(boolean)} hears back from each frame's write, on the render
  *       thread, and is what actually announces the group once every issued frame has reported
  *       in — see its own javadoc for why that has to wait rather than speak for frame 0 alone.</li>
@@ -47,25 +50,31 @@ public final class Burst {
 	 */
 	static final int MAX_IN_FLIGHT = 3;
 
-	/** Also the bound a burst-frames filmstrip caps its thumbnails at. */
-	public static final int MAX_LENGTH = 20;
-	public static final int DEFAULT_LENGTH = 8;
+	/**
+	 * Ten a second: about the slowest rate at which motion still reads as motion rather than a
+	 * slideshow — the rate of a reaction GIF. Fifteen is smoother, but costs half again the disk
+	 * and the sharing copy's size, for moments only a few seconds long.
+	 */
+	public static final int FRAMES_PER_SECOND = 10;
+	public static final int FRAME_INTERVAL_MILLIS = 1000 / FRAMES_PER_SECOND;
+
+	/** Long enough to hold a jump, a kill or a firework from start to finish. */
+	public static final int MIN_SECONDS = 2;
+	/** Fifty frames: a 1080p burst at this length is on the order of 100 MB of PNGs. */
+	public static final int MAX_SECONDS = 5;
+	public static final int DEFAULT_SECONDS = 3;
+	/** The most frames one burst can write; frame names keep two digits up to 99. */
+	public static final int MAX_FRAMES = MAX_SECONDS * FRAMES_PER_SECOND;
 
 	/**
-	 * The length options on the capture menu's outer ring — the same 24°-per-option spacing
-	 * {@link BigScreenshotSize#DIAL_OPTIONS} is sized for, five values fitting a 120° wedge
-	 * without their labels colliding. {@link #setLength} still accepts any value up to {@link
-	 * #MAX_LENGTH}; this is only the ring's quick ladder.
+	 * The length options on the capture menu's outer ring, in seconds — every length there is.
+	 * Four fit a 120° wedge with room to spare at the ring's 24°-per-option spacing.
 	 */
-	public static final int[] DIAL_OPTIONS = { 2, 4, 8, 12, 20 };
+	public static final int[] DIAL_OPTIONS = { 2, 3, 4, 5 };
 
-	/** Frames a burst may sit stalled between issues before giving up rather than hanging the
-	 * capture key forever if the IO pool never drains. */
-	private static final int STALL_FRAMES = 120;
-
-	/** Session-only, like {@link BigScreenshot#getSize()}. What the <em>next</em> burst will
-	 * run at; not touched once a burst is running. */
-	private static volatile int length = DEFAULT_LENGTH;
+	/** Persisted through {@code VoxelCamConfig}. What the <em>next</em> burst will run for; not
+	 * touched once a burst is running. */
+	private static volatile int seconds = DEFAULT_SECONDS;
 
 	// Render-thread state only: request() runs from the capture menu's fire(), the rest from
 	// beforeBlit(); frameCompleted() arrives from ScreenshotHandler.write() (on Util.ioPool())
@@ -73,12 +82,15 @@ public final class Burst {
 	private static State state = State.IDLE;
 	private static List<File> names;
 	private static String groupId;
+	/** How many frames have been issued — also the next frame's index and file name, so a burst
+	 * that skipped slots still writes contiguous {@code _burstNN} names. */
 	private static int nextIndex;
-	/** The length the running burst was armed with — a separate field from {@link #length} so a
-	 * unit test driving {@link #beginBurst} directly cannot change the session preference as a
-	 * side effect. */
-	private static int runningLength;
-	private static int framesSinceIssue;
+	/** The first schedule slot not yet issued or skipped. */
+	private static int nextSlot;
+	/** How many slots the running burst has — a separate field from {@link #seconds} so a unit
+	 * test driving {@link #beginBurst} directly cannot change the session preference as a side
+	 * effect. */
+	private static int runningSlots;
 	private static long startMillis;
 	/** How many issued frames have finished writing, success or failure alike. Compared against
 	 * {@link #nextIndex} (which stops changing once the burst leaves {@code RUNNING}, whether by
@@ -89,12 +101,17 @@ public final class Burst {
 	private Burst() {
 	}
 
-	public static int getLength() {
-		return length;
+	public static int getSeconds() {
+		return seconds;
 	}
 
-	public static void setLength(int newLength) {
-		length = Math.clamp(newLength, 1, MAX_LENGTH);
+	public static void setSeconds(int newSeconds) {
+		seconds = Math.clamp(newSeconds, MIN_SECONDS, MAX_SECONDS);
+	}
+
+	/** How many frames a burst of this many seconds takes, if no slot is skipped. */
+	public static int framesFor(int burstSeconds) {
+		return burstSeconds * FRAMES_PER_SECOND;
 	}
 
 	public static boolean isBusy() {
@@ -119,9 +136,10 @@ public final class Burst {
 			if (!screenshotsDir.exists()) {
 				screenshotsDir.mkdirs();
 			}
-			names = ScreenshotNamer.reserveBurstNames(screenshotsDir, length);
+			int slots = framesFor(seconds);
+			names = ScreenshotNamer.reserveBurstNames(screenshotsDir, slots);
 			groupId = baseName(names.get(0).getName());
-			beginBurst(length, Util.getMillis());
+			beginBurst(slots, Util.getMillis());
 		} catch (Throwable t) {
 			VoxelCamClient.LOGGER.error("Failed to reserve names for a burst capture", t);
 			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.burst.failed");
@@ -140,9 +158,8 @@ public final class Burst {
 	/**
 	 * Just before the frame is presented, the same point the oversized path reads back from.
 	 * Re-checks the gate on every call rather than only at {@link #request()}: a burst spans
-	 * roughly a second of frames, long enough for a screen to open or the world to go away in the
-	 * middle, not just between one request and the next frame the way {@code BigScreenshot} has
-	 * to guard against.
+	 * seconds, long enough for a screen to open or the world to go away in the middle, not just
+	 * between one request and the next frame the way {@code BigScreenshot} has to guard against.
 	 */
 	public static void beforeBlit() {
 		if (state != State.RUNNING) {
@@ -154,26 +171,25 @@ public final class Burst {
 			abort("a screen opened or the world went away mid-burst");
 			return;
 		}
-		if (++framesSinceIssue > STALL_FRAMES) {
-			abort("the IO pool never drained");
-			return;
-		}
-		if (!ScreenshotHandler.beginSave(MAX_IN_FLIGHT)) {
-			// Throttled, not dropped: the cap is the schedule, so this frame is simply retried
-			// on the next blit once a write finishes and frees a slot.
-			return;
-		}
 
-		int index = claimFrame();
-		if (index < 0) {
-			ScreenshotHandler.endSave();
+		long now = Util.getMillis();
+		int slot = dueSlot(now);
+		if (slot == DONE) {
 			finishBurst();
 			return;
 		}
+		if (slot == WAIT) {
+			return;
+		}
+		if (!ScreenshotHandler.beginSave(MAX_IN_FLIGHT)) {
+			// Every in-flight slot is still encoding. Retried on the next blit; if this slot's
+			// time passes first, dueSlot() moves on to the next one and this one is skipped.
+			return;
+		}
 
-		framesSinceIssue = 0;
+		int index = claimFrame(slot);
 		File target = names.get(index);
-		BurstFrame frame = new BurstFrame(groupId, index, offsetAt(Util.getMillis()));
+		BurstFrame frame = new BurstFrame(groupId, index, offsetAt(now));
 		ScreenshotHandler.captureBurstFrame(client.gameRenderer.mainRenderTarget(), target, frame);
 	}
 
@@ -183,7 +199,7 @@ public final class Burst {
 	 * ScreenshotHandler#write}, which runs on {@code Util.ioPool()} — once for every frame of
 	 * the burst that finishes, success or failure alike.
 	 *
-	 * <p>A burst spans roughly a second across several frames encoding concurrently (up to
+	 * <p>A burst spans seconds, with several frames encoding concurrently (up to
 	 * {@link #MAX_IN_FLIGHT} at once), so the frame that happens to finish writing first —
 	 * usually whichever is smallest, or whichever the IO pool got to first — is not reliably the
 	 * last one issued. Announcing off the key frame's own completion, the way a single-frame
@@ -214,8 +230,8 @@ public final class Burst {
 	}
 
 	/**
-	 * {@code nextIndex} is how many frames actually got issued — {@code runningLength} for a
-	 * burst that ran to completion, fewer for one {@link #abort}ed partway through — so the
+	 * {@code nextIndex} is how many frames actually got issued — every slot for a burst that kept
+	 * up, fewer for one that skipped slots or was {@link #abort}ed partway through — so the
 	 * count reported here is always what really landed, not what was originally planned.
 	 */
 	private static void announceCompletion() {
@@ -242,21 +258,37 @@ public final class Burst {
 
 	// --- pure seams, unit-testable with no client ------------------------------------------
 
-	static void beginBurst(int burstLength, long burstStartMillis) {
+	/** {@link #dueSlot}: no slot is due yet on this blit. */
+	static final int WAIT = -1;
+	/** {@link #dueSlot}: the burst's time is up. */
+	static final int DONE = -2;
+
+	static void beginBurst(int slots, long burstStartMillis) {
 		state = State.RUNNING;
 		nextIndex = 0;
-		framesSinceIssue = 0;
+		nextSlot = 0;
 		startMillis = burstStartMillis;
-		runningLength = burstLength;
+		runningSlots = slots;
 		completedFrames = 0;
 		succeededFrames = 0;
 	}
 
-	/** The next 0-based frame index to issue, or -1 once every frame has been claimed. */
-	static int claimFrame() {
-		if (nextIndex >= runningLength) {
-			return -1;
+	/**
+	 * The schedule slot a frame taken at {@code nowMillis} would fill: the latest one whose time
+	 * has come, so a slot already passed is skipped rather than issued late. {@link #WAIT} if
+	 * that slot has already been taken, {@link #DONE} once the burst's whole length has passed.
+	 */
+	static int dueSlot(long nowMillis) {
+		int slot = (int) Math.max(0, (nowMillis - startMillis) / FRAME_INTERVAL_MILLIS);
+		if (slot >= runningSlots) {
+			return DONE;
 		}
+		return slot >= nextSlot ? slot : WAIT;
+	}
+
+	/** Takes {@code slot} and returns the 0-based index of the frame that fills it. */
+	static int claimFrame(int slot) {
+		nextSlot = slot + 1;
 		return nextIndex++;
 	}
 
@@ -275,7 +307,7 @@ public final class Burst {
 		names = null;
 		groupId = null;
 		nextIndex = 0;
-		framesSinceIssue = 0;
+		nextSlot = 0;
 		completedFrames = 0;
 		succeededFrames = 0;
 	}

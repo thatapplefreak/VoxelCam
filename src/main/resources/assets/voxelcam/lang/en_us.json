@@ -65,8 +65,8 @@
 	"voxelcam.tooltip.favoritesonly": "Show only starred screenshots",
 	"voxelcam.tooltip.openmanager": "Open the VoxelCam screenshot manager",
 	"voxelcam.tooltip.settings": "VoxelCam settings",
-	"voxelcam.tooltip.burstlengthdown": "Fewer frames per burst",
-	"voxelcam.tooltip.burstlengthup": "More frames per burst",
+	"voxelcam.tooltip.burstlengthdown": "Shorter bursts",
+	"voxelcam.tooltip.burstlengthup": "Longer bursts",
 	"voxelcam.tooltip.bigscreenshotsize": "Cycle through every big screenshot preset",
 
 	"voxelcam.delete.title": "Delete screenshot?",
@@ -99,6 +99,7 @@
 	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
 	"voxelcam.burst.scrollleft": "<",
 	"voxelcam.burst.scrollright": ">",
+	"voxelcam.burst.seconds": "%ss",
 	"voxelcam.tooltip.setaskey": "Show this frame in the list instead of the current key",
 	"voxelcam.tooltip.exportanimation": "Save all %s frames as one looping animation, with a WebP copy for sharing",
 	"voxelcam.tooltip.burstscroll": "See more frames in this burst",
@@ -107,7 +108,7 @@
 	"voxelcam.settings.gear": "⚙",
 	"voxelcam.settings.burstlengthminus": "-",
 	"voxelcam.settings.burstlengthplus": "+",
-	"voxelcam.settings.burstlength": "Burst length: %s",
+	"voxelcam.settings.burstlength": "Burst length: %s seconds",
 	"voxelcam.settings.bigscreenshotsize": "Big screenshot size: %s",
 
 	"voxelcam.settings.autocapture": "Automatic capture…",

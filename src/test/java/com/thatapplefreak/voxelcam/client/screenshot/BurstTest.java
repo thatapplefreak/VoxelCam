@@ -10,30 +10,65 @@ import org.junit.jupiter.api.Test;
 /**
  * The capture itself needs a live client — {@code beforeBlit()} reads {@code
  * Minecraft.getInstance()} on its very first line — and is covered by the gametest suite. What is
- * reachable here is the pure bookkeeping {@code beforeBlit()} is built on: how many frames a burst
- * hands out and when it considers itself done, none of which touches {@code Minecraft} at all.
+ * reachable here is the pure bookkeeping {@code beforeBlit()} is built on: which slot of the
+ * 10-a-second schedule is due, when it considers itself done, none of which touches {@code
+ * Minecraft} at all.
  */
 class BurstTest {
 
-	private static final int ORIGINAL_LENGTH = Burst.getLength();
+	private static final int ORIGINAL_SECONDS = Burst.getSeconds();
+	private static final int STEP = Burst.FRAME_INTERVAL_MILLIS;
 
 	/** The state machine is static, so a test that leaves one running would follow the next one
-	 * in; {@link Burst#setLength} is restored for the same reason a leaked locale is in {@code
+	 * in; {@link Burst#setSeconds} is restored for the same reason a leaked locale is in {@code
 	 * ScreenshotNamerTest} — a later test asking for the session default should get it. */
 	@AfterEach
 	void settle() {
 		Burst.forgetBurst();
-		Burst.setLength(ORIGINAL_LENGTH);
+		Burst.setSeconds(ORIGINAL_SECONDS);
 	}
 
 	@Test
-	void aBurstIssuesExactlyItsLength() {
+	void aBurstTakesOneFrameEveryTenthOfASecondUntilItsTimeIsUp() {
 		Burst.beginBurst(5, 1000L);
 
-		for (int expected = 0; expected < 5; expected++) {
-			assertEquals(expected, Burst.claimFrame(), "frame " + expected + " should have been the next one issued");
+		for (int slot = 0; slot < 5; slot++) {
+			long due = 1000L + slot * STEP;
+			assertEquals(slot, Burst.dueSlot(due), "slot " + slot + " is due at its own time");
+			assertEquals(slot, Burst.claimFrame(Burst.dueSlot(due)));
+			assertEquals(Burst.WAIT, Burst.dueSlot(due + STEP - 1), "nothing more until the next slot's time");
 		}
-		assertEquals(-1, Burst.claimFrame(), "a sixth claim past a five-frame burst must signal there is nothing left");
+		assertEquals(Burst.DONE, Burst.dueSlot(1000L + 5 * STEP), "five slots at ten a second is half a second");
+	}
+
+	@Test
+	void aSlotMissedWhileTheCapIsFullIsSkippedNotCaughtUp() {
+		Burst.beginBurst(10, 0L);
+		assertEquals(0, Burst.claimFrame(Burst.dueSlot(0L)));
+
+		// Slots 1 and 2 pass with every in-flight frame still encoding; the next blit that can
+		// issue is in slot 3's time, and takes slot 3 — not slot 1, which would bunch the frames.
+		long late = 3 * STEP + 40;
+		assertEquals(3, Burst.dueSlot(late));
+		assertEquals(1, Burst.claimFrame(Burst.dueSlot(late)), "the second frame written, whatever slot it filled");
+		assertEquals(Burst.WAIT, Burst.dueSlot(late + 1));
+		assertEquals(4, Burst.dueSlot(4 * STEP));
+	}
+
+	@Test
+	void secondsBecomeFramesAtTenASecond() {
+		assertEquals(10, Burst.FRAMES_PER_SECOND);
+		assertEquals(30, Burst.framesFor(3));
+		assertEquals(Burst.MAX_FRAMES, Burst.framesFor(Burst.MAX_SECONDS));
+		assertTrue(Burst.MAX_FRAMES <= 99, "frame names keep two digits");
+	}
+
+	@Test
+	void everyRingOptionIsALengthTheSettingAccepts() {
+		for (int seconds : Burst.DIAL_OPTIONS) {
+			Burst.setSeconds(seconds);
+			assertEquals(seconds, Burst.getSeconds());
+		}
 	}
 
 	@Test
@@ -56,36 +91,37 @@ class BurstTest {
 	}
 
 	/** Re-arming has to reset the counters, not carry them over from whatever ran before — a
-	 * second burst in the same session must start counting frames from zero again. */
+	 * second burst in the same session must start counting frames and slots from zero again. */
 	@Test
-	void aFreshBurstStartsItsIndexAtZero() {
+	void aFreshBurstStartsItsIndexAndScheduleAtZero() {
 		Burst.beginBurst(4, 500L);
-		Burst.claimFrame();
-		Burst.claimFrame();
+		Burst.claimFrame(Burst.dueSlot(500L));
+		Burst.claimFrame(Burst.dueSlot(500L + STEP));
 
 		Burst.beginBurst(4, 900L);
 
-		assertEquals(0, Burst.claimFrame(), "re-arming must reset the index, not continue the last burst's count");
+		assertEquals(0, Burst.dueSlot(900L), "re-arming must restart the schedule");
+		assertEquals(0, Burst.claimFrame(0), "re-arming must reset the index, not continue the last burst's count");
 	}
 
 	@Test
-	void setLengthClampsToTheValidRange() {
-		Burst.setLength(0);
-		assertEquals(1, Burst.getLength(), "a burst of zero frames makes no sense; one is the floor");
+	void setSecondsClampsToTheValidRange() {
+		Burst.setSeconds(0);
+		assertEquals(Burst.MIN_SECONDS, Burst.getSeconds(), "shorter than this cannot hold a moment from start to finish");
 
-		Burst.setLength(Burst.MAX_LENGTH + 50);
-		assertEquals(Burst.MAX_LENGTH, Burst.getLength());
+		Burst.setSeconds(Burst.MAX_SECONDS + 50);
+		assertEquals(Burst.MAX_SECONDS, Burst.getSeconds());
 	}
 
-	/** {@code beginBurst} takes an explicit length so a test can drive an arbitrary run without
-	 * touching the session preference {@link Burst#setLength} controls. */
+	/** {@code beginBurst} takes an explicit slot count so a test can drive an arbitrary run without
+	 * touching the session preference {@link Burst#setSeconds} controls. */
 	@Test
 	void beginBurstDoesNotChangeTheSessionLengthPreference() {
-		Burst.setLength(6);
+		Burst.setSeconds(4);
 
 		Burst.beginBurst(2, 1000L);
 
-		assertEquals(6, Burst.getLength(), "the running burst's own length must not overwrite the session default");
+		assertEquals(4, Burst.getSeconds(), "the running burst's own length must not overwrite the session default");
 	}
 
 	/**
@@ -102,16 +138,16 @@ class BurstTest {
 	@Test
 	void completionCanBeReportedBeforeOrAfterTheStateLeavesRunning() {
 		Burst.beginBurst(2, 1000L);
-		Burst.claimFrame();
-		Burst.claimFrame();
+		Burst.claimFrame(0);
+		Burst.claimFrame(1);
 		Burst.frameCompleted(true);
 		Burst.frameCompleted(true);
 		Burst.finishBurst();
 		assertFalse(Burst.isBusy());
 
 		Burst.beginBurst(2, 2000L);
-		Burst.claimFrame();
-		Burst.claimFrame();
+		Burst.claimFrame(0);
+		Burst.claimFrame(1);
 		Burst.finishBurst();
 		Burst.frameCompleted(true);
 		Burst.frameCompleted(true);
@@ -124,8 +160,8 @@ class BurstTest {
 	@Test
 	void aFailedFrameStillCountsAsCompleted() {
 		Burst.beginBurst(2, 1000L);
-		Burst.claimFrame();
-		Burst.claimFrame();
+		Burst.claimFrame(0);
+		Burst.claimFrame(1);
 		Burst.frameCompleted(false);
 		Burst.frameCompleted(true);
 		Burst.finishBurst();

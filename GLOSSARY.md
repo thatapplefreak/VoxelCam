@@ -25,11 +25,11 @@ window (`4x`), or exact dimensions (`3840x2160`).
 _Avoid_: Resolution, scale
 
 **Burst**:
-A run of plain screenshots taken across consecutive frames and kept together as one group.
+A few seconds of play captured as plain screenshots, ten a second, and kept together as one group.
 _Avoid_: Sequence, series, live photo
 
 **Burst length**:
-How many frames a burst takes.
+How many seconds a burst covers, from two to five.
 _Avoid_: Burst count, burst size
 
 **Frame** (of a burst):

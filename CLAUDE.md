@@ -285,16 +285,20 @@ Five things here each cost a playtest to find:
   *hidden* while aiming, not disabled, because disabling it hands the deltas back to mouse-look.
 
 The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
-`BigScreenshotSize.DIAL_OPTIONS`: five values each, because eight would put labels 15° apart and
-colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. In a game test,
+`BigScreenshotSize.DIAL_OPTIONS`: four burst lengths (2–5 s, all of them) and five sizes, because
+eight would put labels 15° apart and colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. In a game test,
 `moveCursor` moves the raw cursor while aim is GUI-scaled, so a vector that clears the dead zone
 may not clear the ring.
 
-**Burst** — a run of plain-size captures across consecutive frames, grouped in the manager as one
-key frame with the rest folded under it (ADR-0006). `Burst.request()` reserves every frame's name
-up front and synchronously, and `beforeBlit()` issues one frame per call. `MAX_IN_FLIGHT` is the
-schedule rather than a timer, because each in-flight frame is a full-resolution `NativeImage` held
-until `Util.ioPool()` encodes it. `ScreenshotHandler`'s save latch is a counted guard
+**Burst** — a few seconds of play captured at `Burst.FRAMES_PER_SECOND` (10), grouped in the
+manager as one key frame with the rest folded under it (ADR-0006). Its length is in seconds
+(`getSeconds()`, 2–5, default 3; persisted as `burstSeconds`), so a 3 s burst is 30 slots, one every
+`FRAME_INTERVAL_MILLIS`. `Burst.request()` reserves every slot's name up front and synchronously.
+`beforeBlit()` issues a frame on the first blit in each slot's time (`dueSlot`), gated by
+`MAX_IN_FLIGHT`, because each in-flight frame is a full-resolution `NativeImage` held until
+`Util.ioPool()` encodes it. A slot that passes while the cap is full is **skipped, never caught
+up**: catching up would bunch frames, while skipping costs one frame and the recorded offsets keep
+playback true to time. Frames are numbered by issue order, so names stay contiguous across a skip. `ScreenshotHandler`'s save latch is a counted guard
 (`beginSave`/`endSave`/`joinSave`) for the same reason, shared by all three capture paths.
 
 Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
@@ -500,10 +504,10 @@ the row's own spacing, and there is a fallback to the old position past the bott
 for menu-replacing mods.
 
 **Config** — `VoxelCamConfig` persists ten settings to `voxelcam.json` (Gson, under
-`FabricLoader.getConfigDir()`): burst length, big-screenshot size, the manager's sort mode, its
+`FabricLoader.getConfigDir()`): burst length in seconds, big-screenshot size, the manager's sort mode, its
 favourites-only filter, and the five automatic-capture settings (four per-trigger booleans plus
 `autoCaptureCooldownSeconds`), and `captureStatusHud`. Only three mirror an existing session-static holder
-(`Burst.getLength()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other seven live *only* on
+(`Burst.getSeconds()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other seven live *only* on
 `VoxelCamConfig.current()` — `favoritesOnly` is read in the manager's `init()` and written in
 `toggleFavoritesOnly()`, and `MomentTrigger`'s per-constant getter/setter lambdas point straight at
 their own flat field — rather than keeping a second copy that could drift. The fields stay flat, and
@@ -522,9 +526,9 @@ Defaults are written as **field initialisers**, not applied after the parse: Gso
 finds no key for at whatever the constructor set, so a `voxelcam.json` written before a setting
 existed keeps that setting's default instead of reading as `false`/`0`.
 
-`Burst.setLength`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
+`Burst.setSeconds`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
 `VoxelCamConfig.saveCurrent()` themselves — that would touch `FabricLoader.getInstance()` from
-`BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setLength`
+`BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setSeconds`
 directly. `saveCurrent()` is instead called explicitly from every place a setting actually changes
 at the player's hand: the capture menu's outer ring, `BigScreenshotCommand`, and the manager's sort
 button and favourites toggle — all of which already need a live client to run at all. `load()` (once,
@@ -535,7 +539,7 @@ writing straight back.
 A settings screen (`GuiSettings`, reachable from a gear button in the manager, or from Mod Menu if
 installed — `VoxelCamModMenu`, `compileOnly` in `build.gradle` so it costs nothing for a player who
 does not have Mod Menu) reaches burst length across its full range and every `BigScreenshotSize`
-preset, complementing the ring's five-value ladders for each. An "Automatic capture…" row opens
+preset, complementing the ring's ladders for each. An "Automatic capture…" row opens
 `GuiAutoCaptureSettings` — its own screen rather than four more rows, because `GuiSettings`
 positions its rows by hand with no scrolling. A "Capture status" `CycleButton` is its fourth row.
 Since 2.5.0 the rows are block-centred on `height / 2`, as `GuiAutoCaptureSettings`' are, rather

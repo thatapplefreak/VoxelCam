@@ -68,12 +68,12 @@ public class SettingsScreenTest implements FabricClientGameTest {
 	 * their own, since they never touch {@code FabricLoader.getConfigDir()} itself.
 	 */
 	private static void assertBurstLengthStepsAndPersists(ClientGameTestContext context) {
-		int before = context.computeOnClient(client -> Burst.getLength());
+		int before = context.computeOnClient(client -> Burst.getSeconds());
 
 		context.clickScreenButton("voxelcam.settings.burstlengthplus");
 		context.waitTicks(2);
 
-		int after = context.computeOnClient(client -> Burst.getLength());
+		int after = context.computeOnClient(client -> Burst.getSeconds());
 		if (after != before + 1) {
 			throw new AssertionError("burst length should have gone from " + before
 					+ " to " + (before + 1) + ", was " + after);
@@ -90,7 +90,7 @@ public class SettingsScreenTest implements FabricClientGameTest {
 			try {
 				String json = Files.readString(configFile.toPath());
 				JsonObject parsed = JsonParser.parseString(json).getAsJsonObject();
-				return parsed.get("burstLength").getAsInt();
+				return parsed.get("burstSeconds").getAsInt();
 			} catch (IOException e) {
 				throw new AssertionError("could not read voxelcam.json", e);
 			}

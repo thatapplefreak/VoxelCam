@@ -28,7 +28,7 @@ import java.util.zip.CRC32;
  *
  * <p>Exported from the files rather than buffered while the burst runs, for three reasons the
  * frames themselves settle: their recorded {@link BurstFrame#offsetMillis()} is the only honest
- * frame timing (a burst is paced by its in-flight cap, not a timer), the frames finish writing
+ * frame timing (a burst skips any slot its in-flight cap cannot make), the frames finish writing
  * out of order while APNG's sequence numbers are strictly monotonic, and holding a burst's worth
  * of full-resolution {@code NativeImage}s off-heap is the very cost {@code Burst.MAX_IN_FLIGHT}
  * exists to bound. Read one frame at a time, the export holds one compressed PNG on the heap.

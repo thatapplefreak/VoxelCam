@@ -39,7 +39,7 @@ class VoxelCamConfigTest {
 	@Test
 	void roundTripsThroughDisk() {
 		VoxelCamConfig original = new VoxelCamConfig();
-		original.burstLength = 12;
+		original.burstSeconds = 4;
 		original.bigScreenshotSize = "4k";
 		original.sortMode = SortMode.NAME_A_TO_Z.name();
 		original.favoritesOnly = true;
@@ -52,7 +52,7 @@ class VoxelCamConfigTest {
 		VoxelCamConfig.save(original, configFile());
 		VoxelCamConfig read = VoxelCamConfig.load(configFile());
 
-		assertEquals(original.burstLength, read.burstLength);
+		assertEquals(original.burstSeconds, read.burstSeconds);
 		assertEquals(original.bigScreenshotSize, read.bigScreenshotSize);
 		assertEquals(original.sortMode, read.sortMode);
 		assertEquals(original.favoritesOnly, read.favoritesOnly);
@@ -68,7 +68,7 @@ class VoxelCamConfigTest {
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
 		VoxelCamConfig defaults = new VoxelCamConfig();
-		assertEquals(defaults.burstLength, config.burstLength);
+		assertEquals(defaults.burstSeconds, config.burstSeconds);
 		assertEquals(defaults.bigScreenshotSize, config.bigScreenshotSize);
 		assertEquals(defaults.sortMode, config.sortMode);
 		assertFalse(config.favoritesOnly);
@@ -85,13 +85,24 @@ class VoxelCamConfigTest {
 	 */
 	@Test
 	void aConfigWrittenBeforeTheseSettingsExistedKeepsTheirDefaults() throws IOException {
-		Files.writeString(configFile(), "{ \"burstLength\": 6 }", StandardCharsets.UTF_8);
+		Files.writeString(configFile(), "{ \"burstSeconds\": 4 }", StandardCharsets.UTF_8);
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(6, config.burstLength);
+		assertEquals(4, config.burstSeconds);
 		assertTrue(config.autoCaptureAdvancement, "an older file must not read as every trigger off");
 		assertEquals(new VoxelCamConfig().autoCaptureCooldownSeconds, config.autoCaptureCooldownSeconds);
+	}
+
+	/** The old {@code burstLength} counted frames; read as seconds, a saved 8 or 20 would be a
+	 * nonsense length, so an upgraded file starts from the default instead. */
+	@Test
+	void anOldFrameCountIsNotReadAsSeconds() throws IOException {
+		Files.writeString(configFile(), "{ \"burstLength\": 20 }", StandardCharsets.UTF_8);
+
+		VoxelCamConfig config = VoxelCamConfig.load(configFile());
+
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
 	}
 
 	/** A file another program is mid-write to, or one hand-edited into something broken, must
@@ -102,7 +113,7 @@ class VoxelCamConfigTest {
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(new VoxelCamConfig().burstLength, config.burstLength);
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
 	}
 
 	@Test
@@ -111,7 +122,7 @@ class VoxelCamConfigTest {
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(new VoxelCamConfig().burstLength, config.burstLength);
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
 	}
 
 	@Test
