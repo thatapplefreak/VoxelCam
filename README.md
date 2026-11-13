@@ -113,6 +113,22 @@ moved its GPU abstraction into a new package and swapped GLFW for SDL, so the
 work was following that: the key handling, the pointer in the capture menu, and
 the Save-As dialog, which is SDL's now and opens without a custom caption.
 
+AI disclosure
+-------------
+
+Since 2.0.0, most of VoxelCam's code, tests and documentation have been written
+with Claude Code, an AI coding assistant, under my direction. I decide what the
+mod does and how it behaves, review every change before it is merged, and test
+each release in game. Versions before 2.0.0 (2013–2014) were written by hand.
+
+The in-game English strings, the Modrinth description and the release notes
+were drafted with Claude too, and the 16×16 star icon was drawn by a script
+Claude wrote. The camera icon and the original pirate translation are
+hand-made. The mod does not use generative AI while you play.
+
+[`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) has the details, and is what the
+disclosure on the [Modrinth page](https://modrinth.com/mod/voxelcam) says.
+
 Licence
 -------
 

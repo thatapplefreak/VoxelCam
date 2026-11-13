@@ -97,6 +97,14 @@ an advancement, die, portal and kill a boss by hand before a release; watch the 
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
 measurement and its failure is silent.
 
+**The Modrinth disclosures are a release check too, and they block the release.** Modrinth unlisted
+the project once for a missing AI disclosure (#67), and its rules require disclosures to stay
+accurate and match what the project says elsewhere. The disclosure is a project setting, so
+`release.yml` can neither set nor check it. Before publishing a GitHub release, make the
+project's Settings → Disclosures match `AI_DISCLOSURE.md`. The same goes for work done here: an
+image or a translation made with AI changes `AI_DISCLOSURE.md` and the README's AI section in the
+same commit.
+
 **A `Checkbox` cannot be clicked by a client game test.** `clickScreenButton` resolves the key to a
 string and then walks the screen's renderables, but its matcher handles `Button` and `CycleButton`
 and nothing else — a checkbox is an `AbstractButton`, passes the outer filter, and is then silently
