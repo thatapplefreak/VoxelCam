@@ -243,6 +243,22 @@ public final class CaptureMenu {
 	}
 
 	/**
+	 * Queues an ordinary screenshot for the next frame's blit, the way a released selection is,
+	 * for a press that never went through the menu: F2 over a screen, F2 with the menu bound to
+	 * another key, or another mod calling {@code Screenshot.grab}.
+	 *
+	 * <p>Taking it on the spot instead would read back the frame already on screen, and that frame
+	 * has the capture status HUD in it, even under F1. A queued capture is one {@link
+	 * CaptureStatus#beforeFrame} hides the HUD for. A capture that is already queued is left alone:
+	 * it is about to be taken from the same frame this one would be.
+	 */
+	public static void queueScreenshot() {
+		if (pendingCapture == null) {
+			queue(Mode.SCREENSHOT);
+		}
+	}
+
+	/**
 	 * Drops a queued capture without taking it. Only the unit tests need this: they release the
 	 * key without a client to render the frame that would consume it, and this state is static.
 	 */

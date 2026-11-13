@@ -207,6 +207,22 @@ class CaptureMenuTest {
 				"the blit of the frame the menu was drawn on must not be the one captured");
 	}
 
+	/**
+	 * A screenshot-key press the menu never saw is queued the same way. The frame on screen when it
+	 * arrives has the capture status HUD in it, so it waits for a frame that has begun — the one
+	 * {@code CaptureStatus.beforeFrame} hides the HUD for, because this reports it is captured.
+	 */
+	@Test
+	void aKeyPressOutsideTheMenuWaitsForAFrameThatHidesTheHud() {
+		CaptureMenu.queueScreenshot();
+
+		CaptureMenu.beforeBlit();
+		assertTrue(CaptureMenu.isCapturePending(), "the frame already on screen must not be the one captured");
+
+		CaptureMenu.beforeFrame();
+		assertTrue(CaptureMenu.capturesThisFrame(), "the next frame should be marked as read back");
+	}
+
 	@Test
 	void abortFromArmedReturnsToIdleWithoutTouchingTheClient() {
 		CaptureMenu.onKeyDown();

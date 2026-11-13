@@ -235,7 +235,8 @@ public final class CaptureStatus {
 	 * <ul>
 	 *   <li>an oversized capture that has resized and is waiting for this blit;</li>
 	 *   <li>a capture-menu selection waiting for its first clean frame — whatever mode it fires, a
-	 *       plain shot and a burst's key frame are both taken from this very blit;</li>
+	 *       plain shot and a burst's key frame are both taken from this very blit. A screenshot-key
+	 *       press that bypassed the menu is queued the same way, so it is covered here too;</li>
 	 *   <li>a burst frame this frame's head settled on — only those, so the recording cue can
 	 *       show on every frame in between;</li>
 	 *   <li>an automatic moment, armed and waiting for the frame its gate accepts.</li>
