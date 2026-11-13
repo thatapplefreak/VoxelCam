@@ -4,6 +4,7 @@ import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
 import com.thatapplefreak.voxelcam.client.share.NativeShare;
 import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimationPreview;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
@@ -636,7 +637,18 @@ public class GuiScreenShotManager extends Screen {
 		// filmstrip to have highlighted anything else in.
 		File shown = previewFrame != null ? previewFrame : selected;
 
-		ScreenshotImageCache.Loaded image = ScreenshotImageCache.get(shown, false);
+		// An exported animation plays here; until its frames are decoded, and for everything
+		// else, the still below is drawn — for an animation that is its first frame, so the
+		// switch to playing is seamless.
+		ScreenshotImageCache.Loaded image = null;
+		if (ScreenshotMetadata.animationFrames(shown) > 0) {
+			image = AnimationPreview.frameAt(shown, Util.getMillis());
+		} else {
+			AnimationPreview.showNothing();
+		}
+		if (image == null) {
+			image = ScreenshotImageCache.get(shown, false);
+		}
 		if (image == null) {
 			Component status = ScreenshotImageCache.hasFailed(shown, false)
 					? Component.translatable("voxelcam.loadfailed")
@@ -762,6 +774,7 @@ public class GuiScreenShotManager extends Screen {
 	@Override
 	public void onClose() {
 		ScreenshotImageCache.releaseAll();
+		AnimationPreview.releaseAll();
 		ScreenshotMetadata.forgetAll();
 		minecraft.setScreenAndShow(null);
 	}

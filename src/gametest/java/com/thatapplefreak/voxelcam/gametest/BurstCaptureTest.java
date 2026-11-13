@@ -3,6 +3,7 @@ package com.thatapplefreak.voxelcam.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimationPreview;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
@@ -198,7 +199,18 @@ public class BurstCaptureTest implements FabricClientGameTest {
 			throw new AssertionError("the JDK's PNG reader rejected " + animation.getName(), e);
 		}
 
-		context.waitTicks(5);
+		// The preview plays it: every frame decoded, and more than one of them shown over time.
+		context.waitFor(client -> AnimationPreview.playingFrameCount(animation) == groupSize, 200);
+		Set<Object> shown = new HashSet<>();
+		for (int i = 0; i < 10; i++) {
+			shown.add(context.computeOnClient(client ->
+					AnimationPreview.frameAt(animation, net.minecraft.util.Util.getMillis()).id()));
+			context.waitTicks(1);
+		}
+		if (shown.size() < 2) {
+			throw new AssertionError("the preview should cycle through the animation's frames, showed " + shown);
+		}
+
 		context.takeScreenshot("manager-with-exported-animation");
 		context.setScreen(() -> null);
 		context.waitForScreen(null);

@@ -223,6 +223,115 @@ public final class AnimatedPng {
 		}
 	}
 
+	/** One frame of an animation as a standalone PNG any decoder can read, and how long it shows. */
+	public record Frame(byte[] png, int delayMillis) {
+	}
+
+	/**
+	 * The reverse of {@link #assemble}: every frame of an APNG rebuilt as a plain PNG — the
+	 * shared IHDR, that frame's data as one {@code IDAT}, IEND — so {@code NativeImage}, which
+	 * only ever decodes the default image, can read each one. Pure bytes again, no decode.
+	 *
+	 * <p>Only the shape this class writes is played back: every frame covering the whole canvas,
+	 * replacing rather than blending over the last. Anything else — a foreign APNG with partial
+	 * frames, or something that is not an APNG at all — returns an empty list, and the caller
+	 * shows the still it would have shown anyway.
+	 */
+	public static List<Frame> splitFrames(byte[] apng) {
+		try {
+			byte[] ihdr = ihdrOf(apng);
+			int width = readInt(ihdr, 0);
+			int height = readInt(ihdr, 4);
+
+			List<Frame> frames = new ArrayList<>();
+			ByteArrayOutputStream data = null;
+			int delay = 0;
+			boolean animated = false;
+			int pos = SIGNATURE.length;
+			while (pos + 12 <= apng.length) {
+				int length = readInt(apng, pos);
+				long end = (long) pos + 12 + length;
+				if (length < 0 || end > apng.length) {
+					return List.of();
+				}
+				String type = type(apng, pos);
+				int dataStart = pos + 8;
+				switch (type) {
+					case "acTL" -> animated = true;
+					case "fcTL" -> {
+						if (length != 26 || readInt(apng, dataStart + 4) != width || readInt(apng, dataStart + 8) != height
+								|| readInt(apng, dataStart + 12) != 0 || readInt(apng, dataStart + 16) != 0
+								|| apng[dataStart + 25] != 0) {
+							return List.of();
+						}
+						if (data != null) {
+							frames.add(new Frame(standalone(ihdr, data.toByteArray()), delay));
+						}
+						data = new ByteArrayOutputStream();
+						delay = delayMillis(readShort(apng, dataStart + 20), readShort(apng, dataStart + 22));
+					}
+					// An IDAT before any fcTL is a poster outside the animation; it is skipped.
+					case "IDAT" -> {
+						if (data != null) {
+							data.write(apng, dataStart, length);
+						}
+					}
+					case "fdAT" -> {
+						if (data == null || length < 4) {
+							return List.of();
+						}
+						data.write(apng, dataStart + 4, length - 4);
+					}
+					default -> {
+					}
+				}
+				if ("IEND".equals(type)) {
+					break;
+				}
+				pos = (int) end;
+			}
+			if (!animated || data == null) {
+				return List.of();
+			}
+			frames.add(new Frame(standalone(ihdr, data.toByteArray()), delay));
+			return frames;
+		} catch (IOException e) {
+			return List.of();
+		}
+	}
+
+	/** {@code fcTL}'s fraction in milliseconds; a zero denominator means hundredths, per the spec. */
+	private static int delayMillis(int numerator, int denominator) {
+		int den = denominator == 0 ? 100 : denominator;
+		return clampDelay(Math.round(numerator * 1000.0 / den));
+	}
+
+	private static byte[] standalone(byte[] ihdr, byte[] zlib) {
+		ByteArrayOutputStream out = new ByteArrayOutputStream(zlib.length + 64);
+		out.writeBytes(SIGNATURE);
+		out.writeBytes(chunk("IHDR", ihdr));
+		out.writeBytes(chunk("IDAT", zlib));
+		out.writeBytes(chunk("IEND", new byte[0]));
+		return out.toByteArray();
+	}
+
+	private static byte[] chunk(String type, byte[] data) {
+		byte[] typeBytes = type.getBytes(StandardCharsets.US_ASCII);
+		CRC32 crc = new CRC32();
+		crc.update(typeBytes);
+		crc.update(data);
+		byte[] out = new byte[12 + data.length];
+		putInt(out, 0, data.length);
+		System.arraycopy(typeBytes, 0, out, 4, 4);
+		System.arraycopy(data, 0, out, 8, data.length);
+		putInt(out, 8 + data.length, (int) crc.getValue());
+		return out;
+	}
+
+	private static int readShort(byte[] data, int at) {
+		return ((data[at] & 0xFF) << 8) | (data[at + 1] & 0xFF);
+	}
+
 	private static byte[] ihdrOf(byte[] png) throws IOException {
 		requireSignature(png);
 		if (png.length < SIGNATURE.length + 8 + 13 || readInt(png, SIGNATURE.length) != 13
@@ -329,18 +438,7 @@ public final class AnimatedPng {
 		}
 
 		private void writeChunk(String type, byte[] data) throws IOException {
-			byte[] typeBytes = type.getBytes(StandardCharsets.US_ASCII);
-			byte[] length = new byte[4];
-			putInt(length, 0, data.length);
-			CRC32 crc = new CRC32();
-			crc.update(typeBytes);
-			crc.update(data);
-			byte[] crcBytes = new byte[4];
-			putInt(crcBytes, 0, (int) crc.getValue());
-			out.write(length);
-			out.write(typeBytes);
-			out.write(data);
-			out.write(crcBytes);
+			out.write(chunk(type, data));
 		}
 	}
 

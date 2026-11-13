@@ -314,6 +314,14 @@ the only thing that tells the manager it moves: everything else in the mod sees 
 the first frame. Set as Key and Export share one stacked column at the filmstrip's right end, so the
 second button costs the strip no cells.
 
+The preview plays a tagged animation through `AnimationPreview`, because `NativeImage` (like any
+decoder that does not know APNG) only ever decodes frame 0. `AnimatedPng.splitFrames` rebuilds each
+frame as a standalone PNG, which is still pure bytes. They are decoded on one loader thread, scaled to
+at most 1024px, and uploaded as one texture per frame. Only the selected animation is held; the still
+from `ScreenshotImageCache` is drawn until its frames land, and that still is frame 0, so the switch
+is seamless. Only full-canvas, replace-blend frames (the shape `AnimatedPng` writes) are played; any
+other APNG stays a still.
+
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
 it (ADR-0002). `PngTextChunk` does the splice and the read. Two of its rules each fixed a real bug:

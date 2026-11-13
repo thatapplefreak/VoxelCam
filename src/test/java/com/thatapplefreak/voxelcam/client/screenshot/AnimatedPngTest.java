@@ -258,6 +258,57 @@ class AnimatedPngTest {
 		assertEquals(0xFF336699, still.getRGB(4, 0));
 	}
 
+	// --- splitting back into frames, for the preview -------------------------------------------
+
+	@Test
+	void splittingIsTheReverseOfAssembling() throws IOException {
+		List<byte[]> sources = List.of(png(10, 5, 0x336699, 0), splitIdat(png(10, 5, 0x336699, 4), 3),
+				png(10, 5, 0x336699, 9));
+		List<AnimatedPng.Frame> frames = AnimatedPng.splitFrames(
+				AnimatedPng.assemble(sources, new int[] { 40, 1234, 25 }, Map.of("voxelcam:world", "Overworld")));
+
+		assertEquals(3, frames.size());
+		assertEquals(List.of(40, 1234, 25), frames.stream().map(AnimatedPng.Frame::delayMillis).toList());
+		for (int i = 0; i < sources.size(); i++) {
+			BufferedImage expected = ImageIO.read(new ByteArrayInputStream(sources.get(i)));
+			BufferedImage actual = ImageIO.read(new ByteArrayInputStream(frames.get(i).png()));
+			for (int x = 0; x < 10; x++) {
+				assertEquals(expected.getRGB(x, 0), actual.getRGB(x, 0), "frame " + i + " pixel " + x);
+			}
+			for (Chunk c : chunks(frames.get(i).png())) {
+				assertTrue(c.crcOk, "frame " + i + " " + c.type);
+			}
+		}
+	}
+
+	@Test
+	void aPlainPngOrGarbageSplitsIntoNothing() throws IOException {
+		assertTrue(AnimatedPng.splitFrames(png(8, 4, 0x102030, 0)).isEmpty());
+		assertTrue(AnimatedPng.splitFrames("not a png".getBytes(StandardCharsets.US_ASCII)).isEmpty());
+		byte[] apng = assemble(List.of(png(8, 4, 0x102030, 0), png(8, 4, 0x102030, 1)), 40, 40);
+		assertTrue(AnimatedPng.splitFrames(Arrays.copyOf(apng, apng.length / 2)).size() < 2,
+				"a truncated file must not play a half-read frame as whole");
+	}
+
+	@Test
+	void aFrameThatDoesNotCoverTheWholeCanvasIsNotPlayed() throws IOException {
+		byte[] apng = assemble(List.of(png(8, 4, 0x102030, 0), png(8, 4, 0x102030, 1)), 40, 40);
+		// Shrink the second fcTL's width: a foreign, partial-frame APNG this player does not composite.
+		List<Chunk> chunks = chunks(apng);
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.writeBytes(Arrays.copyOf(apng, 8));
+		int fctls = 0;
+		for (Chunk c : chunks) {
+			byte[] data = c.data;
+			if (c.type.equals("fcTL") && fctls++ == 1) {
+				data = data.clone();
+				data[7] = 4;
+			}
+			out.writeBytes(chunk(c.type, data));
+		}
+		assertTrue(AnimatedPng.splitFrames(out.toByteArray()).isEmpty());
+	}
+
 	// --- timing -----------------------------------------------------------------------------
 
 	@Test

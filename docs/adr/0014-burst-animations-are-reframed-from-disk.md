@@ -23,9 +23,11 @@ when quantised down to that.
 
 ## Consequences
 
-- The animation is an ordinary `.png`: browsers animate it, and everything else (the manager, its
-  thumbnails, `PngDimensions`, sharing) treats it as a still of frame 0. The
-  `voxelcam:animationframes` tag is what marks it as an animation in the details line.
+- The animation is an ordinary `.png`: browsers animate it, and everything else (thumbnails,
+  `PngDimensions`, sharing) treats it as a still of frame 0. The manager's preview plays it by
+  splitting it back into standalone frames, the same byte reframing in reverse. The
+  `voxelcam:animationframes` tag is what marks it as an animation, for the preview and the details
+  line.
 - Each frame stays up until the next one was captured. At a high frame rate that is a short, fast
   loop. Delays are clamped to at least 20 ms, because browsers handle near-zero delays
   inconsistently. The last frame holds for the average gap so the loop has no stutter.
