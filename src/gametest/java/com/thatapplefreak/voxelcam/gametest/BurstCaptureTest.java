@@ -8,6 +8,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.SmallerShareCopy;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.DataInputStream;
 import java.io.File;
@@ -229,6 +230,23 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		int webpFrames = anmfCount(webp);
 		if (webpFrames != groupSize) {
 			throw new AssertionError("the WebP copy should hold all " + groupSize + " frames, held " + webpFrames);
+		}
+
+		// The smaller copy for Discord, through the game's own decoder: forced here with a limit of
+		// half the real copy, since a still test world never comes near the real one.
+		try {
+			long limit = webp.length() / 2;
+			File smaller = SmallerShareCopy.make(animation, webp.length(), limit, AnimationPreview::argbOf);
+			try {
+				if (smaller.length() > limit || anmfCount(smaller) != groupSize) {
+					throw new AssertionError("the smaller copy should fit " + limit + " bytes with all " + groupSize
+							+ " frames, was " + smaller.length() + " bytes with " + anmfCount(smaller));
+				}
+			} finally {
+				SmallerShareCopy.discard(smaller);
+			}
+		} catch (IOException e) {
+			throw new AssertionError("could not make a smaller copy of " + animation.getName(), e);
 		}
 
 		// A decoder that knows nothing of APNG must still open the file as its first frame.

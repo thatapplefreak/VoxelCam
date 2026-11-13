@@ -55,7 +55,16 @@ public final class NativeShare {
 	 * see ADR-0012.
 	 */
 	public static CompletableFuture<Path> saveCopy(File screenshot, String dialogTitle, String filterDescription) {
-		return showSaveDialog(screenshot, filterDescription).thenApplyAsync(chosen -> {
+		return saveCopy(screenshot, screenshot, dialogTitle, filterDescription);
+	}
+
+	/**
+	 * {@link #saveCopy(File, String, String)} for a file that lives somewhere the player should
+	 * not be sent to — a temporary copy — with the dialog opening on {@code suggested} instead.
+	 */
+	public static CompletableFuture<Path> saveCopy(File screenshot, File suggested, String dialogTitle,
+			String filterDescription) {
+		return showSaveDialog(suggested, filterDescription).thenApplyAsync(chosen -> {
 			if (chosen == null) {
 				return null;
 			}

@@ -341,6 +341,14 @@ codes or colour transforms. It lands within 5–16% of libwebp's lossless size, 
 bit-exact against libwebp, and `AnimatedWebpTest` keeps that honest with its own decoder for
 exactly this subset; extend that decoder with any feature you add to the encoder.
 
+When the sharing WebP is over Discord's free limit (`SmallerShareCopy.DISCORD_LIMIT_BYTES`), Save a
+copy and Get a share link open `ShareSizePopup` first: a smaller copy (recommended) or full
+resolution, Escape and Cancel sending nothing. The smaller copy is re-rendered from the APNG's
+composited frames, area-averaged down to a scale estimated from the full copy's size (side ∝ √bytes,
+15% headroom) and retried smaller if it misses; it lives in a temp folder as
+`<name>_discord.webp`, is reused for a second send, and is deleted when the share popup closes.
+Reveal and Copy path never ask: they point at the file on disk.
+
 Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
 opaque, the best of the five PNG filters per row, zlib 6. That is about 37% smaller than stb's
 output. Single captures still use the vanilla encoder.
