@@ -48,7 +48,72 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertAnAimedReleaseWithTheHudHiddenTakesTheAimedMode(context, dir);
 			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
+			assertMouseButtonsAndTheWheelDoNothingWhileTheMenuIsOpen(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
+		}
+	}
+
+	/**
+	 * Clicking a wedge is the natural thing to do to a radial menu, and the menu is not a screen,
+	 * so vanilla's mouse handling does not know it is there. With no screen up, a press on a
+	 * released mouse is "click to regain focus": vanilla grabs the mouse again, which turns the
+	 * camera under the dial and moves the tracked cursor back to the centre, and the same press
+	 * then clicks its key mapping, so a right click uses the held item. The wheel moves the hotbar
+	 * whether or not the mouse is grabbed.
+	 *
+	 * <p>The hotbar slot is the assertion that holds on any machine. The grab is only checked where
+	 * the mouse was grabbed to begin with, since a window without focus is never grabbed at all.
+	 */
+	private static void assertMouseButtonsAndTheWheelDoNothingWhileTheMenuIsOpen(
+			ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+		boolean wasGrabbed = context.computeOnClient(client -> client.mouseHandler.isMouseGrabbed());
+		int slot = context.computeOnClient(client -> client.player.getInventory().getSelectedSlot());
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+			context.getInput().moveCursor(-130, 75);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BURST, 100);
+
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+			context.getInput().scroll(1.0);
+			context.waitTicks(5);
+
+			String found = context.computeOnClient(client -> {
+				if (!CaptureMenu.isOpen()) {
+					return "the capture menu closed";
+				}
+				if (wasGrabbed && client.mouseHandler.isMouseGrabbed()) {
+					return "the mouse was grabbed again under the open menu";
+				}
+				if (CaptureMenu.aimedMode() != CaptureMenu.Mode.BURST) {
+					return "the aim moved off the burst wedge to " + CaptureMenu.aimedMode();
+				}
+				if (client.player.getInventory().getSelectedSlot() != slot) {
+					return "the wheel moved the hotbar from slot " + slot + " to "
+							+ client.player.getInventory().getSelectedSlot();
+				}
+				return null;
+			});
+			if (found != null) {
+				throw new AssertionError("clicking and scrolling over the open capture menu should do nothing, but "
+						+ found + " (mouse grabbed beforehand: " + wasGrabbed + ")");
+			}
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(40);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> !name.endsWith(".png"));
+		if (!after.isEmpty()) {
+			throw new AssertionError("a click on the capture menu should not have captured anything, wrote " + after);
 		}
 	}
 

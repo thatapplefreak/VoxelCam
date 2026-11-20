@@ -303,6 +303,9 @@ Five things here each cost a playtest to find:
   the pause screen has already opened, and a cancel that pauses the game is not a cancel. A
   cancelled hold latches until the key comes up, or the next tick reopens the menu. The pointer is
   *hidden* while aiming, not disabled, because disabling it hands the deltas back to mouse-look.
+  `MouseHandlerMixin` drops button presses and the wheel for the same span: with no `Screen` up,
+  vanilla takes a press on a released mouse as "click to regain focus", re-grabs it, re-centres
+  the cursor and then clicks the button's key mapping, and the wheel moves the hotbar regardless.
 
 The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
 `BigScreenshotSize.DIAL_OPTIONS`: four burst lengths (2–5 s, all of them) and five sizes, because
