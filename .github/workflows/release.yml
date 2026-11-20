@@ -15,6 +15,12 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    # Same reason as the client game test job in build.yml: when 26.3 cannot start
+    # a graphics backend the client hangs instead of exiting, and without a limit
+    # that is GitHub's 6-hour default spent on a release that is already public.
+    # build.yml gives the game tests alone 15 minutes; this job also runs the unit
+    # tests, the build and the publish around them.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -30,10 +36,14 @@ jobs:
       # a failure here reads as "tests failed" rather than "build failed".
       - run: ./gradlew test --stacktrace
 
+      # Kept identical to the same step in build.yml, which explains each package.
+      # mesa-vulkan-drivers is the one 26.3 needs: without a software Vulkan ICD
+      # neither graphics backend starts on this runner.
       - name: Install a virtual display
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils \
+            mesa-vulkan-drivers libvulkan1
 
       - run: ./gradlew runClientGameTest --stacktrace
 
