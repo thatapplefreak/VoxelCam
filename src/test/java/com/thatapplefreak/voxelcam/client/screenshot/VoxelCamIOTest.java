@@ -736,6 +736,42 @@ class VoxelCamIOTest {
 		assertEquals("key-bytes", Files.readString(frame.toPath()));
 	}
 
+	/**
+	 * The star is a chunk inside the file, so a bare swap carries it to the frame's path, which
+	 * the list folds away. The row, the star button and favorites only all read the key's
+	 * path: to the player the burst is what is starred, whichever frame stands for it.
+	 */
+	@Test
+	void setAsKeyLeavesTheBurstsStarOnItsKeyFrame() throws IOException {
+		File key = realPng("burst.png");
+		File frame = realPng("burst_burst01.png");
+		PngTextChunk.embed(key, new BurstFrame("g", 0, 0).toTags());
+		PngTextChunk.embed(frame, new BurstFrame("g", 1, 100).toTags());
+		Favorite.setStarred(key, true);
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.setAsKey(frame));
+
+		assertTrue(Favorite.isStarred(key), "the burst's row keeps its star");
+		assertFalse(Favorite.isStarred(frame), "and none is left hidden on a folded frame");
+		assertEquals(1, BurstFrame.fromTags(PngTextChunk.read(key)).index(), "the frames still changed places");
+		assertEquals(0, BurstFrame.fromTags(PngTextChunk.read(frame)).index());
+	}
+
+	/** The other direction: a frame's bytes carrying a star must not bring one to the row. */
+	@Test
+	void setAsKeyDoesNotStarABurstThatWasNotStarred() throws IOException {
+		File key = realPng("burst.png");
+		File frame = realPng("burst_burst01.png");
+		Favorite.setStarred(frame, true);
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.setAsKey(frame));
+
+		assertFalse(Favorite.isStarred(key));
+		assertTrue(Favorite.isStarred(frame));
+	}
+
 	@Test
 	void setAsKeyRefusesWithNothingSelected() throws IOException {
 		File frame = shot("burst_burst01.png", 1_000L);

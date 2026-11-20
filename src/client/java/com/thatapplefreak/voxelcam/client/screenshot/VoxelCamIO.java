@@ -328,12 +328,19 @@ public final class VoxelCamIO {
 	 * tags record capture history, and a future export needs the latter regardless of which
 	 * frame is shown first.
 	 *
+	 * <p>The favorite flag is the one tag that is put back where it was. It is a chunk in the
+	 * same bytes, so it changes places with them, but what the player starred is the burst: the
+	 * row, the star button and favorites only all read the key's path. Left to travel, a star
+	 * would end up on a frame the list folds away, where nothing shows it or can clear it.
+	 *
 	 * @return true if the swap happened.
 	 */
 	public static boolean setAsKey(File frame) {
 		if (selected == null || frame == null || frame.equals(selected)) {
 			return false;
 		}
+		boolean keyStarred = Favorite.isStarred(selected);
+		boolean frameStarred = Favorite.isStarred(frame);
 		File dir = selected.getParentFile();
 		File tmp;
 		try {
@@ -365,12 +372,30 @@ public final class VoxelCamIO {
 			return false;
 		}
 
+		// Only when they differ: equal flags already agree with their paths after the swap,
+		// and a rewrite is a second chance to fail on a file that needed none.
+		if (keyStarred != frameStarred) {
+			restoreStar(selected, keyStarred);
+			restoreStar(frame, frameStarred);
+		}
+
 		// Cache invalidation is the caller's job, the same as toggleSelectedFavorite()'s: this
 		// class only touches files, and ScreenshotMetadata lives in the gui package that calls
 		// into this one, not the other way around.
 		ScreenshotImageCache.release(selected);
 		ScreenshotImageCache.release(frame);
 		return true;
+	}
+
+	/** Each path on its own, so that one file refusing the rewrite does not leave the other
+	 * with the wrong flag as well. The swap itself has already happened and is not undone for
+	 * this: it is logged, like any other lost star toggle. */
+	private static void restoreStar(File file, boolean starred) {
+		try {
+			Favorite.setStarred(file, starred);
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to keep the favorite flag on {} across Set as key", file, e);
+		}
 	}
 
 	/**
