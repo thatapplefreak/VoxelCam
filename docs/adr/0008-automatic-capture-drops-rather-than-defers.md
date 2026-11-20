@@ -18,3 +18,7 @@ Two exceptions, each because the obstruction is not the player's doing:
 
 A dropped capture hands its cooldown window back, so a moment that never became a screenshot does
 not suppress the next one.
+
+A capture menu the player is holding counts as their own doing, although it is drawn on the HUD and
+is not a screen. A moment that arrives while the capture key is down is not armed, and one already
+pending when the menu is armed is dropped. Neither exception above applies under it.

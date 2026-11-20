@@ -1,8 +1,10 @@
 package com.thatapplefreak.voxelcam.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
@@ -24,7 +26,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
  * The automatic capture path end to end: {@code AutoCapture.fire} through the blit, the write on
  * the IO pool, and the tags embedded afterwards. The unit suite already proves what the cooldown
  * and the gate <em>decide</em>; what only a real client can show is that a decision to capture
- * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the three
+ * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the four
  * decisions not to capture produce no file at all.
  *
  * <p>Triggers are fired directly rather than through their hooks. Earning an advancement, killing a
@@ -51,7 +53,42 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertASecondMomentInsideTheWindowIsDropped(context, dir);
 			assertADisabledTriggerCapturesNothing(context, dir);
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
+			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
 		}
+	}
+
+	/**
+	 * The capture menu is not a screen, so the gate's screen rows read a held one as a clear view.
+	 * It is the player's own doing all the same: a moment taken under it has the dial drawn across
+	 * it, and its save can refuse the screenshot the player was aiming. The real key is held, since
+	 * that is what arms the menu in play.
+	 *
+	 * <p>The menu is backed out of with Escape rather than released, because a release takes the
+	 * player's own screenshot and this is about the file nobody asked for. Still nothing after it
+	 * closes is what separates dropped from deferred, and the moment that follows being taken is
+	 * what shows the refused one did not spend the cooldown.
+	 */
+	private static void assertAMomentUnderAHeldCaptureMenuIsDropped(ClientGameTestContext context, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+			fire(context, MomentTrigger.ADVANCEMENT, "Stone Age");
+			assertNothingNew(dir, before, "a moment that arrived while the capture menu was held");
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(40);
+		assertNothingNew(dir, before, "a moment that arrived under a capture menu since cancelled");
+
+		fire(context, MomentTrigger.ADVANCEMENT, "Stone Age");
+		theOnlyNewFile(dir, before, "the next moment after the capture menu was put away");
 	}
 
 	private static void assertAnArmedMomentLandsTaggedAtWindowSize(ClientGameTestContext context, File dir) {

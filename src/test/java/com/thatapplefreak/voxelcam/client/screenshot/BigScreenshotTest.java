@@ -1,8 +1,11 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+import net.minecraft.util.Util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +30,26 @@ class BigScreenshotTest {
 	void settle() {
 		BigScreenshot.deferRestore();
 		BigScreenshot.beforeFrame();
+		ScreenshotHandler.forgetSavesInFlight();
+		CaptureStatus.forgetAll();
+	}
+
+	/**
+	 * {@code beforeBlit} joins the save counter without a cap, on the strength of nothing else being
+	 * in flight. A burst and a plain screenshot refuse while a save is running. A big screenshot has
+	 * to as well, or it resizes the window alongside a save that is still encoding.
+	 */
+	@Test
+	void aRequestIsRefusedWhileAnotherSaveIsInFlight() {
+		assertTrue(ScreenshotHandler.beginSave(1));
+
+		BigScreenshot.request();
+
+		assertFalse(BigScreenshot.isBusy(), "a big screenshot must not start alongside a save in flight");
+		List<CaptureStatus.Notice> notices = CaptureStatus.visibleAt(Util.getMillis());
+		assertEquals(1, notices.size(), "the refusal should say why nothing happened");
+		assertEquals(CaptureStatus.Kind.BUSY, notices.get(0).kind());
+		assertEquals("voxelcam.savingpleasewait", notices.get(0).key());
 	}
 
 	@Test

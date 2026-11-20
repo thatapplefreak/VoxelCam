@@ -94,7 +94,11 @@ public final class BigScreenshot {
 	public static void request() {
 		// Defensive: the screenshot key already refuses while a capture is in flight, but this
 		// guard is what keeps a second request from overwriting the saved window size.
-		if (state != State.IDLE) {
+		//
+		// A save in flight refuses too, as it does for a burst and a plain screenshot. The key is
+		// checked at key-down, and a save can start during the hold that follows; beforeBlit joins
+		// the save counter without a cap on the strength of nothing else being in flight.
+		if (state != State.IDLE || ScreenshotHandler.isSaving()) {
 			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
 			return;
 		}

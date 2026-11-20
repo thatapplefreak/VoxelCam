@@ -246,7 +246,9 @@ Five things here are load-bearing and were each found the hard way:
   override `resize`, so its forgiving size search never runs on this path.
 - **A second request mid-capture must be refused,** and the saved window size snapshotted only on
   the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
-  one and every restore path leaves the window permanently huge.
+  one and every restore path leaves the window permanently huge. A request is refused while any
+  other save is in flight as well, as a burst and a plain screenshot are: `beforeBlit` joins the
+  save counter without a cap.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
   `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
   `rebuildWidgets`, and with no world the HUD is not drawn, so a multi-second freeze would come
@@ -413,6 +415,10 @@ Four things here are load-bearing:
   and dropped when it is the player's own doing (any other screen), or when the level or player is
   gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
+  A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
+  term in both places: `shouldArm` refuses from key-down, and `gateFor` drops a moment the menu
+  was armed over. Captured instead, the frame has the dial in it, and the moment's save can refuse
+  the selection the player releases.
 - **The pending countdown does not run under a `LevelLoadingScreen`.** That screen is already
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing

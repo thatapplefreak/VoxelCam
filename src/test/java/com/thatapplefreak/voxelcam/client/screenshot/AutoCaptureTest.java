@@ -23,11 +23,14 @@ class AutoCaptureTest {
 
 	@AfterEach
 	void settle() {
-		// All three are static and outlive a test: a pending capture would follow the next test in,
-		// a config toggle would silence it, and a leaked save slot would refuse every arm.
+		// All four are static and outlive a test: a pending capture would follow the next test in,
+		// a config toggle would silence it, and a leaked save slot or an armed capture menu would
+		// refuse every arm.
 		AutoCapture.forgetAll();
 		VoxelCamConfig.forgetCurrent();
 		ScreenshotHandler.forgetSavesInFlight();
+		CaptureMenu.abort();
+		CaptureMenu.discardPendingCapture();
 	}
 
 	// --- the cooldown ------------------------------------------------------------------------
@@ -90,6 +93,23 @@ class AutoCaptureTest {
 				"once the deliberate capture has finished, automatic ones are allowed again");
 	}
 
+	/**
+	 * A capture menu the player is holding is a capture they are about to take themselves. A moment
+	 * armed under it would be read back with the dial drawn across it, and its save could still be
+	 * in flight when the key comes up, refusing the screenshot the player was aiming.
+	 */
+	@Test
+	void refusesWhileTheCaptureMenuIsArmed() {
+		CaptureMenu.onKeyDown();
+
+		assertFalse(AutoCapture.shouldArm(MomentTrigger.ADVANCEMENT, 0L),
+				"a moment must not arm while the capture key is held");
+
+		CaptureMenu.abort();
+		assertTrue(AutoCapture.shouldArm(MomentTrigger.ADVANCEMENT, 0L),
+				"once the capture menu is put away, moments are allowed again");
+	}
+
 	/** A hand-edited zero would turn an advancement cascade into a screenshot per toast, which is
 	 * the failure the window exists to prevent — so the file is not trusted, it is clamped. */
 	@Test
@@ -106,9 +126,9 @@ class AutoCaptureTest {
 	@Test
 	void anOpenFrameIsTheMomentForEveryTriggerButDeath() {
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, AutoCapture.ScreenKind.NONE));
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, AutoCapture.ScreenKind.NONE));
 	}
 
 	/**
@@ -120,16 +140,16 @@ class AutoCaptureTest {
 	@Test
 	void deathWaitsForItsScreenAndThenCaptures() {
 		assertEquals(AutoCapture.Gate.WAIT,
-				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, AutoCapture.ScreenKind.NONE),
+				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, AutoCapture.ScreenKind.NONE),
 				"an open frame is not yet the death shot — the screen has not arrived");
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, AutoCapture.ScreenKind.DEATH));
+				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, AutoCapture.ScreenKind.DEATH));
 	}
 
 	@Test
 	void aDeathScreenIsNotAnyOtherTriggersMoment() {
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, AutoCapture.ScreenKind.DEATH));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, AutoCapture.ScreenKind.DEATH));
 	}
 
 	/** Held rather than dropped, this would shoot whatever the player was looking at when they
@@ -138,8 +158,25 @@ class AutoCaptureTest {
 	void aScreenThePlayerOpenedDropsTheMoment() {
 		for (MomentTrigger trigger : MomentTrigger.values()) {
 			assertEquals(AutoCapture.Gate.DROP,
-					AutoCapture.gateFor(trigger, true, true, AutoCapture.ScreenKind.OTHER),
+					AutoCapture.gateFor(trigger, true, true, false, AutoCapture.ScreenKind.OTHER),
 					trigger + " must not wait out a screen the player opened");
+		}
+	}
+
+	/**
+	 * The capture menu is not a screen, so the screen rows alone read a held menu as a clear view.
+	 * It is the player's own doing all the same, and it can be armed after the moment was: a moment
+	 * waiting out a level load, or a death waiting for its screen. Dropped, not held, in every row
+	 * that would otherwise capture or wait.
+	 */
+	@Test
+	void anArmedCaptureMenuDropsTheMoment() {
+		for (MomentTrigger trigger : MomentTrigger.values()) {
+			for (AutoCapture.ScreenKind screen : AutoCapture.ScreenKind.values()) {
+				assertEquals(AutoCapture.Gate.DROP,
+						AutoCapture.gateFor(trigger, true, true, true, screen),
+						trigger + " must not be captured or held under an armed capture menu (" + screen + ")");
+			}
 		}
 	}
 
@@ -147,15 +184,15 @@ class AutoCaptureTest {
 	@Test
 	void aLevelLoadIsWaitedOutRatherThanDropped() {
 		assertEquals(AutoCapture.Gate.WAIT,
-				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, AutoCapture.ScreenKind.LEVEL_LOADING));
+				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, AutoCapture.ScreenKind.LEVEL_LOADING));
 	}
 
 	@Test
 	void nothingSurvivesLosingTheWorldOrThePlayer() {
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, false, true, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, false, true, false, AutoCapture.ScreenKind.NONE));
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, false, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, false, false, AutoCapture.ScreenKind.NONE));
 	}
 
 	// --- the pending countdown ----------------------------------------------------------------
