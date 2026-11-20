@@ -434,6 +434,91 @@ class VoxelCamIOTest {
 		assertFalse(VoxelCamIO.getScreenShotFiles().contains(doomed));
 	}
 
+	/** Five rows, named so the name sort is the order they are written in. */
+	private List<File> fiveRowsByName() throws IOException {
+		for (String name : List.of("a.png", "b.png", "c.png", "d.png", "e.png")) {
+			shot(name, 1_000L);
+		}
+		SortMode.setCurrent(SortMode.NAME_A_TO_Z);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		return VoxelCamIO.getScreenShotFiles();
+	}
+
+	private File row(String name) {
+		return dir.resolve(name).toFile();
+	}
+
+	/**
+	 * The selection a delete leaves is the one the manager comes back to. Left at nothing, the
+	 * manager falls back to the head of the list: scrolled down to the twentieth row, the player
+	 * is put on the first, which is then what the next Delete is aimed at.
+	 */
+	@Test
+	void deletingARowSelectsTheOneAfterIt() throws IOException {
+		List<File> listed = fiveRowsByName();
+		VoxelCamIO.selectPhoto(row("c.png"));
+
+		assertTrue(VoxelCamIO.delete(listed));
+
+		assertEquals(row("d.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	@Test
+	void deletingTheLastRowSelectsTheOneBeforeIt() throws IOException {
+		List<File> listed = fiveRowsByName();
+		VoxelCamIO.selectPhoto(row("e.png"));
+
+		assertTrue(VoxelCamIO.delete(listed));
+
+		assertEquals(row("d.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	/**
+	 * Favorites only is the manager's own filter, so the rows it shows can be fewer than the
+	 * folder's. The next file in the folder may not have a row at all, and a selection the
+	 * manager is not listing sends it to the head of the list again.
+	 */
+	@Test
+	void theNeighbourIsOneOfTheRowsBeingShown() throws IOException {
+		fiveRowsByName();
+		List<File> starredOnly = List.of(row("a.png"), row("c.png"), row("e.png"));
+		VoxelCamIO.selectPhoto(row("c.png"));
+
+		assertTrue(VoxelCamIO.delete(starredOnly));
+
+		assertEquals(row("e.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	/** The whole way round, as the manager does it when the confirm dialog hands back to it. */
+	@Test
+	void afterADeleteTheManagerResolvesToTheNeighbourNotTheHeadOfTheList() throws IOException {
+		List<File> listed = fiveRowsByName();
+		File deleted = row("d.png");
+		VoxelCamIO.selectPhoto(deleted);
+
+		assertTrue(VoxelCamIO.delete(listed));
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(row("e.png"), VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), deleted));
+	}
+
+	/** A refused delete leaves the row where it was, so the selection must not move off it. */
+	@Test
+	void aRefusedDeleteDoesNotMoveTheSelectionToANeighbour() throws IOException {
+		shot("a.png", 1_000L);
+		File stubborn = dir.resolve("b.png").toFile();
+		assertTrue(stubborn.mkdir());
+		Files.writeString(stubborn.toPath().resolve("holding-it-open.txt"), "x");
+		shot("c.png", 1_000L);
+		SortMode.setCurrent(SortMode.NAME_A_TO_Z);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(stubborn);
+
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
+
+		assertEquals(stubborn, VoxelCamIO.getSelectedPhoto());
+	}
+
 	/**
 	 * A non-empty directory named like a screenshot is listed the same as a file and
 	 * refuses to be deleted, which is the portable stand-in for the file a Windows image

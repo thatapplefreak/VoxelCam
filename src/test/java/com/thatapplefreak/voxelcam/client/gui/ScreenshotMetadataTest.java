@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.BeforeEach;
@@ -468,8 +469,8 @@ class ScreenshotMetadataTest {
 		showInTheManager(castle);
 
 		VoxelCamIO.selectPhoto(castle);
-		assertTrue(ScreenshotMetadata.deleteSelectedAndForget());
-		VoxelCamIO.selectPhoto(other);
+		assertTrue(ScreenshotMetadata.deleteSelectedAndForget(List.of(castle, other)));
+		assertEquals(other, VoxelCamIO.getSelectedPhoto(), "the delete moves the selection to the row beside it");
 		File renamed = ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "castle");
 
 		assertFalse(ScreenshotMetadata.isStarred(renamed));
@@ -498,7 +499,7 @@ class ScreenshotMetadataTest {
 		showInTheManager(frame);
 
 		VoxelCamIO.selectPhoto(key);
-		assertTrue(ScreenshotMetadata.deleteSelectedAndForget());
+		assertTrue(ScreenshotMetadata.deleteSelectedAndForget(List.of(key)));
 		File newcomer = png("burst_burst01.png", 4, 8);
 
 		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(newcomer));

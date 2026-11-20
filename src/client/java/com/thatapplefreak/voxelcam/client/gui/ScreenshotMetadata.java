@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -269,15 +270,20 @@ public final class ScreenshotMetadata {
 		return renamed;
 	}
 
-	/** {@code VoxelCamIO.delete}, with the deleted paths evicted for the same reason
+	/**
+	 * {@code VoxelCamIO.delete}, with the deleted paths evicted for the same reason
 	 * {@link #renameSelectedAndForget} evicts the ones a rename leaves. Whatever the delete
-	 * reports: a refused one may still have removed some of a burst's frames. */
-	public static boolean deleteSelectedAndForget() {
+	 * reports: a refused one may still have removed some of a burst's frames.
+	 *
+	 * @param listed the rows the manager is showing, which {@code VoxelCamIO.delete} picks the
+	 *        next selection from.
+	 */
+	public static boolean deleteSelectedAndForget(List<File> listed) {
 		File target = VoxelCamIO.getSelectedPhoto();
 		if (target != null) {
 			forgetGroup(target.getParentFile(), target);
 		}
-		return VoxelCamIO.delete();
+		return VoxelCamIO.delete(listed);
 	}
 
 	/** A screenshot and the burst frames folded under it, which rename and delete take with it.

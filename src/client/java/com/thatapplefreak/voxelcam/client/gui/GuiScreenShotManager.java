@@ -334,6 +334,12 @@ public class GuiScreenShotManager extends Screen {
 		updateButtonStates();
 	}
 
+	/** The rows as shown, for {@link DeletePopup}: a delete moves the selection to the row next
+	 * to the deleted one, and with favorites only on that is not the next file in the folder. */
+	List<File> listedFiles() {
+		return visibleFiles;
+	}
+
 	/**
 	 * Set by {@link DeletePopup} on its way out, since the popup itself is gone by the
 	 * time anyone could read it.

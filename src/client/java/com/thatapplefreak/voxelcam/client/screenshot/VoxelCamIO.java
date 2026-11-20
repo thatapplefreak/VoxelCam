@@ -440,11 +440,25 @@ public final class VoxelCamIO {
 	 * one of them actually went. Deleting the key after a frame failure would both manufacture
 	 * orphans and make a "deleted" report a lie about a file that is still there; this way a
 	 * partial failure leaves an honest row behind with a smaller badge.
+	 *
+	 * <p>The selection moves to the row after the deleted one, or the one before it when it was
+	 * last, and is only cleared when it was the only row. The manager's own copy of the
+	 * selection still names the deleted file when the confirm dialog hands back to it, so
+	 * {@link #selectionFor} asks here next; with nothing here it took the head of the list, and
+	 * a player who had scrolled down to delete one screenshot was left aiming the next Delete
+	 * at the first.
+	 *
+	 * @param listed the rows the caller is showing, in their order. Not always {@link
+	 *        #getScreenShotFiles()}: favorites only is the manager's own filter, and the next
+	 *        file in the folder may be one it is not showing.
 	 */
-	public static boolean delete() {
+	public static boolean delete(List<File> listed) {
 		if (selected == null) {
 			return false;
 		}
+		// Worked out before anything goes: listed can be screenShotFiles itself, which loses
+		// the deleted row below, and with it the place to look either side of.
+		File neighbour = neighbourOf(listed, selected);
 		File dir = selected.getParentFile();
 		List<File> frames = new ArrayList<>(burstFrames(dir, selected));
 		// An exported animation's WebP copy goes with it, first, for the same reason frames do.
@@ -470,7 +484,23 @@ public final class VoxelCamIO {
 		}
 		ScreenshotImageCache.release(selected);
 		screenShotFiles.remove(selected);
-		selected = null;
+		selected = neighbour;
 		return true;
+	}
+
+	/** {@link #delete(List)} for a caller showing every row of the last listing. */
+	public static boolean delete() {
+		return delete(screenShotFiles);
+	}
+
+	private static File neighbourOf(List<File> listed, File file) {
+		int index = listed.indexOf(file);
+		if (index < 0) {
+			return null;
+		}
+		if (index + 1 < listed.size()) {
+			return listed.get(index + 1);
+		}
+		return index > 0 ? listed.get(index - 1) : null;
 	}
 }
