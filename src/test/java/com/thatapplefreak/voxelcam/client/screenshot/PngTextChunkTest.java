@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -68,7 +69,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void roundTripsASingleEntry() {
+	void roundTripsASingleEntry() throws IOException {
 		Map<String, String> entries = Map.of("voxelcam:dimension", "minecraft:overworld");
 
 		byte[] spliced = PngTextChunk.embed(minimalPng(), entries);
@@ -77,7 +78,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void roundTripsMultipleEntriesInOrder() {
+	void roundTripsMultipleEntriesInOrder() throws IOException {
 		Map<String, String> entries = new LinkedHashMap<>();
 		entries.put("voxelcam:dimension", "minecraft:the_nether");
 		entries.put("voxelcam:x", "12");
@@ -91,7 +92,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void survivesNonLatin1TextUnlikeATextChunkWould() {
+	void survivesNonLatin1TextUnlikeATextChunkWould() throws IOException {
 		Map<String, String> entries = Map.of("voxelcam:world", "café–base");
 
 		byte[] spliced = PngTextChunk.embed(minimalPng(), entries);
@@ -100,7 +101,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void insertsImmediatelyAfterIhdrNotAtTheEnd() {
+	void insertsImmediatelyAfterIhdrNotAtTheEnd() throws IOException {
 		byte[] original = minimalPng();
 		byte[] spliced = PngTextChunk.embed(original, Map.of("voxelcam:x", "1"));
 
@@ -118,12 +119,51 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void readingATruncatedFileGivesAnEmptyMapRatherThanThrowing() {
+	void readingATruncatedFileGivesAnEmptyMapRatherThanThrowing() throws IOException {
 		byte[] spliced = PngTextChunk.embed(minimalPng(), Map.of("voxelcam:x", "1"));
 		byte[] truncated = new byte[10];
 		System.arraycopy(spliced, 0, truncated, 0, truncated.length);
 
 		assertEquals(Map.of(), PngTextChunk.read(truncated));
+	}
+
+	/**
+	 * The manager lists anything named {@code .png} and offers a star for it, and a
+	 * half-finished save leaves exactly these behind. The refusal has to be the checked
+	 * exception: that is the one the star toggle catches, where an index error would leave
+	 * the click handler on the render thread.
+	 */
+	@Test
+	void embeddingIntoAnEmptyFileIsRefusedWithAnIoException() {
+		assertThrows(IOException.class, () -> PngTextChunk.embed(new byte[0], Map.of("voxelcam:starred", "true")));
+	}
+
+	@Test
+	void embeddingIntoAPngTruncatedInsideIhdrIsRefusedWithAnIoException() {
+		byte[] truncated = java.util.Arrays.copyOf(minimalPng(), 20);
+
+		assertThrows(IOException.class, () -> PngTextChunk.embed(truncated, Map.of("voxelcam:starred", "true")));
+	}
+
+	/** JPEG bytes under a {@code .png} name: the "length" embed used to trust is four bytes of JFIF. */
+	@Test
+	void embeddingIntoAFileThatIsNotAPngIsRefusedWithAnIoException() {
+		byte[] jpeg = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01,
+				0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00 };
+
+		assertThrows(IOException.class, () -> PngTextChunk.embed(jpeg, Map.of("voxelcam:starred", "true")));
+	}
+
+	/** Eight good signature bytes are not enough: the splice point is the end of IHDR, so a
+	 * first chunk that is something else has no place to put a tag. */
+	@Test
+	void embeddingIntoAPngWhoseFirstChunkIsNotIhdrIsRefusedWithAnIoException() {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.writeBytes(new byte[] { (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' });
+		out.writeBytes(chunk("IDAT", new byte[13]));
+		out.writeBytes(chunk("IEND", new byte[0]));
+
+		assertThrows(IOException.class, () -> PngTextChunk.embed(out.toByteArray(), Map.of("voxelcam:starred", "true")));
 	}
 
 	@Test
@@ -132,7 +172,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void embedIsANoOpForNoEntries() {
+	void embedIsANoOpForNoEntries() throws IOException {
 		byte[] original = minimalPng();
 
 		assertTrue(java.util.Arrays.equals(original, PngTextChunk.embed(original, Map.of())));
@@ -143,7 +183,7 @@ class PngTextChunkTest {
 	 * old chunk first, the new value would be shadowed forever by the original one.
 	 */
 	@Test
-	void reEmbeddingTheSameKeyOverwritesRatherThanShadowing() {
+	void reEmbeddingTheSameKeyOverwritesRatherThanShadowing() throws IOException {
 		byte[] once = PngTextChunk.embed(minimalPng(), Map.of("voxelcam:starred", "true"));
 		byte[] twice = PngTextChunk.embed(once, Map.of("voxelcam:starred", "false"));
 
@@ -151,7 +191,7 @@ class PngTextChunkTest {
 	}
 
 	@Test
-	void reEmbeddingOneKeyLeavesUnrelatedKeysIntactAndUnduplicated() {
+	void reEmbeddingOneKeyLeavesUnrelatedKeysIntactAndUnduplicated() throws IOException {
 		byte[] first = PngTextChunk.embed(minimalPng(),
 				Map.of("voxelcam:dimension", "minecraft:overworld", "voxelcam:starred", "false"));
 		byte[] second = PngTextChunk.embed(first, Map.of("voxelcam:starred", "true"));
@@ -170,7 +210,7 @@ class PngTextChunkTest {
 	 * must be kept rather than crashing the embed.
 	 */
 	@Test
-	void reEmbeddingOverAMalformedForeignChunkDoesNotThrow() {
+	void reEmbeddingOverAMalformedForeignChunkDoesNotThrow() throws IOException {
 		byte[] malformed = chunk("iTXt", "nonullbyteshere".getBytes(StandardCharsets.US_ASCII));
 		byte[] png = minimalPng();
 		// Splice the malformed chunk in right after IHDR, same place embed() itself inserts.

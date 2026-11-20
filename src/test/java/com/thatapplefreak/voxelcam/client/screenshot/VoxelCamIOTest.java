@@ -485,6 +485,25 @@ class VoxelCamIOTest {
 		assertFalse(VoxelCamIO.isSelectedFavorite());
 	}
 
+	/**
+	 * A half-finished save leaves a truncated {@code .png} that still gets a row and an active
+	 * star button. The toggle is pressed on the render thread, so the refusal has to end in the
+	 * log, with the file as it was, and not in an exception out of the click handler.
+	 */
+	@Test
+	void starringATruncatedPngLeavesItAloneRatherThanThrowing() throws IOException {
+		File whole = realPng("whole.png");
+		byte[] truncated = java.util.Arrays.copyOf(Files.readAllBytes(whole.toPath()), 20);
+		File file = dir.resolve("half-saved.png").toFile();
+		Files.write(file.toPath(), truncated);
+		VoxelCamIO.selectPhoto(file);
+
+		VoxelCamIO.toggleSelectedFavorite();
+
+		assertArrayEquals(truncated, Files.readAllBytes(file.toPath()));
+		assertFalse(VoxelCamIO.isSelectedFavorite());
+	}
+
 	@Test
 	void toggleSelectedFavoriteWithNothingSelectedIsHarmless() {
 		VoxelCamIO.toggleSelectedFavorite();
