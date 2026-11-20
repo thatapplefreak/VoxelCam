@@ -22,6 +22,8 @@ Two consequences look like mistakes without this record:
 - **It is drawn from a mixin on `Hud`, not a Fabric `HudElement`.** Fabric's elements are drawn
   inside the F1 branch. F1 is where players compose screenshots, and as the only feedback channel,
   a HUD hidden there would leave a several-second big screenshot with no sign of life at all.
+  The capture menu moved onto the same mixin in 2.5.0 for the same reason: as a Fabric element it
+  was neither drawn nor aimed under F1, so a hold there could only ever take a plain screenshot.
 
 One path is not covered. A `Screenshot.grab` that VoxelCam does not defer reads the last presented
 frame on the spot, so a notice on screen at that moment is in the file. That covers a menu key

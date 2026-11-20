@@ -264,10 +264,12 @@ at the call site, and its notices are bounced back through `client.execute`.
 **Capture menu** — `F2` reaches every capture mode (ADR-0005). `CaptureMenu` is a renderer-free
 state machine ticked from `END_CLIENT_TICK`: a release before `HOLD_THRESHOLD_TICKS` is a tap and
 takes a plain screenshot, a longer hold opens the dial, and releasing fires the aimed wedge.
-`CaptureMenuHud` draws it as a Fabric `HudElement`, rasterised on a coarse grid of filled
-rectangles because the extractor draws nothing else. The HUD is also what feeds the aim, recomputing
-it from the live cursor every frame. So an aim a test writes by hand does not survive the next
-frame, and an aimed test has to move the real cursor.
+`CaptureMenuHud` draws it from `HudMixin`'s `TAIL` injection, beside the capture status,
+rasterised on a coarse grid of filled rectangles because the extractor draws nothing else. It was a
+Fabric `HudElement` until 2.5.0, and those are not extracted with the HUD hidden (F1). The HUD is
+also what feeds the aim, recomputing it from the live cursor every frame. So a menu that is not
+drawn cannot be aimed either, an aim a test writes by hand does not survive the next frame, and an
+aimed test has to move the real cursor.
 
 Five things here each cost a playtest to find:
 
@@ -459,7 +461,8 @@ Two things are load-bearing:
   and a big screenshot.
 - **It is drawn by `HudMixin` at `TAIL` of `Hud.extractRenderState`, not a Fabric `HudElement`,**
   so that it survives F1. The method's other return is the `LevelLoadingScreen` early-out, which
-  `TAIL` does not touch.
+  `TAIL` does not touch. The capture menu is drawn from the same injection for the same reason,
+  ahead of the capture status, and `CaptureMenuTest` aims and releases it with the HUD hidden.
 
 `captureStatusHud` in `voxelcam.json` switches it off, which leaves no capture feedback at all.
 

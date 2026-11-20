@@ -45,6 +45,7 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
 			assertAimingPastTheRingCommitsItsOption(context, dir);
+			assertAnAimedReleaseWithTheHudHiddenTakesTheAimedMode(context, dir);
 			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
@@ -209,6 +210,56 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		if (!size.equals(expected)) {
 			throw new AssertionError("aiming past the ring at fhd should have produced a "
 					+ expected + " capture, was " + size);
+		}
+	}
+
+	/**
+	 * The same held, aimed release with the HUD hidden (F1), which is where players compose the
+	 * screenshots a big screenshot is for. The aim is fed by whatever draws the capture menu, so a
+	 * menu drawn somewhere F1 switches off is also a menu that cannot be aimed: the hold still
+	 * opens it, the aim never leaves the centre, and every release takes a plain screenshot.
+	 */
+	private static void assertAnAimedReleaseWithTheHudHiddenTakesTheAimedMode(
+			ClientGameTestContext context, File dir) {
+		Dimensions window = windowSize(context);
+		Set<String> before;
+
+		context.runOnClient(client -> BigScreenshot.setSize(BigScreenshotSize.parse("2x")));
+		context.runOnClient(client -> client.gui.hud.toggle());
+		try {
+			context.waitTicks(2);
+			if (!context.computeOnClient(client -> client.gui.hud.isHidden())) {
+				throw new AssertionError("toggling the HUD should have hidden it");
+			}
+
+			context.getInput().holdKey(InputConstants.KEY_F2);
+			try {
+				context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+				// The big screenshot wedge's centre, as in the aimed release above.
+				context.getInput().moveCursor(130, 75);
+				context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT, 100);
+				// For a human: the capture menu has to be on screen with the HUD hidden, not only
+				// aimable. Taken before the listing, since it lands in the same folder.
+				context.waitTicks(2);
+				context.takeScreenshot("capture-menu-hud-hidden");
+				before = listing(dir);
+			} finally {
+				context.getInput().releaseKey(InputConstants.KEY_F2);
+			}
+
+			context.waitFor(client -> !CaptureMenu.isCapturePending() && !BigScreenshot.isBusy(), 200);
+			context.waitTicks(40);
+		} finally {
+			context.runOnClient(client -> client.gui.hud.toggle());
+		}
+
+		File written = theNewFile(dir, before, "a held, aimed release with the HUD hidden");
+		Dimensions size = pngSize(written);
+		Dimensions expected = new Dimensions(window.width() * 2, window.height() * 2);
+		if (!size.equals(expected)) {
+			throw new AssertionError("aiming at the big screenshot wedge with the HUD hidden should have "
+					+ "produced a " + expected + " screenshot, was " + size);
 		}
 	}
 
