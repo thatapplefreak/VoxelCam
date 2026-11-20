@@ -560,10 +560,30 @@ public class GuiScreenShotManager extends Screen {
 		return false;
 	}
 
+	/** Shortcuts only make sense when not typing a search query. */
+	private boolean shortcutsApply() {
+		return !searchBar.isFocused() && selected != null;
+	}
+
+	/**
+	 * Whether a press of {@code key} belongs to this screen's rename shortcut and so has to be
+	 * kept from vanilla's global keys, which {@code MinecraftClientMixin} asks on every press.
+	 *
+	 * <p>{@code KeyboardHandler.keyPress} offers a press to {@code Minecraft.handleGlobalKeyPress}
+	 * before the open screen and returns if it is taken. The screenshot key is one of the global
+	 * keys and is F2 by default, so the F2 case in {@link #keyPressed} was never reached: the
+	 * press took a screenshot of the manager instead. Under the same condition as the shortcut
+	 * itself, so that F2 in the search field, or with nothing to rename, still takes the
+	 * screenshot it always did.
+	 */
+	public boolean claimsFromGlobalKeys(InputConstants.Key key) {
+		return key.getType() == InputConstants.Type.KEYBOARD && key.getValue() == InputConstants.KEY_F2
+				&& shortcutsApply();
+	}
+
 	@Override
 	public boolean keyPressed(KeyEvent input) {
-		// Shortcuts only make sense when not typing a search query.
-		if (!searchBar.isFocused() && selected != null) {
+		if (shortcutsApply()) {
 			switch (input.input()) {
 				case InputConstants.KEY_DELETE, InputConstants.KEY_BACKSPACE -> {
 					minecraft.setScreenAndShow(DeletePopup.create(this));

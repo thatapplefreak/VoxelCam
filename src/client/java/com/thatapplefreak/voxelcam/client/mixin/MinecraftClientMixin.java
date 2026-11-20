@@ -1,5 +1,7 @@
 package com.thatapplefreak.voxelcam.client.mixin;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
@@ -10,6 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * The two points an oversized capture needs inside a frame: before anything is drawn,
@@ -56,5 +59,27 @@ public class MinecraftClientMixin {
 		// Last: an automatic capture is the only one nobody asked for, so it yields the frame to
 		// every deliberate capture above it rather than competing for the same in-flight slot.
 		AutoCapture.beforeBlit();
+	}
+
+	/**
+	 * Nothing to do with a frame: this is where the manager's F2 rename shortcut gets its key.
+	 * {@code KeyboardHandler.keyPress} offers every press to this method before the open screen
+	 * and returns without calling {@code Screen.keyPressed} if it answers true, and vanilla's
+	 * screenshot key, F2 by default, is one of the keys it answers true for. Answering false for
+	 * the one press the manager claims lets vanilla carry on to the screen as it would for any
+	 * other key.
+	 *
+	 * Here rather than in {@code KeyboardHandlerMixin}: skipping this one call from inside
+	 * {@code keyPress} would take a redirect, which a second mod wanting the same call cannot
+	 * share, where a cancellable inject at the head of the callee can.
+	 */
+	@Inject(method = "handleGlobalKeyPress(Lcom/mojang/blaze3d/platform/InputConstants$Key;Z)Z",
+			at = @At("HEAD"), cancellable = true)
+	private void voxelcam$leaveTheManagerItsShortcut(InputConstants.Key key, boolean controlDown,
+			CallbackInfoReturnable<Boolean> cir) {
+		if (Minecraft.getInstance().gui.screen() instanceof GuiScreenShotManager manager
+				&& manager.claimsFromGlobalKeys(key)) {
+			cir.setReturnValue(false);
+		}
 	}
 }

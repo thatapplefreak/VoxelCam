@@ -501,6 +501,14 @@ Five invariants that are easy to break:
   list instead moves the player onto whichever screenshot the sort puts first — the one the next
   Delete would be aimed at.
 
+**A screen shortcut on a key vanilla binds globally never reaches `Screen.keyPressed` by itself.**
+`KeyboardHandler.keyPress` offers each press to `Minecraft.handleGlobalKeyPress` first (fullscreen,
+the screenshot key) and returns if it is taken, so the manager's F2 rename shortcut used to take a
+screenshot of the manager instead. `MinecraftClientMixin` answers false at the head of that method
+for the one press `GuiScreenShotManager.claimsFromGlobalKeys` claims, which is F2 under the same
+condition as the shortcut itself. `RenameShortcutTest` presses the real key for this reason: a test
+that calls `keyPressed` passes with or without the injection.
+
 **Sharing** — `SharePopup` offers four targets, none needing credentials: `NativeShare.saveCopy`
 (SDL's native Save-As — **asynchronous**, so the dialog is shown on the calling thread and only the
 copy runs on `Util.ioPool()`; see the SDL trap below), `NativeShare.revealInFileManager`
