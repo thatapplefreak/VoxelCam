@@ -411,6 +411,51 @@ class AnimatedPngTest {
 		assertOnlyExportsLeft();
 	}
 
+	/**
+	 * A long burst takes seconds to export, and the names are only checked before the first
+	 * frame. Rename stays available meanwhile, so another screenshot can be given the name the
+	 * export is heading for; an export that finished by moving its file over that one would
+	 * delete a screenshot with nothing said. The decoder is where a test can act mid-export.
+	 */
+	@Test
+	void aScreenshotThatTakesTheTargetNameDuringAnExportIsNotOverwritten() throws IOException {
+		File key = writeFrame("shot.png", 0, 0, 0);
+		File f1 = writeFrame("shot_burst01.png", 1, 40, 1);
+		Path taken = dir.resolve("shot_animation.png");
+		AnimatedPng.PixelDecoder renamingMeanwhile = png -> {
+			if (!Files.exists(taken)) {
+				Files.writeString(taken, "the player's own screenshot");
+			}
+			return argbOf(png);
+		};
+
+		assertThrows(IOException.class, () -> AnimatedPng.export(key, List.of(f1), renamingMeanwhile));
+
+		assertEquals("the player's own screenshot", Files.readString(taken));
+		assertFalse(Files.exists(dir.resolve("shot_animation.webp")), "no sharing copy for an animation that was not written");
+		assertOnlyExportsLeft();
+	}
+
+	/** The WebP's name is the other one the export moves onto. */
+	@Test
+	void aFileThatTakesTheWebpNameDuringAnExportIsNotOverwritten() throws IOException {
+		File key = writeFrame("shot.png", 0, 0, 0);
+		File f1 = writeFrame("shot_burst01.png", 1, 40, 1);
+		Path taken = dir.resolve("shot_animation.webp");
+		AnimatedPng.PixelDecoder savingMeanwhile = png -> {
+			if (!Files.exists(taken)) {
+				Files.writeString(taken, "the player's own webp");
+			}
+			return argbOf(png);
+		};
+
+		assertThrows(IOException.class, () -> AnimatedPng.export(key, List.of(f1), savingMeanwhile));
+
+		assertEquals("the player's own webp", Files.readString(taken));
+		assertFalse(Files.exists(dir.resolve("shot_animation.png")), "no animation without its sharing copy");
+		assertOnlyExportsLeft();
+	}
+
 	private File writeFrame(String name, int index, int offset, int marker) throws IOException {
 		Path path = dir.resolve(name);
 		Files.write(path, png(8, 4, 0x405060, marker));
