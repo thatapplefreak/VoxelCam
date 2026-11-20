@@ -52,6 +52,40 @@ class BigScreenshotTest {
 		assertEquals("voxelcam.savingpleasewait", notices.get(0).key());
 	}
 
+	// --- what the restore puts back ---------------------------------------------------------------
+
+	/** The ordinary end of a capture: the window still has the size the capture gave it. */
+	@Test
+	void aWindowStillAtTheBigScreenshotSizeIsPutBack() {
+		assertTrue(BigScreenshot.owesRestore(3840, 2160, 3840, 2160, 854, 480));
+	}
+
+	/**
+	 * The player pressed F11 or dragged the window's edge while the capture was in progress. The
+	 * platform has since written the real new size, and that is neither the size the capture
+	 * applied nor the one it saved. Putting the saved size back over it leaves a fullscreen game
+	 * rendering at the old windowed size until the next real resize.
+	 */
+	@Test
+	void aWindowThePlatformResizedMeanwhileIsLeftAlone() {
+		assertFalse(BigScreenshot.owesRestore(1920, 1080, 3840, 2160, 854, 480));
+	}
+
+	@Test
+	void aWindowAlreadyAtItsSavedSizeNeedsNothing() {
+		assertFalse(BigScreenshot.owesRestore(854, 480, 3840, 2160, 854, 480));
+		assertFalse(BigScreenshot.owesRestore(854, 480, 854, 480, 854, 480),
+				"a big screenshot size equal to the window resized nothing to begin with");
+	}
+
+	/** One matching dimension is not the applied size: a window the same height as the big
+	 * screenshot but a different width was resized by something else. */
+	@Test
+	void bothDimensionsHaveToMatchTheAppliedSize() {
+		assertFalse(BigScreenshot.owesRestore(1920, 2160, 3840, 2160, 854, 480));
+		assertFalse(BigScreenshot.owesRestore(3840, 1080, 3840, 2160, 854, 480));
+	}
+
 	@Test
 	void aFailedReadbackOwesTheWindowARestoreInsteadOfResizingOnTheSpot() {
 		BigScreenshot.deferRestore();

@@ -61,6 +61,8 @@ public final class BigScreenshot {
 	private static State state = State.IDLE;
 	private static int savedWidth;
 	private static int savedHeight;
+	private static int appliedWidth;
+	private static int appliedHeight;
 	private static int framesInState;
 
 	// Identifies the readback a consumer belongs to. Consumers arrive from a fenced task and
@@ -153,6 +155,22 @@ public final class BigScreenshot {
 		if (state != State.CAPTURING) {
 			return;
 		}
+
+		Minecraft client = Minecraft.getInstance();
+		Window window = client.getWindow();
+		if (window.getWidth() != appliedWidth || window.getHeight() != appliedHeight) {
+			// A fullscreen change is applied a few instructions after beforeFrame() in the same
+			// renderFrame, and overwrites the size it had just set. This frame was then drawn at
+			// the new window size, and read back it would be saved and announced as the big
+			// screenshot it is not. The window is already right, so the deferred restore finds
+			// nothing of this capture's to put back.
+			VoxelCamClient.LOGGER.warn("Window changed to {}x{} under a {}x{} big screenshot, not saving it",
+					window.getWidth(), window.getHeight(), appliedWidth, appliedHeight);
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.bigshot.failed");
+			deferRestore();
+			return;
+		}
+
 		// The oversized path is gated by this class's own state, not by ScreenshotHandler's
 		// counter, so it joins unconditionally rather than through beginSave's cap: nothing else
 		// can be in flight by the time this runs — every other capture path refuses while
@@ -160,7 +178,6 @@ public final class BigScreenshot {
 		ScreenshotHandler.joinSave();
 		int issued = beginReadback();
 
-		Minecraft client = Minecraft.getInstance();
 		try {
 			Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(),
 					image -> onImageReady(issued, image));
@@ -208,6 +225,24 @@ public final class BigScreenshot {
 		}
 	}
 
+	/**
+	 * Whether the window is still the size this capture gave it, and so is this capture's to put
+	 * back.
+	 *
+	 * <p>"Not the saved size" is not enough. Vanilla writes the window's size itself when the
+	 * platform reports a resize ({@code Window.onFramebufferResize}) and on a fullscreen change
+	 * ({@code refreshFramebufferSize}, from {@code updateFullscreenIfChanged} near the top of
+	 * {@code renderFrame}). If either ran during the capture, the window already holds the real new
+	 * size, and restoring the saved one over it leaves the game rendering at the old size: nothing
+	 * rewrites the stored size until the next real resize.
+	 */
+	static boolean owesRestore(int width, int height, int appliedWidth, int appliedHeight,
+			int savedWidth, int savedHeight) {
+		boolean stillAsApplied = width == appliedWidth && height == appliedHeight;
+		boolean alreadyAsSaved = width == savedWidth && height == savedHeight;
+		return stillAsApplied && !alreadyAsSaved;
+	}
+
 	private static void beginCapture() {
 		Minecraft client = Minecraft.getInstance();
 
@@ -234,6 +269,10 @@ public final class BigScreenshot {
 		framesInState = 0;
 
 		BigScreenshotSize.Resolved target = size.resolve(window);
+		// Remembered so the blit and the restore can tell this capture's own resize from one the
+		// platform made since.
+		appliedWidth = target.width();
+		appliedHeight = target.height();
 		try {
 			applySize(client, target.width(), target.height());
 		} catch (Throwable t) {
@@ -262,7 +301,8 @@ public final class BigScreenshot {
 		Minecraft client = Minecraft.getInstance();
 		try {
 			Window window = client.getWindow();
-			if (window.getWidth() != savedWidth || window.getHeight() != savedHeight) {
+			if (owesRestore(window.getWidth(), window.getHeight(), appliedWidth, appliedHeight,
+					savedWidth, savedHeight)) {
 				applySize(client, savedWidth, savedHeight);
 			}
 		} catch (Throwable t) {
@@ -270,6 +310,8 @@ public final class BigScreenshot {
 		} finally {
 			savedWidth = 0;
 			savedHeight = 0;
+			appliedWidth = 0;
+			appliedHeight = 0;
 		}
 	}
 

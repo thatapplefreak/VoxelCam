@@ -250,7 +250,11 @@ Five things here are load-bearing and were each found the hard way:
   override `resize`, so its forgiving size search never runs on this path.
 - **A second request mid-capture must be refused,** and the saved window size snapshotted only on
   the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
-  one and every restore path leaves the window permanently huge. A request is refused while any
+  one and every restore path leaves the window permanently huge. The restore itself runs only
+  while the window still has exactly the size the capture applied (`owesRestore`): vanilla writes
+  the window's size on a resize and on a fullscreen change, and restoring the snapshot over that
+  leaves the game rendering at the old size. A capturing frame whose window is no longer the
+  applied size is not read back at all. A request is refused while any
   other save is in flight as well, as a burst and a plain screenshot are: `beforeBlit` joins the
   save counter without a cap.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
