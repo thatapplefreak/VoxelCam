@@ -568,6 +568,12 @@ Defaults are written as **field initialisers**, not applied after the parse: Gso
 finds no key for at whatever the constructor set, so a `voxelcam.json` written before a setting
 existed keeps that setting's default instead of reading as `false`/`0`.
 
+Each `saveCurrent()` is its own task on `Util.ioPool()`, which has several threads, so the writes
+carry a sequence number taken on the calling thread. `saveIfNewest` takes one lock, drops a
+snapshot older than the one on disk, and `save` writes `voxelcam.json.tmp` and moves it over the
+file. Unordered truncate-and-write could interleave two saves into JSON that no longer parsed, which
+`load` answers with defaults that the next change writes over every setting.
+
 `Burst.setSeconds`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
 `VoxelCamConfig.saveCurrent()` themselves — that would touch `FabricLoader.getInstance()` from
 `BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setSeconds`
