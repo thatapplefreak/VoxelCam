@@ -526,6 +526,11 @@ against, which is what keeps one set of byte-for-byte framing tests covering the
 `ofFile` checks existence eagerly, so a missing file still fails the future before any request is
 sent.
 
+The request timeout scales with the file (`CatboxUploader.timeoutFor`): `HttpRequest.timeout` runs
+until the response arrives and catbox answers only after the whole body, so a flat timeout is a cap
+on file size. A file over catbox's 200 MB limit fails the future with `TooLargeException` before
+anything is sent, which is the one upload failure `SharePopup` gives a reason for.
+
 **Title-screen button** — `VoxelCamClient` registers `ScreenEvents.AFTER_INIT` and appends a
 `PhotoButton` via `Screens.getWidgets(screen).add(...)`. It goes in vanilla's row of square icon
 buttons (friends, language, accessibility), found **by shape at runtime** — square and

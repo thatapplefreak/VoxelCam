@@ -235,6 +235,13 @@ public class SharePopup extends Screen {
 			uploading = false;
 			refreshButtons();
 			discardSmallCopyIfDone();
+			if (error instanceof CatboxUploader.TooLargeException tooLarge) {
+				// The one failure trying again cannot fix, so it says what is wrong with the file.
+				setStatus(Component.translatable("voxelcam.share.linktoobig",
+						SmallerShareCopy.megabytes(tooLarge.bytes()),
+						CatboxUploader.MAX_UPLOAD_BYTES / 1_000_000), true);
+				return;
+			}
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
 				setStatus("voxelcam.share.linkfailed", true);
