@@ -1,0 +1,148 @@
+package com.thatapplefreak.voxelcam.gametest;
+
+import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
+import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.network.chat.contents.TranslatableContents;
+
+/**
+ * The filmstrip under a burst's preview, on a burst written straight to disk. {@code
+ * BurstCaptureTest} covers one captured for real; what is checked here is the manager's own
+ * behaviour around the strip, which needs a burst and no world.
+ */
+public class FilmstripTest implements FabricClientGameTest {
+
+	private static final MouseButtonInfo LEFT_CLICK = new MouseButtonInfo(0, 0);
+
+	@Override
+	public void runTest(ClientGameTestContext context) {
+		context.waitForScreen(TitleScreen.class);
+
+		File dir = context.computeOnClient(client ->
+				new File(client.gameDirectory, "voxelcam-filmstrip-shots"));
+		File key = new File(dir, "burst.png");
+		writeBurst(dir, key);
+
+		assertSetAsKeyIsHeldOffWhileAnExportRuns(context, dir, key);
+
+		context.runOnClient(client -> VoxelCamIO.selectPhoto(null));
+		context.setScreen(TitleScreen::new);
+		context.waitForScreen(TitleScreen.class);
+	}
+
+	/**
+	 * An export fixes the frame order from every file's tags and reads the pixels afterwards,
+	 * so a Set as key that swaps two files' bytes in between writes frames out of order.
+	 *
+	 * <p>All in one task on the client thread, on purpose. A fixture burst exports in
+	 * milliseconds, and the export reports back through {@code Minecraft.execute}: nothing
+	 * queued that way can run until this task returns, so the export is certainly still
+	 * "running" as far as the manager knows for every check below, however fast the disk is.
+	 */
+	private static void assertSetAsKeyIsHeldOffWhileAnExportRuns(ClientGameTestContext context, File dir, File key) {
+		openManagerOn(context, dir, key);
+
+		String problem = context.computeOnClient(client -> {
+			Screen screen = client.gui.screen();
+			Button setAsKey = button(screen, "voxelcam.burst.setaskey");
+			Button export = button(screen, "voxelcam.burst.exportanimation");
+			Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
+
+			// The second cell: a gap after the left scroll button, one cell and its gap along,
+			// then half a cell in. Its frame is not the key, which is what arms Set as key.
+			double cellX = scrollLeft.getRight() + 6 + (34 + 3) + 17;
+			double cellY = scrollLeft.getY() + scrollLeft.getHeight() / 2.0;
+			screen.mouseClicked(new MouseButtonEvent(cellX, cellY, LEFT_CLICK), false);
+			if (!setAsKey.active) {
+				return "picking a frame that is not the key should enable Set as key";
+			}
+
+			export.onPress(LEFT_CLICK);
+			if (setAsKey.active) {
+				return "Set as key should be disabled while an export is running";
+			}
+
+			// onPress skips the active check, as a click that was already on its way would.
+			setAsKey.onPress(LEFT_CLICK);
+			int keyIndex = BurstFrame.fromTags(PngTextChunk.read(key)).index();
+			if (keyIndex != 0) {
+				return "a Set as key that got through mid-export should do nothing, but the key's path now holds frame "
+						+ keyIndex;
+			}
+			return null;
+		});
+		if (problem != null) {
+			throw new AssertionError(problem);
+		}
+
+		// The export selects the animation it wrote, which is how its end is seen from here.
+		context.waitFor(client -> !key.equals(VoxelCamIO.getSelectedPhoto()), 400);
+	}
+
+	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {
+		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+		context.waitTicks(20);
+	}
+
+	/** By translation key rather than by label, so the pirate translation finds it too. */
+	private static Button button(Screen screen, String translationKey) {
+		for (GuiEventListener child : screen.children()) {
+			if (child instanceof Button button
+					&& button.getMessage().getContents() instanceof TranslatableContents contents
+					&& contents.getKey().equals(translationKey)) {
+				return button;
+			}
+		}
+		throw new AssertionError("the manager should have a " + translationKey + " button");
+	}
+
+	/** A key frame and two more, tagged the way a capture tags them, all the same size. */
+	private static void writeBurst(File dir, File key) {
+		try {
+			if (dir.isDirectory()) {
+				File[] stale = dir.listFiles();
+				if (stale != null) {
+					for (File file : stale) {
+						Files.deleteIfExists(file.toPath());
+					}
+				}
+			}
+			Files.createDirectories(dir.toPath());
+			writeFrame(key, 0);
+			writeFrame(new File(dir, "burst_burst01.png"), 1);
+			writeFrame(new File(dir, "burst_burst02.png"), 2);
+		} catch (IOException e) {
+			throw new AssertionError("could not write the burst fixture", e);
+		}
+	}
+
+	/** A real, decodable PNG, with a band that moves so the frames differ. */
+	private static void writeFrame(File file, int index) throws IOException {
+		int width = 160;
+		int height = 90;
+		java.awt.image.BufferedImage image =
+				new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				boolean band = x / 20 == index;
+				image.setRGB(x, y, band ? 0xFFFFFF : (x * 255 / width) << 16 | (y * 255 / height) << 8 | 0x80);
+			}
+		}
+		javax.imageio.ImageIO.write(image, "png", file);
+		PngTextChunk.embed(file, new BurstFrame("filmstrip-fixture", index, index * 100).toTags());
+	}
+}

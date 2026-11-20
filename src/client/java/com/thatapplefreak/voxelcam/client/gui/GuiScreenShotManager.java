@@ -357,8 +357,9 @@ public class GuiScreenShotManager extends Screen {
 		setAsKeyButton.visible = hasFilmstrip;
 		// Active only once a non-key frame is actually highlighted: promoting the key to itself
 		// is a no-op VoxelCamIO.setAsKey already refuses, so the button starts disabled instead
-		// of accepting a click that does nothing.
-		setAsKeyButton.active = hasFilmstrip && previewFrame != null;
+		// of accepting a click that does nothing. And not during an export, for the reason
+		// setSelectedFrameAsKey() gives.
+		setAsKeyButton.active = hasFilmstrip && previewFrame != null && !exporting;
 		exportAnimationButton.visible = hasFilmstrip;
 		exportAnimationButton.active = hasFilmstrip && !exporting;
 		if (hasFilmstrip) {
@@ -410,7 +411,13 @@ public class GuiScreenShotManager extends Screen {
 	 * so capture order stays intact for a future export; see {@code VoxelCamIO.setAsKey}.
 	 */
 	private void setSelectedFrameAsKey() {
-		if (selected == null || previewFrame == null) {
+		// Not while an export runs. AnimatedPng.export fixes the frame order from every file's
+		// tags first and reads each file's pixels later, one at a time, so it relies on a path
+		// still holding the frame whose tags it read. A swap in between writes two frames in
+		// each other's place, or one of them twice, into both the APNG and the WebP. Checked
+		// here as well as on the button, because one export flag covers every burst and the
+		// button is only refreshed when something calls updateButtonStates().
+		if (selected == null || previewFrame == null || exporting) {
 			return;
 		}
 		File frame = previewFrame;
