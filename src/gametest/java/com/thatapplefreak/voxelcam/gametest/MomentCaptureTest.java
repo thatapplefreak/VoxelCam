@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -54,6 +55,49 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertADisabledTriggerCapturesNothing(context, dir);
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
 			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
+			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
+		}
+	}
+
+	/**
+	 * The one trigger hook that can be staged: the integrated server takes commands, and a Wither
+	 * can be summoned and killed with two of them. Its bar is the hard case for {@code
+	 * BossBarTracker}, because a Wither stops updating it at the killing blow, so the bar is removed
+	 * still showing the health that blow landed on. Here that is all of it.
+	 *
+	 * <p>{@code NoAI} keeps the Wither from firing at the player, and is also why its bar never
+	 * moves: a Wither writes its bar from its AI step. Peaceful difficulty discards a Wither without
+	 * killing it, which makes it the control. That bar goes the same way, at the same progress,
+	 * with nothing dying, and must not be taken for a kill.
+	 */
+	private static void assertAWitherKilledAtFullHealthIsCaptured(ClientGameTestContext context,
+			TestServerContext server, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		try {
+			server.runCommand("difficulty normal");
+			server.runCommand("execute at @p run summon minecraft:wither ~ ~10 ~ {NoAI:1b}");
+			context.waitTicks(40);
+			server.runCommand("difficulty peaceful");
+			context.waitTicks(60);
+			assertNothingNew(dir, before, "a Wither that went away at full health without dying");
+
+			server.runCommand("difficulty normal");
+			server.runCommand("execute at @p run summon minecraft:wither ~ ~10 ~ {NoAI:1b}");
+			context.waitTicks(40);
+			server.runCommand("kill @e[type=minecraft:wither]");
+			// Twenty ticks of dying before the Wither and its bar go, then the blit, the encode on
+			// the IO pool and the tags.
+			context.waitTicks(100);
+		} finally {
+			server.runCommand("difficulty peaceful");
+		}
+
+		File written = theOnlyNewFile(dir, before, "a Wither killed at full health");
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(written));
+		if (tag == null || tag.trigger() != MomentTrigger.BOSS_DEFEATED || !"Wither".equals(tag.subject())) {
+			throw new AssertionError("expected the boss-defeated moment naming the Wither, got " + tag);
 		}
 	}
 

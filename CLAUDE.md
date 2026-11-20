@@ -69,7 +69,8 @@ for exactly this reason.
 
 `AutoCapture.gateFor` takes a `ScreenKind` rather than a `Screen` for the same reason, and
 `BossBarTracker` holds no Minecraft types at all — `BossBarSignal` flattens the packet's
-`Component` name to a `String` on the way in, which is what leaves the kill-detection rule
+`Component` name to a `String` on the way in, and hands over the level's game time and whether the
+bar's owner is dying as a `long` and a `boolean`, which is what leaves the kill-detection rule
 reachable from a no-client suite.
 
 `SharePopupTest` presses only "Copy file path". The other three targets each escape a test: the save
@@ -87,12 +88,15 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are all four automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
-directly, because earning an advancement, killing a boss, dying and walking a portal are
-server-driven events a client game test cannot stage — staging them would be testing Minecraft. So
-`ToastManagerMixin`'s `instanceof AdvancementToast` branch, `BossBarSignal`'s three overrides, and
-the `watchDeath`/`watchDimension` tick watches have never executed under test, even though the
-injectors themselves are proven to resolve (`defaultRequire: 1` fails the launch otherwise). Earn
+**So are the automatic triggers' own hooks, all but one.** `MomentCaptureTest` calls
+`AutoCapture.fire` directly, because earning an advancement, dying and walking a portal are
+server-driven events a client game test does not stage — staging them would be testing Minecraft. So
+`ToastManagerMixin`'s `instanceof AdvancementToast` branch and the `watchDeath`/`watchDimension`
+tick watches have never executed under test, even though the injectors themselves are proven to
+resolve (`defaultRequire: 1` fails the launch otherwise). The exception is a Wither: the integrated
+server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest` summons one
+and kills it, which runs `BossBarSignal`'s add and remove and its search for a dying owner. The
+Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
 measurement and its failure is silent.
@@ -377,8 +381,8 @@ records the server-list name, never the address (ADR-0003). `ModProvenance` cura
 `ShaderPack` reads Iris entirely by reflection (ADR-0009).
 
 **Automatic capture** — four vanilla-visible signals arm a single plain-size screenshot nobody
-pressed a key for: an advancement toast, a boss bar emptying and disappearing, the player's own
-death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
+pressed a key for: an advancement toast, a boss bar disappearing because its boss died, the player's
+own death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
 the dispatcher and the settings screen both iterate (so a trigger is never named individually), and
 `MomentTag` the PNG tags — `voxelcam:trigger`, `voxelcam:momentsubject` — that let the manager say
 afterwards why a file nobody asked for exists. All four ship **on**, each individually toggleable;
@@ -404,6 +408,16 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   depends on the bar's progress just before it vanished — vanilla drops the entry, and that
   progress with it, while handling the packet, so running afterwards leaves nothing to judge by.
   `BossBarTracker` keeping its own copy is the point, not duplication.
+  **A removal is a kill on either of two grounds,** because vanilla's bosses disagree about what
+  a dead boss's bar looks like. The Ender Dragon's bar is driven to zero and removed 200 ticks
+  later, so a bar that *changed* to empty within `DEFEATED_WINDOW_TICKS` (400) is a kill. The
+  window is what keeps a won raid out: its bar empties at the win and is removed 600 ticks later.
+  It runs from the last change and not from the first low reading, or a dragon left on a sliver
+  before the final blow would time out. The Wither stops writing its bar at the killing blow
+  (`customServerAiStep` does not run for a dying mob), so its bar goes still showing the health
+  the blow landed on; what says kill is a mob with the bar's name dying in the client level, which
+  is still there because `ServerEntity.removePairing` takes the bar away before the entity. The
+  clock is the level's game time, since both vanilla delays are counted in server ticks.
 - Death and new-dimension need no mixin: both are plain client state.
 
 Four things here are load-bearing:
