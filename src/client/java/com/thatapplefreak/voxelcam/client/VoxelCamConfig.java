@@ -70,12 +70,24 @@ public final class VoxelCamConfig {
 	 */
 	public static void load() {
 		current = load(configPath());
-		Burst.setSeconds(current.burstSeconds);
-		BigScreenshotSize size = BigScreenshotSize.parse(current.bigScreenshotSize);
+		applyToSession(current);
+	}
+
+	/**
+	 * Package-private seam: the half of {@link #load()} that needs no {@code FabricLoader}, and
+	 * the half that runs inside {@code onInitializeClient}, where a throw is a crash at launch.
+	 * Nothing has been saved by then, so the file that caused it is still there next launch.
+	 */
+	static void applyToSession(VoxelCamConfig config) {
+		Burst.setSeconds(config.burstSeconds);
+		// A field initialiser only covers a missing key. "bigScreenshotSize": null parses,
+		// and Gson writes that null over the default, so it is as unparseable as any other
+		// token and leaves the size where it was. parseSortMode guards its field the same way.
+		BigScreenshotSize size = config.bigScreenshotSize == null ? null : BigScreenshotSize.parse(config.bigScreenshotSize);
 		if (size != null) {
 			BigScreenshot.setSize(size);
 		}
-		SortMode.setCurrent(parseSortMode(current.sortMode));
+		SortMode.setCurrent(parseSortMode(config.sortMode));
 	}
 
 	/**

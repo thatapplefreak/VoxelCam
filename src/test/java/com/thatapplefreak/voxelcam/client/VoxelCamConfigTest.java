@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
+import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -123,6 +125,29 @@ class VoxelCamConfigTest {
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
 		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
+	}
+
+	/**
+	 * Not the same file as the literal {@code null} above: here the object parses, and Gson
+	 * writes the JSON null over the field's initialiser. The settings are applied during mod
+	 * initialisation, before anything could save a repaired file, so a throw there repeats at
+	 * every launch until the player edits voxelcam.json by hand.
+	 */
+	@Test
+	void aNullBigScreenshotSizeLeavesTheSizeInPlaceRatherThanCrashingTheLaunch() throws IOException {
+		Files.writeString(configFile(), "{ \"burstSeconds\": 4, \"bigScreenshotSize\": null, \"sortMode\": \"NAME_A_TO_Z\" }",
+				StandardCharsets.UTF_8);
+		String sizeBefore = BigScreenshot.getSize().token();
+		try {
+			VoxelCamConfig.applyToSession(VoxelCamConfig.load(configFile()));
+
+			assertEquals(sizeBefore, BigScreenshot.getSize().token());
+			assertEquals(4, Burst.getSeconds(), "the settings either side of the bad one still apply");
+			assertEquals(SortMode.NAME_A_TO_Z, SortMode.current());
+		} finally {
+			Burst.setSeconds(Burst.DEFAULT_SECONDS);
+			SortMode.setCurrent(SortMode.DATE_NEWEST);
+		}
 	}
 
 	@Test
