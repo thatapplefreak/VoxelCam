@@ -472,6 +472,11 @@ rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display
 embedded capture context, and the starred flag. Everything the extract pass shows goes through it —
 nothing else in the GUI calls `Favorite` or `PngDimensions` itself, and `VoxelCamIO.isSelectedFavorite`
 stays uncached only because the game test wants the flag from the file rather than from the cache.
+That cache is keyed by path, and a path can change hands while the manager is open, so the popups
+rename and delete through `ScreenshotMetadata.renameSelectedAndForget`/`deleteSelectedAndForget`,
+which evict every path the operation leaves or lands on, burst frames included. Calling
+`VoxelCamIO.rename`/`delete` straight from a screen brings back a row drawn with another file's
+star, size and dimensions.
 
 Five invariants that are easy to break:
 

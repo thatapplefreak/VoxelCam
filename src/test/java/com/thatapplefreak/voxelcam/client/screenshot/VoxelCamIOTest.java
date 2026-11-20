@@ -627,6 +627,28 @@ class VoxelCamIOTest {
 	}
 
 	/**
+	 * What the image cache holds for a frame is under the path the frame had, so that is the
+	 * path a rename has to release: the new one holds nothing yet. Released the wrong way
+	 * round, a renamed burst's old thumbnails stay resident until the manager closes. A claim
+	 * stands in for a texture here, since {@code release} drops both and only a claim needs
+	 * no client.
+	 */
+	@Test
+	void renamingABurstReleasesTheImagesCachedUnderItsFramesOldPaths() throws IOException {
+		ScreenshotImageCache.releaseAll();
+		File key = shot("burst.png", 1_000L);
+		File frame = shot("burst_burst01.png", 1_000L);
+		ScreenshotImageCache.get(frame, true);
+		assertTrue(ScreenshotImageCache.isLoading(frame, true));
+		VoxelCamIO.selectPhoto(key);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "sunset");
+
+		assertEquals("sunset.png", renamed.getName());
+		assertFalse(ScreenshotImageCache.isLoading(frame, true));
+	}
+
+	/**
 	 * Every target name — the key's and every frame's — is collision-checked before anything
 	 * moves, so a rename that would only fail on frame 2 of 8 refuses cleanly rather than
 	 * carrying the first frame across and then rolling it back.

@@ -7,6 +7,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,10 +34,15 @@ import java.util.regex.Pattern;
  * is the one whose retry costs the most, and a half-finished save is exactly what leaves one
  * in the folder. {@code ScreenshotImageCache.FAILED} takes the same line with a decode.
  *
- * <p>Entries live until the manager closes and calls {@link #forgetAll()}; the one thing that
- * rewrites a listed screenshot in place while it is open is the star toggle, which calls
- * {@link #forget(File)} afterwards. Renaming or capturing produces a different {@code File}
- * key, so a rebuilt list reads those afresh without any eviction.
+ * <p>Entries live until the manager closes and calls {@link #forgetAll()}, unless something
+ * changes what a path holds while it is open, and each thing that does evicts for itself. The
+ * star toggle rewrites a file in place and calls {@link #forget(File)}; Set as key swaps two
+ * files' bytes and calls {@link #forgetFile(File)} for both. A rename or a delete leaves the
+ * bytes alone but takes the file away from its path, and that path can be given to another
+ * screenshot before the manager closes, so the manager renames and deletes through
+ * {@link #renameSelectedAndForget} and {@link #deleteSelectedAndForget}. A capture needs none
+ * of this: it is written under a name that is free, and a name the manager freed was evicted
+ * when it was.
  */
 public final class ScreenshotMetadata {
 
@@ -237,6 +243,53 @@ public final class ScreenshotMetadata {
 		STARRED.remove(file);
 		NAMES.remove(file);
 		SIZES.remove(file);
+	}
+
+	/**
+	 * {@code VoxelCamIO.rename}, as the manager has to call it: with every path the rename takes
+	 * a file away from, or brings one to, evicted. Every cache here is keyed by path, and a
+	 * path can change hands while the manager is open. Rename a starred {@code castle} away,
+	 * give another screenshot its name, and without this the new {@code castle} is drawn with
+	 * the old one's star, size and dimensions.
+	 *
+	 * <p>The path a rename lands on is evicted as well as the one it leaves: a file can lose
+	 * its name without the manager's doing, and what was cached under it would be waiting.
+	 *
+	 * <p>Here, not in {@code VoxelCamIO}, because that class only touches files and does not
+	 * reach into this package; and here, not in {@code RenamePopup}, so that a plain JUnit
+	 * test can reach it, the reason {@code VoxelCamIO.nameCollides} is not in the popup either.
+	 */
+	public static File renameSelectedAndForget(File screenshotsDir, String newName) {
+		// Before the rename: afterwards the frames are no longer listed under their old names.
+		forgetGroup(screenshotsDir, VoxelCamIO.getSelectedPhoto());
+		File renamed = VoxelCamIO.rename(screenshotsDir, newName);
+		if (renamed != null) {
+			forgetGroup(screenshotsDir, renamed);
+		}
+		return renamed;
+	}
+
+	/** {@code VoxelCamIO.delete}, with the deleted paths evicted for the same reason
+	 * {@link #renameSelectedAndForget} evicts the ones a rename leaves. Whatever the delete
+	 * reports: a refused one may still have removed some of a burst's frames. */
+	public static boolean deleteSelectedAndForget() {
+		File target = VoxelCamIO.getSelectedPhoto();
+		if (target != null) {
+			forgetGroup(target.getParentFile(), target);
+		}
+		return VoxelCamIO.delete();
+	}
+
+	/** A screenshot and the burst frames folded under it, which rename and delete take with it.
+	 * An evicted entry that turns out not to have moved costs one re-read. */
+	private static void forgetGroup(File screenshotsDir, File key) {
+		if (key == null) {
+			return;
+		}
+		forgetFile(key);
+		for (File frame : VoxelCamIO.burstFrames(screenshotsDir, key)) {
+			forgetFile(frame);
+		}
 	}
 
 	/**

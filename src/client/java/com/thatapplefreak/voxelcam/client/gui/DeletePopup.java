@@ -31,7 +31,7 @@ public final class DeletePopup {
 				// A delete that failed leaves the file on disk, and the manager re-lists the
 				// directory as it comes back, so the row returns on its own; the manager has
 				// to say why. Chat cannot: it is silent from the title screen.
-				parent.reportDeleteResult(target, VoxelCamIO.delete());
+				parent.reportDeleteResult(target, ScreenshotMetadata.deleteSelectedAndForget());
 			}
 			Minecraft.getInstance().setScreenAndShow(parent);
 		}, Component.translatable("voxelcam.delete.title"), message,

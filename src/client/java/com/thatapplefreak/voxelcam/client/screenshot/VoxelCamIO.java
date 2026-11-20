@@ -299,7 +299,11 @@ public final class VoxelCamIO {
 			return null;
 		}
 
-		for (File frame : movedTo) {
+		// The old paths: that is where the textures and claims are. The new ones hold nothing
+		// yet, and releasing those instead left a renamed burst's thumbnails resident until
+		// the manager closed. What ScreenshotMetadata has cached under the same paths is the
+		// caller's to evict, as it is for setAsKey below.
+		for (File frame : movedFrom) {
 			ScreenshotImageCache.release(frame);
 		}
 		ScreenshotImageCache.release(selected);

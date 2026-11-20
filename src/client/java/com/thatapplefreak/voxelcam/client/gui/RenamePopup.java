@@ -114,7 +114,7 @@ public class RenamePopup extends Screen {
 		if (!canConfirm()) {
 			return;
 		}
-		if (VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim()) == null) {
+		if (ScreenshotMetadata.renameSelectedAndForget(screenshotsDir, nameField.getValue().trim()) == null) {
 			// The file kept its old name and the manager would re-list it with nothing to
 			// say why, so the dialog stays up instead — holding the typed name for a retry,
 			// which is all a Windows-forbidden character or a moved file needs. The reason
