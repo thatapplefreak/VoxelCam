@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,6 +102,24 @@ class NativeShareTest {
 		NativeShare.copyTo(source, target.toString());
 
 		assertEquals("pretend png", Files.readString(target));
+	}
+
+	/**
+	 * The dialog's overwrite prompt was about the name it returned. Where the dialog does not add
+	 * the extension itself, the player types {@code target}, the dialog finds no such file and asks
+	 * nothing, and the extension added afterwards lands the copy on a {@code target.png} nobody was
+	 * asked about.
+	 */
+	@Test
+	void copyDoesNotReplaceAFileTheDialogNeverAskedAbout() throws IOException {
+		File source = screenshot("shot.png");
+		Path existing = dir.resolve("target.png");
+		Files.writeString(existing, "old contents");
+
+		assertThrows(FileAlreadyExistsException.class,
+				() -> NativeShare.copyTo(source, dir.resolve("target").toString()));
+
+		assertEquals("old contents", Files.readString(existing));
 	}
 
 	@Test

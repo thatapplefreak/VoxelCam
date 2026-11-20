@@ -136,7 +136,15 @@ public final class NativeShare {
 	 */
 	static Path copyTo(File screenshot, String chosen) throws IOException {
 		Path target = targetPath(chosen, extensionOf(screenshot));
-		Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+		if (target.equals(Path.of(chosen))) {
+			// The dialog asked about overwriting this exact path, so replacing is the answer given.
+			Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			// The extension was added after the dialog answered, so its overwrite prompt was about
+			// a different name and nobody was asked about this one. An existing file there fails
+			// the copy with FileAlreadyExistsException instead of being replaced.
+			Files.copy(screenshot.toPath(), target);
+		}
 		return target;
 	}
 
