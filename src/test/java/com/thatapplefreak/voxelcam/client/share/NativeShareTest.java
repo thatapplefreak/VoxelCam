@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import com.thatapplefreak.voxelcam.client.share.NativeShare.RevealOutcome;
 import net.minecraft.util.Util;
 import org.junit.jupiter.api.Test;
@@ -241,7 +242,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "sh", "-c", "exit 1" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "sh", "-c", "exit 1" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -253,7 +254,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "sh", "-c", "exit 0" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "sh", "-c", "exit 0" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.REVEALED, outcome);
 		assertEquals(0, folderOpened.get());
@@ -265,7 +266,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "voxelcam-no-such-program" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "voxelcam-no-such-program" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -276,7 +277,7 @@ class NativeShareTest {
 	void noRevealCommandOpensTheFolderDirectly() {
 		AtomicInteger folderOpened = new AtomicInteger();
 
-		RevealOutcome outcome = NativeShare.reveal(null, dir.toFile(), folderOpened::incrementAndGet);
+		RevealOutcome outcome = NativeShare.reveal(null, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -288,10 +289,33 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				null, dir.resolve("deleted").toFile(), folderOpened::incrementAndGet);
+				null, dir.resolve("deleted").toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.FAILED, outcome);
 		assertEquals(0, folderOpened.get());
+	}
+
+	/**
+	 * Linux always lands on the folder fallback, and there the fallback is {@code xdg-open}: not
+	 * installed, or exiting non-zero with no file manager behind it, on plenty of setups. Nothing
+	 * opened, so the popup must not say the containing folder did.
+	 */
+	@Test
+	void aFolderThatDidNotOpenIsReportedAsAFailure() {
+		RevealOutcome withNoRevealCommand = NativeShare.reveal(null, dir.toFile(), () -> false);
+		RevealOutcome afterAFailedReveal = NativeShare.reveal(
+				new String[] { "voxelcam-no-such-program" }, dir.toFile(), () -> false);
+
+		assertEquals(RevealOutcome.FAILED, withNoRevealCommand);
+		assertEquals(RevealOutcome.FAILED, afterAFailedReveal);
+	}
+
+	/** A stand-in for the folder fallback that counts its calls and reports the folder opened. */
+	private static BooleanSupplier opening(AtomicInteger folderOpened) {
+		return () -> {
+			folderOpened.incrementAndGet();
+			return true;
+		};
 	}
 
 	@Test
