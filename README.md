@@ -29,7 +29,7 @@ Features
   right in the manager. Sharing it hands out an animated WebP copy, which plays
   on Discord, and offers a smaller copy when it is over Discord's 10 MB limit.
 * Let VoxelCam catch the moments you would have missed: it takes a screenshot
-  by itself when you earn an advancement, when a boss bar empties, when you
+  by itself when you earn an advancement, when a boss is defeated, when you
   die, and the first time you arrive in a dimension. All four are on by
   default, each can be switched off, and no more than one is taken every ten
   seconds so a run of advancements is one screenshot rather than five.

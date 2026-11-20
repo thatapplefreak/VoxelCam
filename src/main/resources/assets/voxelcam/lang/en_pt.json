@@ -141,7 +141,7 @@
 	"voxelcam.moment.death": "Yer end",
 	"voxelcam.moment.newdimension": "New shore",
 	"voxelcam.tooltip.moment.advancement": "Snap a map when ye earn a feat — from any mod aboard",
-	"voxelcam.tooltip.moment.bossdefeated": "Snap a map when a beastie's bar empties an' fades",
+	"voxelcam.tooltip.moment.bossdefeated": "Snap a map when a beastie be slain",
 	"voxelcam.tooltip.moment.death": "Snap a map th' moment ye meet Davy Jones",
 	"voxelcam.tooltip.moment.newdimension": "Snap a map th' first time ye make landfall somewhere new",
 	"voxelcam.moment.subject": "%s: %s",
