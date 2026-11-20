@@ -231,6 +231,7 @@ public class SharePopup extends Screen {
 		uploading = true;
 		refreshButtons();
 		setStatus("voxelcam.share.uploading.link", false);
+		int upload = LinkClipboard.begin();
 		CatboxUploader.upload(file).whenComplete((link, error) -> minecraft.execute(() -> {
 			uploading = false;
 			refreshButtons();
@@ -245,6 +246,14 @@ public class SharePopup extends Screen {
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
 				setStatus("voxelcam.share.linkfailed", true);
+				return;
+			}
+			if (!LinkClipboard.mayCopy(upload, stillOpen())) {
+				// An upload already under way when the player backed out still finishes, but its
+				// link must not replace the one a later popup said it copied, or whatever they
+				// have copied since. Logged, so the upload is not lost.
+				VoxelCamClient.LOGGER.info("Share link for {} arrived after its popup was left; not copied: {}",
+						file.getName(), link);
 				return;
 			}
 			NativeShare.copyText(link);
@@ -280,6 +289,16 @@ public class SharePopup extends Screen {
 					status.copy().withStyle(statusIsError ? ChatFormatting.RED : ChatFormatting.GREEN),
 					width / 2, height / 2 + (BUTTON_HEIGHT + GAP) * 3 + 8, statusIsError ? 0xFFFF5555 : 0xFF55FF55);
 		}
+	}
+
+	/**
+	 * Whether the player is still in this popup: not backed out of it, and it has not been replaced
+	 * by some other screen. Its own size popup counts as still being here, since the player comes
+	 * back from that to this popup's status line.
+	 */
+	private boolean stillOpen() {
+		Screen current = minecraft.gui.screen();
+		return !closed && (current == this || current instanceof ShareSizePopup);
 	}
 
 	@Override
