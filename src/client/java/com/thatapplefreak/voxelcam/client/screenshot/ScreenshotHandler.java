@@ -272,7 +272,9 @@ public final class ScreenshotHandler {
 			if (burst == null) {
 				client.execute(() -> announceSaved(target, moment));
 			}
-		} catch (IOException e) {
+		} catch (IOException | RuntimeException e) {
+			// Unchecked as well: an encoder that throws one has failed the save just the same, and
+			// uncaught it would end this task with no notice at all.
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			if (burst == null) {
 				client.execute(() -> CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed"));
@@ -311,18 +313,24 @@ public final class ScreenshotHandler {
 	 * header every frame it is on screen. A file that was already there is left alone — this
 	 * undoes what the failed write itself created, nothing else.
 	 *
+	 * <p>Whatever the write failed with, which is why this is a flag and a {@code finally} rather
+	 * than a catch: a burst frame's encoder opens the file and then throws unchecked, an {@code
+	 * IllegalArgumentException} for a bad pixel array or an {@code OutOfMemoryError} for the pixels
+	 * themselves, and neither is this method's to catch.
+	 *
 	 * <p>Split out from {@link #write} so it can be tested; encoding a real NativeImage needs a
 	 * GL context.
 	 */
 	static void writeOrDiscard(File target, PngWriter writer) throws IOException {
 		boolean existed = target.exists();
+		boolean written = false;
 		try {
 			writer.writeTo(target);
-		} catch (IOException e) {
-			if (!existed) {
+			written = true;
+		} finally {
+			if (!written && !existed) {
 				target.delete();
 			}
-			throw e;
 		}
 	}
 
@@ -346,23 +354,25 @@ public final class ScreenshotHandler {
 	 * either way, so neither needs a snapshot before the frame moves on.
 	 */
 	private static void embedMetadata(File target, CaptureContext context, BurstFrame burst, MomentTag moment) {
-		Map<String, String> tags = new LinkedHashMap<>();
-		if (context != null) {
-			tags.putAll(context.toTags());
-		}
-		tags.putAll(ModProvenance.capture().toTags());
-		if (burst != null) {
-			tags.putAll(burst.toTags());
-		}
-		if (moment != null) {
-			tags.putAll(moment.toTags());
-		}
-		if (tags.isEmpty()) {
-			return;
-		}
+		// The whole of it, and unchecked failures too: write() reports whatever escapes from here
+		// as a failed save, and this file is saved.
 		try {
+			Map<String, String> tags = new LinkedHashMap<>();
+			if (context != null) {
+				tags.putAll(context.toTags());
+			}
+			tags.putAll(ModProvenance.capture().toTags());
+			if (burst != null) {
+				tags.putAll(burst.toTags());
+			}
+			if (moment != null) {
+				tags.putAll(moment.toTags());
+			}
+			if (tags.isEmpty()) {
+				return;
+			}
 			PngTextChunk.embed(target, tags);
-		} catch (IOException e) {
+		} catch (IOException | RuntimeException e) {
 			VoxelCamClient.LOGGER.error("Failed to embed metadata into {}", target, e);
 		}
 	}
