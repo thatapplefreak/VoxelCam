@@ -136,9 +136,11 @@ public class SharePopup extends Screen {
 			}
 		}, Util.ioPool()).whenComplete((made, error) -> minecraft.execute(() -> {
 			shrinking = false;
-			if (closed) {
+			if (!stillOpen()) {
 				// Backing out while the copy was being made is backing out of the send: nothing is
-				// uploaded and no Save dialog opens over the game.
+				// uploaded and no Save dialog opens over the game. Being replaced counts the same.
+				// A death screen or a disconnect takes the popup away through removed(), never
+				// onClose(), so the closed flag alone would leave this send armed.
 				SmallerShareCopy.discard(made);
 				return;
 			}
