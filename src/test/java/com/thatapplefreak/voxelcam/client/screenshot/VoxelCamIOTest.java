@@ -646,6 +646,78 @@ class VoxelCamIOTest {
 		assertFalse(dir.resolve("sunset.png").toFile().exists());
 	}
 
+	/**
+	 * Membership is by filename alone, and the list folds one level. A key frame renamed to
+	 * {@code dragon_burst2} would itself fold under {@code dragon.png}, and its own frames,
+	 * carried to {@code dragon_burst2_burstNN}, would fold under a key that is now hidden: in
+	 * no row and no filmstrip, with deleting {@code dragon} taking the renamed key frame.
+	 */
+	@Test
+	void renamingABurstKeyToAnotherScreenshotsFrameNameIsRefused() throws IOException {
+		File dragon = shot("dragon.png", 2_000L);
+		File key = shot("burst.png", 1_000L);
+		File frame1 = shot("burst_burst01.png", 1_000L);
+		File frame2 = shot("burst_burst02.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon_burst2"));
+
+		assertTrue(key.exists(), "the key frame keeps its name");
+		assertTrue(frame1.exists());
+		assertTrue(frame2.exists());
+		assertEquals(key, VoxelCamIO.getSelectedPhoto());
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		assertEquals(List.of("dragon.png", "burst.png"), names());
+		assertEquals(0, VoxelCamIO.burstFrameCount(dragon));
+		assertEquals(2, VoxelCamIO.burstFrameCount(key));
+	}
+
+	/** The row the player just named would vanish into the other screenshot's filmstrip, and a
+	 * delete of that screenshot would then take it, so a plain screenshot is refused as well. */
+	@Test
+	void renamingAPlainScreenshotToAnotherScreenshotsFrameNameIsRefused() throws IOException {
+		shot("dragon.png", 2_000L);
+		File plain = shot("plain.png", 1_000L);
+		VoxelCamIO.selectPhoto(plain);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon_burst2"));
+
+		assertTrue(plain.exists());
+		assertFalse(dir.resolve("dragon_burst2.png").toFile().exists());
+	}
+
+	/** What the rename dialog asks before it lets Ok through. */
+	@Test
+	void aNameEndingInAFrameTagFoldsOnlyWhenTheKeyItPointsAtExists() throws IOException {
+		shot("dragon.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_burst2", other));
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "wyvern_burst2", other),
+				"no wyvern.png, so the name is an ordinary one that happens to end in the tag");
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_2", other));
+	}
+
+	/** The list folds by lowercased name, so the answer has to as well: on a case-sensitive
+	 * filesystem a bare {@code exists()} probe for {@code dragon.png} would miss this key. */
+	@Test
+	void theKeyANameFoldsUnderIsMatchedIgnoringCaseLikeTheListDoes() throws IOException {
+		shot("Dragon.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_BURST2", other));
+	}
+
+	/** {@code shot} renamed to {@code shot_burst1} leaves no {@code shot.png} behind to fold under. */
+	@Test
+	void aNameDoesNotFoldUnderTheFileBeingRenamed() throws IOException {
+		File shot = shot("shot.png", 1_000L);
+		VoxelCamIO.selectPhoto(shot);
+
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "shot_burst1", shot));
+		assertEquals("shot_burst1.png", VoxelCamIO.rename(dir.toFile(), "shot_burst1").getName());
+	}
+
 	// --- Set as key ----------------------------------------------------------------------------
 
 	@Test

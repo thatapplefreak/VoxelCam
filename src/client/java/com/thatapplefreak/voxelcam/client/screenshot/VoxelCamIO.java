@@ -159,6 +159,41 @@ public final class VoxelCamIO {
 	}
 
 	/**
+	 * Whether a file named {@code newName} would be folded under another screenshot as one of
+	 * its burst frames: the name ends in a burst frame's tag and the key it points at exists.
+	 *
+	 * <p>{@link ScreenshotNamer#burstKeyName} accepts a hand-named {@code holiday_burst01.png}
+	 * grouping under {@code holiday.png} because that only hides the file. A rename from the
+	 * manager is different. The row the player just named vanishes into another row's
+	 * filmstrip, and when it was a burst's key frame its own frames follow it to
+	 * {@code <newName>_burstNN} and fold under a key the list no longer shows, since
+	 * {@link #updateScreenShotFilesList} folds one level only. They are then in no row and no
+	 * filmstrip, and deleting the other screenshot takes the renamed key frame with it.
+	 *
+	 * <p>The key is looked up the way the fold does it, by lowercased name over the directory,
+	 * so the answer matches the list on a case-sensitive filesystem too. That costs a
+	 * directory read, paid only for a name that already ends in the tag. {@code currentFile}
+	 * does not count as the key: it will not have that name once it is renamed.
+	 */
+	public static boolean nameFoldsUnderAnotherScreenshot(File screenshotsDir, String newName, File currentFile) {
+		String keyName = ScreenshotNamer.burstKeyName(newName.toLowerCase(Locale.ROOT) + ".png");
+		if (keyName == null) {
+			return false;
+		}
+		String[] namesInDir = screenshotsDir.list();
+		if (namesInDir == null) {
+			return false;
+		}
+		for (String name : namesInDir) {
+			boolean isTheFileBeingRenamed = currentFile != null && name.equals(currentFile.getName());
+			if (!isTheFileBeingRenamed && name.toLowerCase(Locale.ROOT).equals(keyName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * The screenshot a browser listing {@code files} should have selected, given the
 	 * {@code current} one it is already showing.
 	 *
@@ -211,6 +246,9 @@ public final class VoxelCamIO {
 			return null;
 		}
 		if (nameCollides(screenshotsDir, newName, selected)) {
+			return null;
+		}
+		if (nameFoldsUnderAnotherScreenshot(screenshotsDir, newName, selected)) {
 			return null;
 		}
 

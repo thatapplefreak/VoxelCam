@@ -24,6 +24,10 @@ public class RenamePopup extends Screen {
 	private EditBox nameField;
 	private Button confirmButton;
 	private boolean renameFailed;
+	/** The validation line for the name as typed, or null. Worked out when the text changes
+	 * and not on every extracted frame, because the burst frame check reads the folder;
+	 * {@code VoxelCamIO.rename} makes every one of these checks again before it moves anything. */
+	private String validationError;
 
 	public RenamePopup(GuiScreenShotManager parent, File screenshotsDir, File currentFile) {
 		super(Component.translatable("voxelcam.rename"));
@@ -74,10 +78,11 @@ public class RenamePopup extends Screen {
 
 	/** Blocks names that are empty, unchanged, or would collide with an existing file. */
 	private void updateConfirmState() {
+		validationError = validate();
 		confirmButton.active = canConfirm();
 	}
 
-	private String validationError() {
+	private String validate() {
 		String name = nameField.getValue().trim();
 		if (name.isEmpty()) {
 			return null; // Nothing typed yet: just disabled, no scolding.
@@ -94,12 +99,15 @@ public class RenamePopup extends Screen {
 		if (VoxelCamIO.nameCollides(screenshotsDir, name, currentFile)) {
 			return "voxelcam.rename.exists";
 		}
+		if (VoxelCamIO.nameFoldsUnderAnotherScreenshot(screenshotsDir, name, currentFile)) {
+			return "voxelcam.rename.burstframe";
+		}
 		return null;
 	}
 
 	private boolean canConfirm() {
 		String name = nameField.getValue().trim();
-		return !name.isEmpty() && !name.equals(originalName) && validationError() == null;
+		return !name.isEmpty() && !name.equals(originalName) && validationError == null;
 	}
 
 	private void confirm() {
@@ -134,7 +142,7 @@ public class RenamePopup extends Screen {
 
 		// A rename the filesystem refused outranks the validation line: the name in the
 		// field passed every check this screen can make, so there is nothing else to say.
-		String error = renameFailed ? "voxelcam.rename.failed" : validationError();
+		String error = renameFailed ? "voxelcam.rename.failed" : validationError;
 		if (error != null) {
 			context.centeredText(font,
 					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);

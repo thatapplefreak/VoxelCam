@@ -86,6 +86,7 @@
 
 	"voxelcam.rename.exists": "A map by that name already sails these waters",
 	"voxelcam.rename.invalid": "That name's got scallywag characters that ain't allowed",
+	"voxelcam.rename.burstframe": "That name'd stow this map away in another map's flurry",
 	"voxelcam.rename.failed": "Couldn't re-christen this map — try another name",
 
 	"voxelcam.capturemenu.screenshot": "Chart a Map",

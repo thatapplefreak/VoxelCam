@@ -315,6 +315,9 @@ reserved for it, so no generation tag is needed. The end-of-burst notice waits i
 mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
+The collapse is one level deep, so rename refuses any name that would fold the renamed file under
+another screenshot (`VoxelCamIO.nameFoldsUnderAnotherScreenshot`, also what `RenamePopup` asks): a
+key frame hidden that way would strand its own frames in no row and no filmstrip.
 
 **Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
 `<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the
