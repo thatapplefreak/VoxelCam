@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -164,6 +166,78 @@ class PngTextChunkTest {
 		out.writeBytes(chunk("IEND", new byte[0]));
 
 		assertThrows(IOException.class, () -> PngTextChunk.embed(out.toByteArray(), Map.of("voxelcam:starred", "true")));
+	}
+
+	/**
+	 * A minimal PNG tagged {@code voxelcam:x=1}, with one damaged chunk after the tag whose
+	 * length field says {@code length}, and a {@code voxelcam:starred=false} tag after that.
+	 */
+	private static byte[] pngWithADamagedChunkOfLength(int length) {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.writeBytes(new byte[] { (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' });
+		out.writeBytes(chunk("IHDR", ihdrData(64, 32)));
+		out.writeBytes(PngTextChunk.iTXtChunk("voxelcam:x", "1"));
+		writeInt4(out, length);
+		out.writeBytes("zzZz".getBytes(StandardCharsets.US_ASCII));
+		out.writeBytes(new byte[4]);
+		out.writeBytes(PngTextChunk.iTXtChunk("voxelcam:starred", "false"));
+		out.writeBytes(chunk("IDAT", new byte[0]));
+		out.writeBytes(chunk("IEND", new byte[0]));
+		return out.toByteArray();
+	}
+
+	/**
+	 * A length of -12 puts the next chunk exactly where this one started, so the walk never
+	 * advanced. The manager reads every visible row's tags on the render thread, and a loop
+	 * that never ends throws nothing for {@code read(File)} to catch. The timeout is
+	 * preemptive so that a regression fails here instead of hanging the suite.
+	 */
+	@Test
+	void readingStopsAtAChunkWithANegativeLengthRatherThanLoopingForever() {
+		byte[] png = pngWithADamagedChunkOfLength(-12);
+
+		Map<String, String> tags = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> PngTextChunk.read(png));
+
+		assertEquals(Map.of("voxelcam:x", "1"), tags);
+	}
+
+	/**
+	 * Starring walks the same chunks to strip the old flag. From a damaged chunk on, the file
+	 * is copied through untouched, the way a truncated chunk already was: what follows it
+	 * cannot be trusted to be chunks at all.
+	 */
+	@Test
+	void embeddingCopiesEverythingFromAChunkWithANegativeLengthThroughUnchanged() {
+		byte[] png = pngWithADamagedChunkOfLength(-12);
+
+		byte[] result = assertTimeoutPreemptively(Duration.ofSeconds(5),
+				() -> PngTextChunk.embed(png, Map.of("voxelcam:starred", "true")));
+
+		assertEquals(Map.of("voxelcam:starred", "true", "voxelcam:x", "1"), PngTextChunk.read(result));
+		assertTrue(java.util.Arrays.equals(tailFromTheDamagedChunk(png), tailOfTheSameLength(result, png)));
+	}
+
+	/** -32 used to reach {@code write} with a negative count, the unchecked throw of a damaged star. */
+	@Test
+	void embeddingCopiesEverythingFromAChunkWhoseNegativeLengthPointsBackwardsThroughUnchanged() {
+		byte[] png = pngWithADamagedChunkOfLength(-32);
+
+		byte[] result = assertTimeoutPreemptively(Duration.ofSeconds(5),
+				() -> PngTextChunk.embed(png, Map.of("voxelcam:starred", "true")));
+
+		assertEquals(Map.of("voxelcam:starred", "true", "voxelcam:x", "1"), PngTextChunk.read(result));
+		assertTrue(java.util.Arrays.equals(tailFromTheDamagedChunk(png), tailOfTheSameLength(result, png)));
+	}
+
+	private static byte[] tailFromTheDamagedChunk(byte[] png) {
+		// signature + IHDR chunk, then the one whole tag ahead of the damage
+		int damagedAt = 8 + 25 + PngTextChunk.iTXtChunk("voxelcam:x", "1").length;
+		return java.util.Arrays.copyOfRange(png, damagedAt, png.length);
+	}
+
+	private static byte[] tailOfTheSameLength(byte[] result, byte[] png) {
+		int length = tailFromTheDamagedChunk(png).length;
+		return java.util.Arrays.copyOfRange(result, result.length - length, result.length);
 	}
 
 	@Test
