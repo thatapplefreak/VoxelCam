@@ -106,10 +106,12 @@ public class GuiScreenShotManager extends Screen {
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
-	/** What {@link #filmstripCells()} last worked out, and the burst key it was for; null when
-	 * it has to be worked out again. See {@link #forgetFilmstripCells()}. */
+	/** What {@link #filmstripCells()} last worked out; null when it has to be worked out again.
+	 * See {@link #forgetFilmstripCells()}. */
 	private List<File> filmstripCells;
-	private File filmstripCellsOf;
+	/** The key frame of the burst {@link #filmstripCells} was worked out for: the selection at
+	 * the time. A different selection means the cells are another burst's. */
+	private File filmstripCellsKeyFrame;
 
 	private int previewX;
 	private int previewY;
@@ -539,14 +541,14 @@ public class GuiScreenShotManager extends Screen {
 		}
 		// Kept between frames. Working it out lists the whole screenshots folder, and the
 		// strip is drawn on every extracted frame for as long as a burst stays selected.
-		if (filmstripCells == null || !selected.equals(filmstripCellsOf)) {
+		if (filmstripCells == null || !selected.equals(filmstripCellsKeyFrame)) {
 			List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, selected);
 			List<File> cells = new ArrayList<>(frames.size() + 1);
 			cells.add(selected);
 			cells.addAll(frames);
 			cells.sort(Comparator.comparingInt(this::captureIndexOf));
 			filmstripCells = cells;
-			filmstripCellsOf = selected;
+			filmstripCellsKeyFrame = selected;
 		}
 		return filmstripCells;
 	}
@@ -561,7 +563,7 @@ public class GuiScreenShotManager extends Screen {
 	 */
 	private void forgetFilmstripCells() {
 		filmstripCells = null;
-		filmstripCellsOf = null;
+		filmstripCellsKeyFrame = null;
 	}
 
 	/** A file with no burst tags at all — should not happen for anything this is asked about —
