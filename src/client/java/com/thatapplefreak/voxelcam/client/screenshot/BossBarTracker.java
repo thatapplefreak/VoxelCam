@@ -52,6 +52,19 @@ public final class BossBarTracker {
 	 * on 3 health of 200 is already under {@link #DEFEATED_PROGRESS} and may not take its final blow
 	 * for a minute; that blow and its death still move the bar. A raid's bar does not move again
 	 * once it is empty.
+	 *
+	 * <p><strong>Known gaps,</strong> both a raid's, both still taken for a kill:
+	 * <ul>
+	 *   <li>Leaving the raid's range within this window of winning it. The server removes the
+	 *       player from the bar, and the bar emptied less than 400 ticks ago.</li>
+	 *   <li>Arriving, or coming back into range, during the last 400 ticks of the celebration. The
+	 *       window starts at any observation of the bar, and the first one is {@link #added}: a bar
+	 *       that arrives already empty counts as having just emptied, and the celebration ends
+	 *       inside the window.</li>
+	 * </ul>
+	 * The second would go if a bar first seen empty were not stamped until it changed. That is a
+	 * change to what an add means here (a bar added at zero and then removed has always read as a
+	 * kill, and a player who joins as the dragon dies relies on it), so it is left for a decision.
 	 */
 	static final long DEFEATED_WINDOW_TICKS = 400L;
 
