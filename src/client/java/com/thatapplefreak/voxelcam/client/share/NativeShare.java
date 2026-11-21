@@ -19,6 +19,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * The OS-level sharing this mod can actually reach. There is no cross-platform
@@ -135,7 +136,15 @@ public final class NativeShare {
 	 */
 	static Path copyTo(File screenshot, String chosen) throws IOException {
 		Path target = targetPath(chosen, extensionOf(screenshot));
-		Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+		if (target.equals(Path.of(chosen))) {
+			// The dialog asked about overwriting this exact path, so replacing is the answer given.
+			Files.copy(screenshot.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			// The extension was added after the dialog answered, so its overwrite prompt was about
+			// a different name and nobody was asked about this one. An existing file there fails
+			// the copy with FileAlreadyExistsException instead of being replaced.
+			Files.copy(screenshot.toPath(), target);
+		}
 		return target;
 	}
 
@@ -160,7 +169,7 @@ public final class NativeShare {
 		REVEALED,
 		/** No reveal command, or it failed: the containing folder was opened. */
 		OPENED_FOLDER,
-		/** Not even the folder is there any more, so nothing was opened. */
+		/** The folder is not there any more, or it could not be opened either: nothing was opened. */
 		FAILED
 	}
 
@@ -194,15 +203,16 @@ public final class NativeShare {
 	 * The reveal with the platform lookup and the folder fallback handed in, so the
 	 * outcome can be tested without a file manager opening on the tester's desktop.
 	 */
-	static RevealOutcome reveal(String[] command, File parent, Runnable openFolder) {
+	static RevealOutcome reveal(String[] command, File parent, BooleanSupplier openFolder) {
 		if (command != null && runReveal(command)) {
 			return RevealOutcome.REVEALED;
 		}
 		if (parent == null || !parent.isDirectory()) {
 			return RevealOutcome.FAILED;
 		}
-		openFolder.run();
-		return RevealOutcome.OPENED_FOLDER;
+		// The fallback's own result, not an assumption: on Linux this is always the path taken,
+		// and xdg-open is missing or exits non-zero on plenty of setups.
+		return openFolder.getAsBoolean() ? RevealOutcome.OPENED_FOLDER : RevealOutcome.FAILED;
 	}
 
 	/** Runs one reveal command to completion and reports whether it revealed anything. */
@@ -251,8 +261,8 @@ public final class NativeShare {
 	 * <p>26.3 reduced {@code Util.OS} to a telemetry tag - {@code openFile(File)} and the
 	 * rest of its behaviour went with the GLFW-to-SDL switch - so there is no vanilla
 	 * call left to delegate to and the command is ours to name. Failure is logged and
-	 * swallowed: this backs a button and a fallback, neither of which has anywhere to
-	 * report to.
+	 * returned as {@code false}, including a platform with no command at all: the reveal
+	 * fallback reports it, and the manager's folder button has nowhere to and ignores it.
 	 *
 	 * <p><strong>Runs the command on the calling thread</strong>, which waits on the child
 	 * for up to {@link #REVEAL_TIMEOUT_SECONDS}. That suits {@link #reveal}'s fallback,
@@ -261,13 +271,13 @@ public final class NativeShare {
 	 * instead would hand the fallback a second pool hop and let it report
 	 * {@code OPENED_FOLDER} before the command had even started.
 	 */
-	public static void openFolder(File directory) {
+	public static boolean openFolder(File directory) {
 		String[] command = openFolderCommand(Util.getPlatform(), directory);
 		if (command == null) {
 			VoxelCamClient.LOGGER.warn("No folder-open command for platform {}", Util.getPlatform());
-			return;
+			return false;
 		}
-		runReveal(command);
+		return runReveal(command);
 	}
 
 	/**

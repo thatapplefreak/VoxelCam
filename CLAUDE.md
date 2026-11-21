@@ -69,7 +69,8 @@ for exactly this reason.
 
 `AutoCapture.gateFor` takes a `ScreenKind` rather than a `Screen` for the same reason, and
 `BossBarTracker` holds no Minecraft types at all — `BossBarSignal` flattens the packet's
-`Component` name to a `String` on the way in, which is what leaves the kill-detection rule
+`Component` name to a `String` on the way in, and hands over the level's game time and whether the
+bar's owner is dying as a `long` and a `boolean`, which is what leaves the kill-detection rule
 reachable from a no-client suite.
 
 `SharePopupTest` presses only "Copy file path". The other three targets each escape a test: the save
@@ -87,12 +88,15 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are all four automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
-directly, because earning an advancement, killing a boss, dying and walking a portal are
-server-driven events a client game test cannot stage — staging them would be testing Minecraft. So
-`ToastManagerMixin`'s `instanceof AdvancementToast` branch, `BossBarSignal`'s three overrides, and
-the `watchDeath`/`watchDimension` tick watches have never executed under test, even though the
-injectors themselves are proven to resolve (`defaultRequire: 1` fails the launch otherwise). Earn
+**So are the automatic triggers' own hooks, all but one.** `MomentCaptureTest` calls
+`AutoCapture.fire` directly, because earning an advancement, dying and walking a portal are
+server-driven events a client game test does not stage — staging them would be testing Minecraft. So
+`ToastManagerMixin`'s `instanceof AdvancementToast` branch and the `watchDeath`/`watchDimension`
+tick watches have never executed under test, even though the injectors themselves are proven to
+resolve (`defaultRequire: 1` fails the launch otherwise). The exception is a Wither: the integrated
+server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest` summons one
+and kills it, which runs `BossBarSignal`'s add and remove and its search for a dying owner. The
+Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
 measurement and its failure is silent.
@@ -246,7 +250,13 @@ Five things here are load-bearing and were each found the hard way:
   override `resize`, so its forgiving size search never runs on this path.
 - **A second request mid-capture must be refused,** and the saved window size snapshotted only on
   the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
-  one and every restore path leaves the window permanently huge.
+  one and every restore path leaves the window permanently huge. The restore itself runs only
+  while the window still has exactly the size the capture applied (`owesRestore`): vanilla writes
+  the window's size on a resize and on a fullscreen change, and restoring the snapshot over that
+  leaves the game rendering at the old size. A capturing frame whose window is no longer the
+  applied size is not read back at all. A request is refused while any
+  other save is in flight as well, as a burst and a plain screenshot are: `beforeBlit` joins the
+  save counter without a cap.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
   `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
   `rebuildWidgets`, and with no world the HUD is not drawn, so a multi-second freeze would come
@@ -264,10 +274,12 @@ at the call site, and its notices are bounced back through `client.execute`.
 **Capture menu** — `F2` reaches every capture mode (ADR-0005). `CaptureMenu` is a renderer-free
 state machine ticked from `END_CLIENT_TICK`: a release before `HOLD_THRESHOLD_TICKS` is a tap and
 takes a plain screenshot, a longer hold opens the dial, and releasing fires the aimed wedge.
-`CaptureMenuHud` draws it as a Fabric `HudElement`, rasterised on a coarse grid of filled
-rectangles because the extractor draws nothing else. The HUD is also what feeds the aim, recomputing
-it from the live cursor every frame. So an aim a test writes by hand does not survive the next
-frame, and an aimed test has to move the real cursor.
+`CaptureMenuHud` draws it from `HudMixin`'s `TAIL` injection, beside the capture status,
+rasterised on a coarse grid of filled rectangles because the extractor draws nothing else. It was a
+Fabric `HudElement` until 2.5.0, and those are not extracted with the HUD hidden (F1). The HUD is
+also what feeds the aim, recomputing it from the live cursor every frame. So a menu that is not
+drawn cannot be aimed either, an aim a test writes by hand does not survive the next frame, and an
+aimed test has to move the real cursor.
 
 Five things here each cost a playtest to find:
 
@@ -291,6 +303,9 @@ Five things here each cost a playtest to find:
   the pause screen has already opened, and a cancel that pauses the game is not a cancel. A
   cancelled hold latches until the key comes up, or the next tick reopens the menu. The pointer is
   *hidden* while aiming, not disabled, because disabling it hands the deltas back to mouse-look.
+  `MouseHandlerMixin` drops button presses and the wheel for the same span: with no `Screen` up,
+  vanilla takes a press on a released mouse as "click to regain focus", re-grabs it, re-centres
+  the cursor and then clicks the button's key mapping, and the wheel moves the hotbar regardless.
 
 The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
 `BigScreenshotSize.DIAL_OPTIONS`: four burst lengths (2–5 s, all of them) and five sizes, because
@@ -363,6 +378,10 @@ resolution, Escape and Cancel sending nothing. The smaller copy is re-rendered f
 composited frames, area-averaged down to a scale estimated from the full copy's size (side ∝ √bytes,
 15% headroom) and retried smaller if it misses; it lives in a temp folder as
 `<name>_discord.webp`, is reused for a second send, and is deleted when the share popup closes.
+A popup that another screen replaces (a death, a disconnect) gets `removed()` and never
+`onClose()`, so the cleanup hangs off `removed()` too, with opening its own size prompt as the one
+departure that is not leaving. If that prompt is itself replaced, a copy already made stays until
+the game exits. A late link or a pending send asks `LateShare.popupStillOpen` first.
 Reveal and Copy path never ask: they point at the file on disk.
 
 Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
@@ -381,8 +400,8 @@ records the server-list name, never the address (ADR-0003). `ModProvenance` cura
 `ShaderPack` reads Iris entirely by reflection (ADR-0009).
 
 **Automatic capture** — four vanilla-visible signals arm a single plain-size screenshot nobody
-pressed a key for: an advancement toast, a boss bar emptying and disappearing, the player's own
-death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
+pressed a key for: an advancement toast, a boss bar disappearing because its boss died, the player's
+own death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
 the dispatcher and the settings screen both iterate (so a trigger is never named individually), and
 `MomentTag` the PNG tags — `voxelcam:trigger`, `voxelcam:momentsubject` — that let the manager say
 afterwards why a file nobody asked for exists. All four ship **on**, each individually toggleable;
@@ -403,11 +422,25 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   so any content mod granting one through the vanilla system arrives with no adapter.
 - `BossHealthOverlayMixin` at `HEAD` of `update`, handing the packet to `BossBarSignal`.
   `ClientboundBossEventPacket.Handler` is a public interface whose methods all have defaults, so
-  `packet.dispatch(...)` reaches add/progress/remove with no accessor and no reflection.
+  `packet.dispatch(...)` reaches add/progress/name/remove with no accessor and no reflection.
+  The name is followed because it is what a bar's owner is recognised by, and what the
+  screenshot is tagged with.
   **`HEAD`, not the more obvious `TAIL`:** the moment is the *removal*, and whether it was a kill
   depends on the bar's progress just before it vanished — vanilla drops the entry, and that
   progress with it, while handling the packet, so running afterwards leaves nothing to judge by.
   `BossBarTracker` keeping its own copy is the point, not duplication.
+  **A removal is a kill on either of two grounds,** because vanilla's bosses disagree about what
+  a dead boss's bar looks like. The Ender Dragon's bar is driven to zero and removed 200 ticks
+  later, so a bar that *changed* to empty within `DEFEATED_WINDOW_TICKS` (400) is a kill. The
+  window is what keeps a won raid out: its bar empties at the win and is removed 600 ticks later.
+  Not entirely: a player who leaves or enters the raid's range inside the window still reads as a
+  kill, which the Javadoc on `DEFEATED_WINDOW_TICKS` spells out as a known gap.
+  It runs from the last change and not from the first low reading, or a dragon left on a sliver
+  before the final blow would time out. The Wither stops writing its bar at the killing blow
+  (`customServerAiStep` does not run for a dying mob), so its bar goes still showing the health
+  the blow landed on; what says kill is a mob with the bar's name dying in the client level, which
+  is still there because `ServerEntity.removePairing` takes the bar away before the entity. The
+  clock is the level's game time, since both vanilla delays are counted in server ticks.
 - Death and new-dimension need no mixin: both are plain client state.
 
 Four things here are load-bearing:
@@ -419,6 +452,10 @@ Four things here are load-bearing:
   and dropped when it is the player's own doing (any other screen), or when the level or player is
   gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
+  A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
+  term in both places: `shouldArm` refuses from key-down, and `gateFor` drops a moment the menu
+  was armed over. Captured instead, the frame has the dial in it, and the moment's save can refuse
+  the selection the player releases.
 - **The pending countdown does not run under a `LevelLoadingScreen`.** That screen is already
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing
@@ -447,6 +484,8 @@ notice suppression) while `moment` carries only tags and a notice key.
 **Capture status HUD** — every capture's feedback (busy, saved, failed, refused) is a notice
 posted to `CaptureStatus` and drawn top-left by `CaptureStatusHud` (ADR-0013). Completions are
 *posted*, never polled, because the save counter drops to zero on the IO pool between two frames.
+The one save that posts nothing is one that dies with an `Error`; the catch in
+`ScreenshotHandler.write` says why.
 The ambient "Saving screenshot…" line, with a spinner, is the one derived state. It shows from a
 save's first frame and is held for at least `BUSY_MIN_SHOW_MILLIS`, so a quick plain shot does not
 flicker it. The save's own result notice ends that hold early. While a save really is running it
@@ -467,7 +506,8 @@ Two things are load-bearing:
   and a big screenshot.
 - **It is drawn by `HudMixin` at `TAIL` of `Hud.extractRenderState`, not a Fabric `HudElement`,**
   so that it survives F1. The method's other return is the `LevelLoadingScreen` early-out, which
-  `TAIL` does not touch.
+  `TAIL` does not touch. The capture menu is drawn from the same injection for the same reason,
+  ahead of the capture status, and `CaptureMenuTest` aims and releases it with the HUD hidden.
 
 `captureStatusHud` in `voxelcam.json` switches it off, which leaves no capture feedback at all.
 
@@ -539,6 +579,11 @@ without a production caller — it stays deliberately, as the oracle
 against, which is what keeps one set of byte-for-byte framing tests covering the shipped path.
 `ofFile` checks existence eagerly, so a missing file still fails the future before any request is
 sent.
+
+The request timeout scales with the file (`CatboxUploader.timeoutFor`): `HttpRequest.timeout` runs
+until the response arrives and catbox answers only after the whole body, so a flat timeout is a cap
+on file size. A file over catbox's 200 MB limit fails the future with `TooLargeException` before
+anything is sent, which is the one upload failure `SharePopup` gives a reason for.
 
 **Title-screen button** — `VoxelCamClient` registers `ScreenEvents.AFTER_INIT` and appends a
 `PhotoButton` via `Screens.getWidgets(screen).add(...)`. It goes in vanilla's row of square icon

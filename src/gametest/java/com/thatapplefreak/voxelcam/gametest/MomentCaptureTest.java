@@ -1,8 +1,10 @@
 package com.thatapplefreak.voxelcam.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
@@ -15,6 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -24,14 +27,18 @@ import net.minecraft.client.gui.screens.TitleScreen;
  * The automatic capture path end to end: {@code AutoCapture.fire} through the blit, the write on
  * the IO pool, and the tags embedded afterwards. The unit suite already proves what the cooldown
  * and the gate <em>decide</em>; what only a real client can show is that a decision to capture
- * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the three
+ * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the four
  * decisions not to capture produce no file at all.
  *
- * <p>Triggers are fired directly rather than through their hooks. Earning an advancement, killing a
- * boss and dying are all server-side events a client game test cannot stage, and staging them would
- * be testing Minecraft rather than VoxelCam; the mixins that turn those into a {@code fire} call
- * are covered by launching the client at all, since {@code defaultRequire: 1} fails a mis-targeted
- * injector at load.
+ * <p>Triggers are fired directly rather than through their hooks, with one exception. Earning an
+ * advancement, dying and walking a portal are server-side events this test does not stage, since
+ * staging them would be testing Minecraft rather than VoxelCam. Of their hooks, only the
+ * advancement's is a mixin, and launching the client at all covers that it resolves, since {@code
+ * defaultRequire: 1} fails a mis-targeted injector at load. Death and a new dimension are watches
+ * in {@code AutoCapture.tick} with no injector to resolve, so nothing here exercises them. The
+ * exception is a boss: the integrated server takes commands, so a Wither is summoned and killed
+ * for real, and that capture arrives through {@code BossBarSignal} with nothing here calling
+ * {@code fire}.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
@@ -51,7 +58,85 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertASecondMomentInsideTheWindowIsDropped(context, dir);
 			assertADisabledTriggerCapturesNothing(context, dir);
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
+			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
+			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
 		}
+	}
+
+	/**
+	 * The one trigger hook that can be staged: the integrated server takes commands, and a Wither
+	 * can be summoned and killed with two of them. Its bar is the hard case for {@code
+	 * BossBarTracker}, because a Wither stops updating it at the killing blow, so the bar is removed
+	 * still showing the health that blow landed on. Here that is all of it.
+	 *
+	 * <p>{@code NoAI} keeps the Wither from firing at the player, and is also why its bar never
+	 * moves: a Wither writes its bar from its AI step. Peaceful difficulty discards a Wither without
+	 * killing it, which makes it the control. That bar goes the same way, at the same progress,
+	 * with nothing dying, and must not be taken for a kill.
+	 */
+	private static void assertAWitherKilledAtFullHealthIsCaptured(ClientGameTestContext context,
+			TestServerContext server, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		try {
+			server.runCommand("difficulty normal");
+			server.runCommand("execute at @p run summon minecraft:wither ~ ~10 ~ {NoAI:1b}");
+			context.waitTicks(40);
+			server.runCommand("difficulty peaceful");
+			context.waitTicks(60);
+			assertNothingNew(dir, before, "a Wither that went away at full health without dying");
+
+			server.runCommand("difficulty normal");
+			server.runCommand("execute at @p run summon minecraft:wither ~ ~10 ~ {NoAI:1b}");
+			context.waitTicks(40);
+			server.runCommand("kill @e[type=minecraft:wither]");
+			// Twenty ticks of dying before the Wither and its bar go, then the blit, the encode on
+			// the IO pool and the tags.
+			context.waitTicks(100);
+		} finally {
+			server.runCommand("difficulty peaceful");
+		}
+
+		File written = theOnlyNewFile(dir, before, "a Wither killed at full health");
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(written));
+		if (tag == null || tag.trigger() != MomentTrigger.BOSS_DEFEATED || !"Wither".equals(tag.subject())) {
+			throw new AssertionError("expected the boss-defeated moment naming the Wither, got " + tag);
+		}
+	}
+
+	/**
+	 * The capture menu is not a screen, so the gate's screen rows read a held one as a clear view.
+	 * It is the player's own doing all the same: a moment taken under it has the dial drawn across
+	 * it, and its save can refuse the screenshot the player was aiming. The real key is held, since
+	 * that is what arms the menu in play.
+	 *
+	 * <p>The menu is backed out of with Escape rather than released, because a release takes the
+	 * player's own screenshot and this is about the file nobody asked for. Still nothing after it
+	 * closes is what separates dropped from deferred, and the moment that follows being taken is
+	 * what shows the refused one did not spend the cooldown.
+	 */
+	private static void assertAMomentUnderAHeldCaptureMenuIsDropped(ClientGameTestContext context, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+			fire(context, MomentTrigger.ADVANCEMENT, "Stone Age");
+			assertNothingNew(dir, before, "a moment that arrived while the capture menu was held");
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(40);
+		assertNothingNew(dir, before, "a moment that arrived under a capture menu since cancelled");
+
+		fire(context, MomentTrigger.ADVANCEMENT, "Stone Age");
+		theOnlyNewFile(dir, before, "the next moment after the capture menu was put away");
 	}
 
 	private static void assertAnArmedMomentLandsTaggedAtWindowSize(ClientGameTestContext context, File dir) {

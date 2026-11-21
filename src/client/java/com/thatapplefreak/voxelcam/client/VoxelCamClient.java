@@ -7,12 +7,10 @@ import com.thatapplefreak.voxelcam.client.gui.PhotoButton;
 import com.thatapplefreak.voxelcam.client.mixin.KeyMappingAccessor;
 import com.thatapplefreak.voxelcam.client.screenshot.AutoCapture;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
-import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenuHud;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
@@ -113,11 +111,6 @@ public class VoxelCamClient implements ClientModInitializer {
 		// visited, whether the player was alive, which boss bars are up. A pending capture outliving
 		// the world it was armed in has nothing left to shoot either.
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> AutoCapture.forgetSession());
-
-		// Last, so the menu draws over the hotbar and bars rather than under them.
-		HudElementRegistry.addLast(
-				Identifier.fromNamespaceAndPath(MOD_ID, "capture_menu"),
-				CaptureMenuHud::extractRenderState);
 
 		ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
 			if (screen instanceof TitleScreen || screen instanceof PauseScreen) {

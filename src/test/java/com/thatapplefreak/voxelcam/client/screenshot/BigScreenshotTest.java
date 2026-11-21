@@ -1,8 +1,11 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+import net.minecraft.util.Util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +30,64 @@ class BigScreenshotTest {
 	void settle() {
 		BigScreenshot.deferRestore();
 		BigScreenshot.beforeFrame();
+		ScreenshotHandler.forgetSavesInFlight();
+		CaptureStatus.forgetAll();
+	}
+
+	/**
+	 * {@code beforeBlit} joins the save counter without a cap, on the strength of nothing else being
+	 * in flight. A burst and a plain screenshot refuse while a save is running. A big screenshot has
+	 * to as well, or it resizes the window alongside a save that is still encoding.
+	 */
+	@Test
+	void aRequestIsRefusedWhileAnotherSaveIsInFlight() {
+		assertTrue(ScreenshotHandler.beginSave(1));
+
+		BigScreenshot.request();
+
+		assertFalse(BigScreenshot.isBusy(), "a big screenshot must not start alongside a save in flight");
+		List<CaptureStatus.Notice> notices = CaptureStatus.visibleAt(Util.getMillis());
+		assertEquals(1, notices.size(), "the refusal should say why nothing happened");
+		assertEquals(CaptureStatus.Kind.BUSY, notices.get(0).kind());
+		assertEquals("voxelcam.savingpleasewait", notices.get(0).key());
+	}
+
+	// --- what the restore puts back ---------------------------------------------------------------
+
+	private static final BigScreenshot.Size WINDOWED = new BigScreenshot.Size(854, 480);
+	private static final BigScreenshot.Size BIG = new BigScreenshot.Size(3840, 2160);
+	private static final BigScreenshot.Size FULLSCREEN = new BigScreenshot.Size(1920, 1080);
+
+	/** The ordinary end of a capture: the window still has the size the capture gave it. */
+	@Test
+	void aWindowStillAtTheBigScreenshotSizeIsPutBack() {
+		assertTrue(BigScreenshot.owesRestore(BIG, BIG, WINDOWED));
+	}
+
+	/**
+	 * The player pressed F11 or dragged the window's edge while the capture was in progress. The
+	 * platform has since written the real new size, and that is neither the size the capture
+	 * applied nor the one it saved. Putting the saved size back over it leaves a fullscreen game
+	 * rendering at the old windowed size until the next real resize.
+	 */
+	@Test
+	void aWindowThePlatformResizedMeanwhileIsLeftAlone() {
+		assertFalse(BigScreenshot.owesRestore(FULLSCREEN, BIG, WINDOWED));
+	}
+
+	@Test
+	void aWindowAlreadyAtItsSavedSizeNeedsNothing() {
+		assertFalse(BigScreenshot.owesRestore(WINDOWED, BIG, WINDOWED));
+		assertFalse(BigScreenshot.owesRestore(WINDOWED, WINDOWED, WINDOWED),
+				"a big screenshot size equal to the window resized nothing to begin with");
+	}
+
+	/** One matching dimension is not the applied size: a window the same height as the big
+	 * screenshot but a different width was resized by something else. */
+	@Test
+	void bothDimensionsHaveToMatchTheAppliedSize() {
+		assertFalse(BigScreenshot.owesRestore(new BigScreenshot.Size(1920, 2160), BIG, WINDOWED));
+		assertFalse(BigScreenshot.owesRestore(new BigScreenshot.Size(3840, 1080), BIG, WINDOWED));
 	}
 
 	@Test
