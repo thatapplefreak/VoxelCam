@@ -275,6 +275,12 @@ public final class ScreenshotHandler {
 		} catch (IOException | RuntimeException e) {
 			// Unchecked as well: an encoder that throws one has failed the save just the same, and
 			// uncaught it would end this task with no notice at all.
+			//
+			// Known gap: an Error is not caught, so a single screenshot that fails with one (an
+			// OutOfMemoryError, in practice) has its file removed by writeOrDiscard and its slot
+			// released below, but posts no failure notice; the pool logs it. Posting one from the
+			// finally block would cover it, but that is allocating on the way out of an
+			// out-of-memory failure, ahead of the endSave() that must not be skipped.
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			if (burst == null) {
 				client.execute(() -> CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed"));
