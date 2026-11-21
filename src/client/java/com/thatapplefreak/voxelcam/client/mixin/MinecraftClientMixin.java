@@ -15,13 +15,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * The two points an oversized capture needs inside a frame: before anything is drawn,
- * where the framebuffer can still be resized, and after the frame is finished but before
- * it is presented, where it can be read back.
+ * Everything VoxelCam injects into Minecraft itself, which is two unrelated things.
  *
- * Both live in renderFrame rather than runTick: 26.x split the old single frame method,
- * leaving runTick with the game tick and renderFrame with everything from acquiring the
- * surface through presenting it.
+ * The first is the two points an oversized capture needs inside a frame: before anything
+ * is drawn, where the framebuffer can still be resized, and after the frame is finished but
+ * before it is presented, where it can be read back. Both live in renderFrame rather than
+ * runTick: 26.x split the old single frame method, leaving runTick with the game tick and
+ * renderFrame with everything from acquiring the surface through presenting it.
+ *
+ * The second is key routing. An injection at the head of handleGlobalKeyPress is what lets
+ * the manager's F2 rename shortcut have its key, and is here only because that method is
+ * Minecraft's. Its own comment says why it is needed.
  */
 @Mixin(Minecraft.class)
 public class MinecraftClientMixin {
