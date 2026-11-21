@@ -524,11 +524,6 @@ public final class VoxelCamIO {
 		return true;
 	}
 
-	/** {@link #delete(List)} for a caller showing every row of the last listing. */
-	public static boolean delete() {
-		return delete(screenShotFiles);
-	}
-
 	private static File neighbourOf(List<File> listed, File file) {
 		int index = listed.indexOf(file);
 		if (index < 0) {

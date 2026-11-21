@@ -377,7 +377,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(animation);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 		assertFalse(animation.exists());
 		assertFalse(webp.exists(), "an orphaned WebP would be invisible in the manager and never cleaned up");
 	}
@@ -390,7 +390,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(screenshot);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 		assertFalse(screenshot.exists());
 		assertTrue(webp.isFile(), "a WebP the player made is theirs, and a delete cannot be undone");
 	}
@@ -427,7 +427,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(doomed);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertFalse(doomed.exists());
 		assertNull(VoxelCamIO.getSelectedPhoto());
@@ -535,7 +535,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(stubborn);
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(stubborn.exists());
 		assertEquals(stubborn, VoxelCamIO.getSelectedPhoto());
@@ -547,7 +547,7 @@ class VoxelCamIOTest {
 		File keep = shot("keep.png", 1_000L);
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(keep.exists());
 	}
@@ -663,7 +663,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(key);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertFalse(key.exists());
 		assertFalse(frame1.exists());
@@ -688,7 +688,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(key);
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(key.exists(), "the key must survive a partial delete");
 		assertTrue(stubbornFrame.exists());
