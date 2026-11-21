@@ -11,12 +11,9 @@ import org.junit.jupiter.api.Test;
  * drawn after the widgets, so a cell that does not fit is painted over a button whose clicks
  * still go to the button.
  *
- * <p>The sizes below are written out again here, not read from the manager, so that this
- * checks the arithmetic against the layout and not against itself: scroll buttons 16 wide,
- * cells 34 wide and 3 apart, and 6 between everything else.
- *
- * <p>Only the two static functions are touched. {@code GuiScreenShotManager} is a {@code
- * Screen}, and its class does initialise without a client, which is all calling them needs.
+ * <p>The sizes below are written out again here, not read from {@link FilmstripLayout}, so
+ * that this checks the arithmetic against the layout and not against itself: scroll buttons 16
+ * wide, cells 34 wide and 3 apart, and 6 between everything else.
  */
 class FilmstripLayoutTest {
 
@@ -29,13 +26,13 @@ class FilmstripLayoutTest {
 	}
 
 	private static int rightScrollButtonLeft(int previewWidth) {
-		return previewWidth - GuiScreenShotManager.filmstripActionWidth(previewWidth) - 6 - 16;
+		return previewWidth - FilmstripLayout.actionWidth(previewWidth) - 6 - 16;
 	}
 
 	@Test
 	void atTheNarrowestWindowTheActionColumnGivesWayToOneCell() {
-		assertEquals(54, GuiScreenShotManager.filmstripActionWidth(NARROWEST_PREVIEW));
-		assertEquals(1, GuiScreenShotManager.filmstripCellCapacity(NARROWEST_PREVIEW));
+		assertEquals(54, FilmstripLayout.actionWidth(NARROWEST_PREVIEW));
+		assertEquals(1, FilmstripLayout.cellCapacity(NARROWEST_PREVIEW));
 	}
 
 	/** At 320 wide a 96-wide column left minus eight pixels for cells, and the one cell drawn
@@ -43,7 +40,7 @@ class FilmstripLayoutTest {
 	@Test
 	void atEveryWidthThereIsACellAndItClearsTheButtonsToItsRight() {
 		for (int previewWidth = NARROWEST_PREVIEW; previewWidth <= 400; previewWidth++) {
-			int cells = GuiScreenShotManager.filmstripCellCapacity(previewWidth);
+			int cells = FilmstripLayout.cellCapacity(previewWidth);
 
 			assertTrue(cells >= 1, "no frame can be picked at a preview " + previewWidth + " wide");
 			assertTrue(lastCellRight(cells) + 6 <= rightScrollButtonLeft(previewWidth),
@@ -54,16 +51,16 @@ class FilmstripLayoutTest {
 	/** Where the full column already fits beside a cell, nothing about the row changes. */
 	@Test
 	void theActionColumnKeepsItsFullWidthWhereverACellFitsBesideIt() {
-		assertEquals(96, GuiScreenShotManager.filmstripActionWidth(180));
-		assertEquals(1, GuiScreenShotManager.filmstripCellCapacity(180));
-		assertEquals(96, GuiScreenShotManager.filmstripActionWidth(244));
-		assertEquals(2, GuiScreenShotManager.filmstripCellCapacity(244));
+		assertEquals(96, FilmstripLayout.actionWidth(180));
+		assertEquals(1, FilmstripLayout.cellCapacity(180));
+		assertEquals(96, FilmstripLayout.actionWidth(244));
+		assertEquals(2, FilmstripLayout.cellCapacity(244));
 	}
 
 	/** Narrower than vanilla can make it, the answer is no cells, not one drawn over a button. */
 	@Test
 	void aPreviewTooNarrowForAnyCellDrawsNone() {
-		assertEquals(0, GuiScreenShotManager.filmstripCellCapacity(60));
-		assertEquals(0, GuiScreenShotManager.filmstripActionWidth(60));
+		assertEquals(0, FilmstripLayout.cellCapacity(60));
+		assertEquals(0, FilmstripLayout.actionWidth(60));
 	}
 }

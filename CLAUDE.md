@@ -669,9 +669,11 @@ follow the player's system locale are the exception, not the rule.
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
 Below ~362px the filmstrip's Set as key / Export animation column narrows too
-(`filmstripActionWidth`), so that one cell always fits between the scroll buttons. The cells are
-drawn after the widgets, so a cell the row has no room for is painted over a button; the cell count
-is never forced up to one. `FilmstripLayoutTest` sweeps the widths.
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
+are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
+count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
+free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`
+sweeps the widths without loading a `Screen`.
 The cells themselves are kept between frames (`filmstripCells`): working them out lists the whole
 folder, and extraction asks every frame. `forgetFilmstripCells()` goes wherever the folder is
 listed again and after Set as key, which changes the strip's order.
