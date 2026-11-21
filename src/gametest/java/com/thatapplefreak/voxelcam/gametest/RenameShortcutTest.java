@@ -7,7 +7,6 @@ import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -143,30 +142,10 @@ public class RenameShortcutTest implements FabricClientGameTest {
 
 	private static void writeFixture(File dir) {
 		try {
-			if (dir.isDirectory()) {
-				File[] stale = dir.listFiles();
-				if (stale != null) {
-					for (File file : stale) {
-						Files.deleteIfExists(file.toPath());
-					}
-				}
-			}
-			Files.createDirectories(dir.toPath());
-			writePng(new File(dir, "shortcut-target.png"), 320, 180);
+			ScreenshotFixtures.emptyFolder(dir);
+			ScreenshotFixtures.writePng(new File(dir, "shortcut-target.png"), 320, 180);
 		} catch (IOException e) {
 			throw new AssertionError("could not write the rename shortcut fixture", e);
 		}
-	}
-
-	/** A real, decodable PNG — the manager uploads these as textures. */
-	private static void writePng(File file, int width, int height) throws IOException {
-		java.awt.image.BufferedImage image =
-				new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB);
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				image.setRGB(x, y, (x * 255 / width) << 16 | (y * 255 / height) << 8 | 0x80);
-			}
-		}
-		javax.imageio.ImageIO.write(image, "png", file);
 	}
 }

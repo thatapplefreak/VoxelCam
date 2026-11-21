@@ -6,7 +6,6 @@ import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -288,15 +287,7 @@ public class FilmstripTest implements FabricClientGameTest {
 	/** A key frame and two more, tagged the way a capture tags them, all the same size. */
 	private static void writeBurst(File dir, File key) {
 		try {
-			if (dir.isDirectory()) {
-				File[] stale = dir.listFiles();
-				if (stale != null) {
-					for (File file : stale) {
-						Files.deleteIfExists(file.toPath());
-					}
-				}
-			}
-			Files.createDirectories(dir.toPath());
+			ScreenshotFixtures.emptyFolder(dir);
 			writeFrame(key, 0);
 			writeFrame(new File(dir, "burst_burst01.png"), 1);
 			writeFrame(new File(dir, "burst_burst02.png"), 2);
@@ -305,7 +296,8 @@ public class FilmstripTest implements FabricClientGameTest {
 		}
 	}
 
-	/** A real, decodable PNG, with a band that moves so the frames differ. */
+	/** A real, decodable PNG, with a band that moves so the frames differ. Its own writer and
+	 * not {@code ScreenshotFixtures.writePng}, which would make three frames of one picture. */
 	private static void writeFrame(File file, int index) throws IOException {
 		int width = 160;
 		int height = 90;
