@@ -57,7 +57,8 @@ public class GuiScreenShotManager extends Screen {
 	private static final int FILMSTRIP_GAP = 3;
 	private static final int FILMSTRIP_SCROLL_BUTTON_WIDTH = 16;
 	/** Set as key and Export animation share one column at the strip's right end, stacked, so a
-	 * second burst action costs the strip no cells; wide enough for the longer of the two labels. */
+	 * second burst action costs the strip no cells; wide enough for the longer of the two labels.
+	 * The widest it gets: {@link #filmstripActionWidth} narrows it where a cell would not fit. */
 	private static final int FILMSTRIP_ACTION_WIDTH = 96;
 	/** Two of these plus their gap fill the 40px band; the search row's controls are this tall too. */
 	private static final int FILMSTRIP_ACTION_HEIGHT = 18;
@@ -206,16 +207,19 @@ public class GuiScreenShotManager extends Screen {
 		// can change without a rebuild, from clicking a different row in the list.
 		int filmstripTop = previewY + previewHeight - FILMSTRIP_HEIGHT;
 		int filmstripButtonY = filmstripTop + (FILMSTRIP_HEIGHT - BUTTON_HEIGHT) / 2;
-		int actionX = previewX + previewWidth - FILMSTRIP_ACTION_WIDTH;
+		// The same width the cell count is worked out against, so the buttons and the cells
+		// drawn between them cannot disagree about where the column starts.
+		int burstActionWidth = filmstripActionWidth(previewWidth);
+		int actionX = previewX + previewWidth - burstActionWidth;
 		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
 		setAsKeyButton = addRenderableWidget(button("voxelcam.burst.setaskey", "voxelcam.tooltip.setaskey",
-				b -> setSelectedFrameAsKey(), actionX, actionTop, FILMSTRIP_ACTION_WIDTH));
+				b -> setSelectedFrameAsKey(), actionX, actionTop, burstActionWidth));
 		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		// A fixed label, with the frame count in the tooltip: a label that changed with the burst
 		// would be one a test (and clickScreenButton) could never find by its translation.
 		exportAnimationButton = addRenderableWidget(button("voxelcam.burst.exportanimation",
 				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
-				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, FILMSTRIP_ACTION_WIDTH));
+				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, burstActionWidth));
 		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		filmstripScrollLeftButton = addRenderableWidget(button("voxelcam.burst.scrollleft",
 				"voxelcam.tooltip.burstscroll", b -> scrollFilmstrip(-1),
@@ -531,9 +535,35 @@ public class GuiScreenShotManager extends Screen {
 	 * Set as key and Export animation — a burst longer than this needs {@link #filmstripScroll} to
 	 * reach the rest. */
 	private int maxFilmstripCells() {
+		return filmstripCellCapacity(previewWidth);
+	}
+
+	/**
+	 * How wide the Set as key / Export animation column is: {@link #FILMSTRIP_ACTION_WIDTH}
+	 * wherever a cell still fits beside it, and less where one would not. Below a scaled width
+	 * of about 362 the full column leaves no room between the scroll buttons, and at 320, the
+	 * narrowest vanilla produces, it leaves minus eight pixels. The column is what gives way
+	 * because a label that does not fit its button scrolls, while a strip with no cell leaves
+	 * no frame to pick and so nothing for Set as key to act on.
+	 *
+	 * <p>Static and package-private so a plain JUnit test can sweep the widths.
+	 */
+	static int filmstripActionWidth(int previewWidth) {
 		int scrollButtons = (FILMSTRIP_SCROLL_BUTTON_WIDTH + GAP) * 2;
-		int available = previewWidth - FILMSTRIP_ACTION_WIDTH - GAP - scrollButtons;
-		return Math.max(1, (available + FILMSTRIP_GAP) / (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP));
+		int besideOneCell = previewWidth - scrollButtons - FILMSTRIP_CELL_SIZE - GAP;
+		return Math.max(0, Math.min(FILMSTRIP_ACTION_WIDTH, besideOneCell));
+	}
+
+	/**
+	 * Never forced up to one. The cells are drawn after the widgets, so a cell the row has no
+	 * room for is painted over the right scroll button and the action column, whose clicks
+	 * still go to them. {@link #filmstripActionWidth} is what keeps this at one or more at
+	 * every width vanilla allows; narrower than that, no cell is the honest answer.
+	 */
+	static int filmstripCellCapacity(int previewWidth) {
+		int scrollButtons = (FILMSTRIP_SCROLL_BUTTON_WIDTH + GAP) * 2;
+		int available = previewWidth - filmstripActionWidth(previewWidth) - GAP - scrollButtons;
+		return Math.max(0, (available + FILMSTRIP_GAP) / (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP));
 	}
 
 	/** {@code visibleIndex} is relative to the left scroll button and to {@link

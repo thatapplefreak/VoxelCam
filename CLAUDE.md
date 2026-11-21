@@ -663,6 +663,10 @@ follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
+Below ~362px the filmstrip's Set as key / Export animation column narrows too
+(`filmstripActionWidth`), so that one cell always fits between the scroll buttons. The cells are
+drawn after the widgets, so a cell the row has no room for is painted over a button; the cell count
+is never forced up to one. `FilmstripLayoutTest` sweeps the widths.
 
 ## Known dead ends
 

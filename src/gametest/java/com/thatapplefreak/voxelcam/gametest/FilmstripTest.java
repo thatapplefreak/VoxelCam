@@ -35,11 +35,62 @@ public class FilmstripTest implements FabricClientGameTest {
 		File key = new File(dir, "burst.png");
 		writeBurst(dir, key);
 
+		// Before the export, which moves the selection onto the animation it writes.
+		assertTheStripHasRoomForACellAtTheSmallestWindow(context, dir, key);
 		assertSetAsKeyIsHeldOffWhileAnExportRuns(context, dir, key);
 
 		context.runOnClient(client -> VoxelCamIO.selectPhoto(null));
 		context.setScreen(TitleScreen::new);
 		context.waitForScreen(TitleScreen.class);
+	}
+
+	/**
+	 * At 320x240 the GUI scale is 1 and the preview is at its narrowest. The full-width action
+	 * column left less than nothing between the scroll buttons there, and the one cell drawn
+	 * anyway covered the right scroll button and the edge of Set as key and Export animation.
+	 * The cells are not widgets, so what is measured is the room the widgets leave for them;
+	 * {@code FilmstripLayoutTest} holds the cell arithmetic to the same row at every width.
+	 */
+	private static void assertTheStripHasRoomForACellAtTheSmallestWindow(ClientGameTestContext context, File dir,
+			File key) {
+		int[] original = context.computeOnClient(client ->
+				new int[] { client.getWindow().getScreenWidth(), client.getWindow().getScreenHeight() });
+		context.getInput().resizeWindow(320, 240);
+		try {
+			context.waitTicks(5);
+			openManagerOn(context, dir, key);
+
+			String problem = context.computeOnClient(client -> {
+				Screen screen = client.gui.screen();
+				Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
+				Button scrollRight = button(screen, "voxelcam.burst.scrollright");
+				Button setAsKey = button(screen, "voxelcam.burst.setaskey");
+				Button export = button(screen, "voxelcam.burst.exportanimation");
+				if (!scrollLeft.visible || !scrollRight.visible || !setAsKey.visible || !export.visible) {
+					return "a selected burst should show its filmstrip buttons";
+				}
+				// A 34-wide cell with the 6 the row keeps either side of it.
+				int room = scrollRight.getX() - scrollLeft.getRight();
+				if (room < 6 + 34 + 6) {
+					return "the scroll buttons leave " + room + " for cells, which is less than one";
+				}
+				if (scrollRight.getRight() > setAsKey.getX() || scrollRight.getRight() > export.getX()) {
+					return "the right scroll button runs under the action column";
+				}
+				if (setAsKey.getRight() > screen.width || export.getRight() > screen.width) {
+					return "the action column runs off a " + screen.width + " wide screen";
+				}
+				return null;
+			});
+			if (problem != null) {
+				throw new AssertionError("filmstrip at 320x240: " + problem);
+			}
+			// For a human: the one cell, clear of the buttons either side of it.
+			context.takeScreenshot("manager-filmstrip-320x240");
+		} finally {
+			context.getInput().resizeWindow(original[0], original[1]);
+			context.waitTicks(5);
+		}
 	}
 
 	/**
