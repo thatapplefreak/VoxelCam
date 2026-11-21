@@ -15,11 +15,11 @@ import java.util.Locale;
  * bottom-left, toasts and effects are top-right, boss bars are top-centre, and the advancement
  * toast an automatic capture is announcing is exactly where a top-right notice would land.
  *
- * <p>Not a Fabric {@code HudElement} like {@code CaptureMenuHud}: those are extracted inside {@code
- * Hud}'s F1 branch, and F1 is the mode a player composes screenshots in. With chat gone this is the
- * only feedback there is, so {@code HudMixin} calls it from the tail of {@code
- * Hud.extractRenderState}, outside {@code isHidden}. It still stays off the level-loading screen,
- * which returns before the tail.
+ * <p>Not a Fabric {@code HudElement}: those are extracted inside {@code Hud}'s F1 branch, and F1 is
+ * the mode a player composes screenshots in. With chat gone this is the only feedback there is, so
+ * {@code HudMixin} calls it from the tail of {@code Hud.extractRenderState}, outside {@code
+ * isHidden}, as it does {@code CaptureMenuHud}. It still stays off the level-loading screen, which
+ * returns before the tail.
  */
 public final class CaptureStatusHud {
 

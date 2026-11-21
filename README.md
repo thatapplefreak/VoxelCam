@@ -29,7 +29,7 @@ Features
   right in the manager. Sharing it hands out an animated WebP copy, which plays
   on Discord, and offers a smaller copy when it is over Discord's 10 MB limit.
 * Let VoxelCam catch the moments you would have missed: it takes a screenshot
-  by itself when you earn an advancement, when a boss bar empties, when you
+  by itself when you earn an advancement, when a boss is defeated, when you
   die, and the first time you arrive in a dimension. All four are on by
   default, each can be switched off, and no more than one is taken every ten
   seconds so a run of advancements is one screenshot rather than five.
@@ -108,8 +108,12 @@ implementation remains in this repository's Git history.
 the camera button joining the title screen's row of icon buttons; the work was
 following Minecraft's own move to unobfuscated code and a rewritten GUI layer.
 
-2.5.0 moved from 26.2 to 26.3, which again changes nothing for players. 26.3
-moved its GPU abstraction into a new package and swapped GLFW for SDL, so the
+2.5.0 moved from 26.2 to 26.3, and this time players get something too. A
+status line in the top corner says what a capture is doing, in place of chat
+messages. A burst can be anywhere from two to five seconds long. **Export
+Animation** turns a burst into one looping animation, and sharing it hands out
+an animated WebP copy that plays on Discord. Underneath, 26.3 moved its GPU
+abstraction into a new package and swapped GLFW for SDL, so the rest of the
 work was following that: the key handling, the pointer in the capture menu, and
 the Save-As dialog, which is SDL's now and opens without a custom caption.
 
@@ -124,7 +128,8 @@ each release in game. Versions before 2.0.0 (2013–2014) were written by hand.
 The in-game English strings, the Modrinth description and the release notes
 were drafted with Claude too, and the 16×16 star icon was drawn by a script
 Claude wrote. The camera icon and the original pirate translation are
-hand-made. The mod does not use generative AI while you play.
+hand-made; strings added to the translation since were drafted with Claude.
+The mod does not use generative AI while you play.
 
 [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) has the details, and is what the
 disclosure on the [Modrinth page](https://modrinth.com/mod/voxelcam) says.

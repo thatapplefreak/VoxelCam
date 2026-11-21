@@ -1,6 +1,5 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
@@ -13,9 +12,13 @@ import java.util.List;
  * machine so that one stays renderer-free and unit-testable without a GL context.
  *
  * <p>This is the first thing in VoxelCam to draw during gameplay rather than inside a {@code
- * Screen}. It registers as a Fabric {@code HudElement} (see {@code VoxelCamClient}), which fits the
+ * Screen}. {@code HudMixin} calls it from the tail of {@code Hud.extractRenderState}, which fits the
  * same retained-mode extraction model the rest of the GUI uses — the HUD hands out the very same
- * {@code GuiGraphicsExtractor} the manager's screens extract into.
+ * {@code GuiGraphicsExtractor} the manager's screens extract into. It was a Fabric {@code
+ * HudElement} until 2.5.0. Those are extracted inside {@code Hud}'s F1 branch, and this method is
+ * also the only thing that feeds {@link CaptureMenu#setAimOffset}, so with the HUD hidden the menu
+ * opened unseen and every release took a plain screenshot. The tail runs last, so the dial still
+ * sits over the hotbar and bars.
  *
  * <p>The dial is rasterised on a {@link #CELL}-pixel grid rather than drawn as smooth geometry: the
  * extractor fills axis-aligned rectangles and nothing else, and stepping in visible chunks is what
@@ -50,7 +53,7 @@ public final class CaptureMenuHud {
 	private CaptureMenuHud() {
 	}
 
-	public static void extractRenderState(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+	public static void extractRenderState(GuiGraphicsExtractor graphics) {
 		if (!CaptureMenu.isOpen()) {
 			return;
 		}

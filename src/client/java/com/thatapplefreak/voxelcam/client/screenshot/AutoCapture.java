@@ -133,7 +133,9 @@ public final class AutoCapture {
 
 	/**
 	 * Just before the frame is presented, after {@link Burst#beforeBlit()} for the same reason burst
-	 * sits after the capture menu: the frame is finished and carries no menu of ours.
+	 * sits after the capture menu: the frame is finished, and a selection released from the menu
+	 * has already fired. A menu still held is a different matter — it is drawn in this frame — and
+	 * {@link #gateFor} drops the moment for it.
 	 */
 	public static void beforeBlit() {
 		if (state != State.PENDING) {
@@ -142,7 +144,8 @@ public final class AutoCapture {
 
 		Minecraft client = Minecraft.getInstance();
 		ScreenKind screen = screenKind(client.gui.screen());
-		switch (gateFor(pendingTrigger, client.level != null, client.player != null, screen)) {
+		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
+				screen)) {
 			case DROP -> dropPending();
 			case WAIT -> {
 				if (advancePending(screen)) {
@@ -245,6 +248,12 @@ public final class AutoCapture {
 		if (BigScreenshot.isBusy() || Burst.isBusy() || ScreenshotHandler.isSaving()) {
 			return false;
 		}
+		// From key-down, not only once the dial is up: a moment armed in the ticks before the menu
+		// opens gives a clean frame, but its save can still be in flight when a tap comes up, and
+		// the player's own screenshot is then the one refused.
+		if (CaptureMenu.isArmed()) {
+			return false;
+		}
 		return lastArmMillis == NEVER || nowMillis - lastArmMillis >= cooldownSeconds() * 1000L;
 	}
 
@@ -307,8 +316,17 @@ public final class AutoCapture {
 	 * result every time, and {@code DeathScreen} draws the world behind itself rather than replacing
 	 * it, so the moment is still in the shot.
 	 */
-	static Gate gateFor(MomentTrigger trigger, boolean hasLevel, boolean hasPlayer, ScreenKind screen) {
+	static Gate gateFor(MomentTrigger trigger, boolean hasLevel, boolean hasPlayer, boolean captureMenuArmed,
+			ScreenKind screen) {
 		if (!hasLevel || !hasPlayer) {
+			return Gate.DROP;
+		}
+		// The capture menu is drawn on the HUD rather than opened as a Screen, so the rows below
+		// read a held one as a clear view. It is the player's own doing like any screen they
+		// opened, and this frame has the dial in it. shouldArm already refuses under it, so this is
+		// the menu that came up after the moment armed: one waiting out a level load, or a death
+		// waiting for its screen.
+		if (captureMenuArmed) {
 			return Gate.DROP;
 		}
 		return switch (screen) {

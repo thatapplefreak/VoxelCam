@@ -46,7 +46,7 @@ public class SharePopup extends Screen {
 	private File smallCopy;
 	/*
 	 * What is still running. Kept here rather than read off the buttons: init() rebuilds every
-	 * button on the way back from the size popup, which would forget a save dialog or upload that
+	 * button on the way back from the size prompt, which would forget a save dialog or upload that
 	 * is still in flight and offer to start a second one.
 	 */
 	private boolean shrinking;
@@ -55,6 +55,12 @@ public class SharePopup extends Screen {
 	private boolean revealing;
 	/** Set once the player backs out. Anything that finishes after this must not start something new. */
 	private boolean closed;
+	/** The size prompt this popup has open, or null. Kept so that only its own prompt, and not
+	 * some later popup's, counts as the player still being here. */
+	private ShareSizePopup sizePrompt;
+	/** Set whenever the popup stops being the screen for anything but its own size prompt: Done and
+	 * Escape as well as another screen taking its place. Cleared when it is put back. */
+	private boolean left;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -86,7 +92,7 @@ public class SharePopup extends Screen {
 		y += BUTTON_HEIGHT + GAP * 2;
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
-		// init() runs again on the way back from the size popup, with fresh buttons.
+		// init() runs again on the way back from the size prompt, with fresh buttons.
 		refreshButtons();
 	}
 
@@ -106,14 +112,15 @@ public class SharePopup extends Screen {
 			action.accept(screenshot);
 			return;
 		}
-		minecraft.setScreenAndShow(new ShareSizePopup(this, screenshot.length(), smaller -> {
+		sizePrompt = new ShareSizePopup(this, screenshot.length(), smaller -> {
 			minecraft.setScreenAndShow(this);
 			if (smaller) {
 				withSmallerCopy(action);
 			} else {
 				action.accept(screenshot);
 			}
-		}));
+		});
+		minecraft.setScreenAndShow(sizePrompt);
 	}
 
 	/** Makes the smaller copy off the render thread — it decodes and re-encodes every frame, at
@@ -136,9 +143,11 @@ public class SharePopup extends Screen {
 			}
 		}, Util.ioPool()).whenComplete((made, error) -> minecraft.execute(() -> {
 			shrinking = false;
-			if (closed) {
+			if (!stillOpen()) {
 				// Backing out while the copy was being made is backing out of the send: nothing is
-				// uploaded and no Save dialog opens over the game.
+				// uploaded and no Save dialog opens over the game. Being replaced counts the same.
+				// A death screen or a disconnect takes the popup away through removed(), never
+				// onClose(), so the closed flag alone would leave this send armed.
 				SmallerShareCopy.discard(made);
 				return;
 			}
@@ -231,13 +240,29 @@ public class SharePopup extends Screen {
 		uploading = true;
 		refreshButtons();
 		setStatus("voxelcam.share.uploading.link", false);
+		int upload = LateShare.beginUpload();
 		CatboxUploader.upload(file).whenComplete((link, error) -> minecraft.execute(() -> {
 			uploading = false;
 			refreshButtons();
 			discardSmallCopyIfDone();
+			if (error instanceof CatboxUploader.TooLargeException tooLarge) {
+				// The one failure trying again cannot fix, so it says what is wrong with the file.
+				setStatus(Component.translatable("voxelcam.share.linktoobig",
+						SmallerShareCopy.megabytes(tooLarge.bytes()),
+						CatboxUploader.MAX_UPLOAD_BYTES / 1_000_000), true);
+				return;
+			}
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
 				setStatus("voxelcam.share.linkfailed", true);
+				return;
+			}
+			if (!LateShare.mayCopyLink(upload, stillOpen())) {
+				// An upload already under way when the player backed out still finishes, but its
+				// link must not replace the one a later popup said it copied, or whatever they
+				// have copied since. Logged, so the upload is not lost.
+				VoxelCamClient.LOGGER.info("Share link for {} arrived after its popup was left; not copied: {}",
+						file.getName(), link);
 				return;
 			}
 			NativeShare.copyText(link);
@@ -275,6 +300,16 @@ public class SharePopup extends Screen {
 		}
 	}
 
+	/**
+	 * Whether the player is still in this popup: not backed out of it, and it has not been replaced
+	 * by some other screen. Its own size prompt counts as still being here, since the player comes
+	 * back from that to this popup's status line. The decision is {@link LateShare#popupStillOpen},
+	 * where a test can reach it.
+	 */
+	private boolean stillOpen() {
+		return LateShare.popupStillOpen(closed, minecraft.gui.screen(), this, sizePrompt);
+	}
+
 	@Override
 	public void onClose() {
 		closed = true;
@@ -283,12 +318,42 @@ public class SharePopup extends Screen {
 	}
 
 	/**
-	 * Deletes the smaller copy once the popup is closed and nothing is still reading it. A save
-	 * dialog or an upload that was already under way when the player backed out still finishes;
-	 * the copy goes when the last of them does, rather than out from under it.
+	 * The popup is on screen: for the first time, back from its own size prompt, or put back by
+	 * whatever had covered it. Either way the size prompt is done with and the player is here.
+	 */
+	@Override
+	public void added() {
+		super.added();
+		sizePrompt = null;
+		left = false;
+	}
+
+	/**
+	 * Vanilla calls this whenever the popup stops being the screen, and for a screen that takes its
+	 * place (a death, a disconnect) it is the only call: {@code onClose()} is for Done and Escape.
+	 * So this is where the smaller copy is cleaned up for a popup that was replaced.
+	 *
+	 * <p>Opening its own size prompt is the one departure that is not leaving. The prompt is
+	 * assigned before the switch, which is how it is told apart here. If that prompt is itself
+	 * replaced by another screen, nothing tells this popup, and a copy it had already made stays
+	 * until the game exits, when {@code deleteOnExit} takes it.
+	 */
+	@Override
+	public void removed() {
+		super.removed();
+		if (sizePrompt == null) {
+			left = true;
+			discardSmallCopyIfDone();
+		}
+	}
+
+	/**
+	 * Deletes the smaller copy once the player has left the popup and nothing is still reading it.
+	 * A save dialog or an upload that was already under way when they left still finishes; the
+	 * copy goes when the last of them does, rather than out from under it.
 	 */
 	private void discardSmallCopyIfDone() {
-		if (closed && !saving && !uploading && smallCopy != null) {
+		if ((closed || left) && !saving && !uploading && smallCopy != null) {
 			SmallerShareCopy.discard(smallCopy);
 			smallCopy = null;
 		}

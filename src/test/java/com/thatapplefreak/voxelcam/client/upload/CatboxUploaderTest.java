@@ -1,6 +1,7 @@
 package com.thatapplefreak.voxelcam.client.upload;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -8,10 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,9 +44,13 @@ class CatboxUploaderTest {
 	private HttpServer server;
 	private URI endpoint;
 
+	private static final int SLOW_READ_PIECE_BYTES = 64 * 1024;
+
 	/** What the stub will answer with, and what it last received. */
 	private int status;
 	private String responseBody;
+	/** Above zero, the stub pauses this long after each piece of the body it reads. */
+	private volatile long slowReadPauseMillis;
 	private final AtomicReference<byte[]> lastBody = new AtomicReference<>();
 	private final AtomicReference<String> lastContentType = new AtomicReference<>();
 	private final AtomicReference<String> lastMethod = new AtomicReference<>();
@@ -52,6 +61,7 @@ class CatboxUploaderTest {
 	void startStub() throws IOException {
 		status = 200;
 		responseBody = "https://files.catbox.moe/abc123.png";
+		slowReadPauseMillis = 0;
 
 		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/user/api.php", this::handle);
@@ -70,13 +80,30 @@ class CatboxUploaderTest {
 		lastContentLength.set(exchange.getRequestHeaders().getFirst("Content-Length"));
 		lastTransferEncoding.set(exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
 		try (var in = exchange.getRequestBody()) {
-			lastBody.set(in.readAllBytes());
+			lastBody.set(slowReadPauseMillis > 0 ? readSlowly(in) : in.readAllBytes());
 		}
 		byte[] out = responseBody.getBytes(StandardCharsets.UTF_8);
 		exchange.sendResponseHeaders(status, out.length);
 		try (var body = exchange.getResponseBody()) {
 			body.write(out);
 		}
+	}
+
+	/** A player's slow connection, from the server's side: the body arrives a piece at a time. */
+	private byte[] readSlowly(InputStream in) throws IOException {
+		ByteArrayOutputStream received = new ByteArrayOutputStream();
+		byte[] piece = new byte[SLOW_READ_PIECE_BYTES];
+		int read;
+		while ((read = in.readNBytes(piece, 0, piece.length)) > 0) {
+			received.write(piece, 0, read);
+			try {
+				Thread.sleep(slowReadPauseMillis);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IOException(e);
+			}
+		}
+		return received.toByteArray();
 	}
 
 	private File screenshot(String name, byte[] content) throws IOException {
@@ -209,6 +236,90 @@ class CatboxUploaderTest {
 
 		Thread.sleep(Duration.ofMillis(100));
 		assertTrue(lastMethod.get() == null, "no request should have reached the server");
+	}
+
+	// --- how long an upload may take ------------------------------------------------------------
+
+	/**
+	 * The request timeout runs until the response arrives, and catbox answers only once it has the
+	 * whole body. So it is a limit on how long sending the file may take, not a guard against a
+	 * silent server alone, and a flat one is a limit on file size. The stub takes about a second to
+	 * receive this file: a timeout shorter than that fails while it is still receiving, and one
+	 * that allows for the file gets the link.
+	 */
+	@Test
+	void theTimeoutHasToCoverSendingTheWholeFile() throws Exception {
+		File large = screenshot("large.png", new byte[1024 * 1024]);
+		slowReadPauseMillis = 60;
+
+		ExecutionException cutOff = assertThrows(ExecutionException.class,
+				() -> CatboxUploader.upload(large, endpoint, Duration.ofMillis(250)).get());
+		assertInstanceOf(HttpTimeoutException.class, rootCause(cutOff));
+
+		assertEquals("https://files.catbox.moe/abc123.png",
+				CatboxUploader.upload(large, endpoint, Duration.ofSeconds(20)).get());
+	}
+
+	/**
+	 * Worked examples, at upload speeds players have. The flat 60 seconds this replaced failed all
+	 * three every time, however often the player tried again.
+	 */
+	@Test
+	void aLargeFileIsAllowedTheTimeASlowConnectionNeeds() {
+		// The reproduction in #78: 20 MB at about 200 KB/s is 100 seconds.
+		assertLongerThan(Duration.ofSeconds(100), CatboxUploader.timeoutFor(20_000_000L));
+		// A big screenshot at 4x, about 60 MB, on a 1 Mbit/s uplink: 480 seconds.
+		assertLongerThan(Duration.ofSeconds(480), CatboxUploader.timeoutFor(60_000_000L));
+		// The largest file catbox takes, 200 MB, on the same uplink: 1600 seconds.
+		assertLongerThan(Duration.ofSeconds(1600), CatboxUploader.timeoutFor(200_000_000L));
+	}
+
+	/** The timeout is still what ends an upload to a server that has stopped answering, so an
+	 * ordinary screenshot of a couple of megabytes must not wait on one for many minutes. */
+	@Test
+	void anOrdinaryScreenshotStillGivesUpOnASilentServer() {
+		Duration timeout = CatboxUploader.timeoutFor(2_000_000L);
+
+		assertTrue(timeout.compareTo(Duration.ofSeconds(60)) >= 0, "never shorter than it used to be: " + timeout);
+		assertTrue(timeout.compareTo(Duration.ofMinutes(2)) <= 0, "but not open-ended either: " + timeout);
+	}
+
+	private static void assertLongerThan(Duration needed, Duration timeout) {
+		assertTrue(timeout.compareTo(needed) > 0, "needs more than " + needed + ", was allowed " + timeout);
+	}
+
+	// --- catbox's size limit --------------------------------------------------------------------
+
+	@Test
+	void catboxTakesFilesUpToTwoHundredMegabytes() {
+		assertFalse(CatboxUploader.exceedsLimit(200_000_000L));
+		assertTrue(CatboxUploader.exceedsLimit(200_000_001L));
+	}
+
+	/**
+	 * Sent anyway, a file over the limit uploads for minutes and is then refused with nothing to
+	 * say why. Refused here, the popup can tell the player it is the size. The file is sparse: its
+	 * length is all that is asked of it.
+	 */
+	@Test
+	void aFileOverTheLimitIsRefusedBeforeAnythingIsSent() throws Exception {
+		File huge = dir.resolve("huge.png").toFile();
+		try (RandomAccessFile sparse = new RandomAccessFile(huge, "rw")) {
+			sparse.setLength(200_000_001L);
+		}
+
+		var future = CatboxUploader.upload(huge, endpoint);
+
+		assertTrue(future.isCompletedExceptionally(), "refused on the spot, not after an upload");
+		ExecutionException thrown = assertThrows(ExecutionException.class, future::get);
+		CatboxUploader.TooLargeException refusal =
+				assertInstanceOf(CatboxUploader.TooLargeException.class, rootCause(thrown));
+		assertEquals(200_000_001L, refusal.bytes());
+		// Unwrapped, which is how the share popup tells this failure from every other.
+		assertInstanceOf(CatboxUploader.TooLargeException.class, future.handle((link, error) -> error).get());
+
+		Thread.sleep(Duration.ofMillis(100));
+		assertNull(lastMethod.get(), "no request should have reached the server");
 	}
 
 	private static Throwable rootCause(Throwable thrown) {

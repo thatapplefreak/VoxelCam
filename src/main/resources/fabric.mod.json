@@ -3,7 +3,7 @@
 	"id": "voxelcam",
 	"version": "${version}",
 	"name": "VoxelCam",
-	"description": "Adds features to make in-game screenshots easier to handle, including editing and uploading to image hosts.",
+	"description": "An in-game screenshot manager. Browse, rename, star and delete your screenshots, hold F2 for a capture menu with big screenshots and bursts, and share them without an account.",
 	"authors": [
 		"thatapplefreak"
 	],

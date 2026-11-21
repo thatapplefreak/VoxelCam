@@ -74,6 +74,52 @@ class ScreenshotHandlerTest {
 		assertTrue(target.exists());
 	}
 
+	/**
+	 * A burst frame's encoder opens the file and then encodes, and what can go wrong there is not
+	 * an {@code IOException}: the encoder rejects a pixel array of the wrong length with an {@code
+	 * IllegalArgumentException}. The file is just as empty either way.
+	 */
+	@Test
+	void aWriteThatFailsWithAnUncheckedExceptionLeavesNoFileBehind() {
+		File target = new File(dir.toFile(), "capture_burst07.png");
+		IllegalArgumentException failure = new IllegalArgumentException("12 pixels for a 4x4 image");
+
+		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+				() -> ScreenshotHandler.writeOrDiscard(target, t -> {
+					Files.write(t.toPath(), new byte[0]);
+					throw failure;
+				}));
+
+		assertSame(failure, thrown, "the failure still has to reach the caller, which accounts for the frame");
+		assertFalse(target.exists(), "a failed save left a broken .png in the screenshots folder");
+	}
+
+	/** Running out of heap for a frame's pixels, with several frames in flight, is an {@code Error},
+	 * and nothing should catch one. The file it leaves is still this write's to remove. */
+	@Test
+	void aWriteThatFailsWithAnErrorLeavesNoFileBehind() {
+		File target = new File(dir.toFile(), "capture_burst08.png");
+
+		assertThrows(OutOfMemoryError.class, () -> ScreenshotHandler.writeOrDiscard(target, t -> {
+			Files.write(t.toPath(), new byte[0]);
+			throw new OutOfMemoryError("staged: no room for the frame's pixels");
+		}));
+
+		assertFalse(target.exists(), "a failed save left a broken .png in the screenshots folder");
+	}
+
+	@Test
+	void anUncheckedFailureStillLeavesAnotherWritesFileAlone() throws IOException {
+		File target = new File(dir.toFile(), "capture.png");
+		Files.write(target.toPath(), "not ours".getBytes(StandardCharsets.UTF_8));
+
+		assertThrows(IllegalStateException.class, () -> ScreenshotHandler.writeOrDiscard(target, t -> {
+			throw new IllegalStateException("encoder failed");
+		}));
+
+		assertTrue(target.exists());
+	}
+
 	@Test
 	void aSuccessfulWriteKeepsItsFile() throws IOException {
 		File target = new File(dir.toFile(), "capture.png");
