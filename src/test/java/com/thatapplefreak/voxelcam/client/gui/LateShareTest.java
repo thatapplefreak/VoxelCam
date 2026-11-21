@@ -6,9 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Which upload's link may reach the clipboard. The share popup's upload-result branch cannot be
- * driven by a test, since it would upload to the real catbox, so the decision it makes there lives
- * in {@link LateShare} and is tested without a popup or an upload.
+ * Which upload's link may reach the clipboard, and whether the player is still in the popup that
+ * asked for it. The share popup's upload-result branch cannot be driven by a test, since it would
+ * upload to the real catbox, so the decisions it makes there live in {@link LateShare} and are
+ * tested without a popup, a screen or an upload.
  */
 class LateShareTest {
 
@@ -41,5 +42,57 @@ class LateShareTest {
 		int upload = LateShare.beginUpload();
 
 		assertFalse(LateShare.mayCopyLink(upload, false));
+	}
+
+	// --- whether the player is still in the popup -------------------------------------------------
+
+	// Stand-ins for screens. The decision only ever asks whether two of them are the same one.
+	private static final Object POPUP = new Object();
+	private static final Object ITS_SIZE_PROMPT = new Object();
+	private static final Object ANOTHER_POPUPS_SIZE_PROMPT = new Object();
+	private static final Object DEATH_SCREEN = new Object();
+
+	@Test
+	void aPopupOnScreenIsStillOpen() {
+		assertTrue(LateShare.popupStillOpen(false, POPUP, POPUP, null));
+	}
+
+	/** The player comes back from the size prompt to the popup's own status line, so a link that
+	 * lands meanwhile is still theirs to have. */
+	@Test
+	void aPopupBehindItsOwnSizePromptIsStillOpen() {
+		assertTrue(LateShare.popupStillOpen(false, ITS_SIZE_PROMPT, POPUP, ITS_SIZE_PROMPT));
+	}
+
+	/**
+	 * A size prompt is not enough: it has to be this popup's. A popup a death screen replaced is
+	 * gone, and a later share popup asking its own size question must not bring the first one's
+	 * late link, or the send it was waiting to make, back to life.
+	 */
+	@Test
+	void anotherPopupsSizePromptDoesNotMakeAPopupOpen() {
+		assertFalse(LateShare.popupStillOpen(false, ANOTHER_POPUPS_SIZE_PROMPT, POPUP, null),
+				"a popup that never opened a size prompt");
+		assertFalse(LateShare.popupStillOpen(false, ANOTHER_POPUPS_SIZE_PROMPT, POPUP, ITS_SIZE_PROMPT),
+				"a popup whose own size prompt was itself replaced");
+	}
+
+	/** Vanilla takes a replaced screen away through {@code removed()} and never {@code onClose()},
+	 * so the popup's own closed flag says nothing here. */
+	@Test
+	void aPopupReplacedByAnotherScreenIsNotOpen() {
+		assertFalse(LateShare.popupStillOpen(false, DEATH_SCREEN, POPUP, null));
+	}
+
+	/** No screen and no size prompt are both "nothing", and must not be taken for each other. */
+	@Test
+	void aPopupIsNotOpenWhenNoScreenIsUp() {
+		assertFalse(LateShare.popupStillOpen(false, null, POPUP, null));
+	}
+
+	@Test
+	void aPopupThePlayerBackedOutOfIsNotOpen() {
+		assertFalse(LateShare.popupStillOpen(true, POPUP, POPUP, null));
+		assertFalse(LateShare.popupStillOpen(true, ITS_SIZE_PROMPT, POPUP, ITS_SIZE_PROMPT));
 	}
 }

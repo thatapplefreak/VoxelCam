@@ -55,6 +55,9 @@ public class SharePopup extends Screen {
 	private boolean revealing;
 	/** Set once the player backs out. Anything that finishes after this must not start something new. */
 	private boolean closed;
+	/** The size prompt this popup last opened, or null. Kept so that only its own prompt, and not
+	 * some later popup's, counts as the player still being here. */
+	private ShareSizePopup sizePrompt;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -106,14 +109,15 @@ public class SharePopup extends Screen {
 			action.accept(screenshot);
 			return;
 		}
-		minecraft.setScreenAndShow(new ShareSizePopup(this, screenshot.length(), smaller -> {
+		sizePrompt = new ShareSizePopup(this, screenshot.length(), smaller -> {
 			minecraft.setScreenAndShow(this);
 			if (smaller) {
 				withSmallerCopy(action);
 			} else {
 				action.accept(screenshot);
 			}
-		}));
+		});
+		minecraft.setScreenAndShow(sizePrompt);
 	}
 
 	/** Makes the smaller copy off the render thread — it decodes and re-encodes every frame, at
@@ -295,12 +299,12 @@ public class SharePopup extends Screen {
 
 	/**
 	 * Whether the player is still in this popup: not backed out of it, and it has not been replaced
-	 * by some other screen. Its own size popup counts as still being here, since the player comes
-	 * back from that to this popup's status line.
+	 * by some other screen. Its own size prompt counts as still being here, since the player comes
+	 * back from that to this popup's status line. The decision is {@link LateShare#popupStillOpen},
+	 * where a test can reach it.
 	 */
 	private boolean stillOpen() {
-		Screen current = minecraft.gui.screen();
-		return !closed && (current == this || current instanceof ShareSizePopup);
+		return LateShare.popupStillOpen(closed, minecraft.gui.screen(), this, sizePrompt);
 	}
 
 	@Override
