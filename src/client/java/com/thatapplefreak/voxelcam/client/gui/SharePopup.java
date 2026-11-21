@@ -233,7 +233,7 @@ public class SharePopup extends Screen {
 		uploading = true;
 		refreshButtons();
 		setStatus("voxelcam.share.uploading.link", false);
-		int upload = LinkClipboard.begin();
+		int upload = LateShare.beginUpload();
 		CatboxUploader.upload(file).whenComplete((link, error) -> minecraft.execute(() -> {
 			uploading = false;
 			refreshButtons();
@@ -250,7 +250,7 @@ public class SharePopup extends Screen {
 				setStatus("voxelcam.share.linkfailed", true);
 				return;
 			}
-			if (!LinkClipboard.mayCopy(upload, stillOpen())) {
+			if (!LateShare.mayCopyLink(upload, stillOpen())) {
 				// An upload already under way when the player backed out still finishes, but its
 				// link must not replace the one a later popup said it copied, or whatever they
 				// have copied since. Logged, so the upload is not lost.

@@ -8,15 +8,15 @@ import org.junit.jupiter.api.Test;
 /**
  * Which upload's link may reach the clipboard. The share popup's upload-result branch cannot be
  * driven by a test, since it would upload to the real catbox, so the decision it makes there lives
- * in {@link LinkClipboard} and is tested without a popup or an upload.
+ * in {@link LateShare} and is tested without a popup or an upload.
  */
-class LinkClipboardTest {
+class LateShareTest {
 
 	@Test
 	void theLatestUploadsLinkIsCopiedWhileItsPopupIsOpen() {
-		int upload = LinkClipboard.begin();
+		int upload = LateShare.beginUpload();
 
-		assertTrue(LinkClipboard.mayCopy(upload, true));
+		assertTrue(LateShare.mayCopyLink(upload, true));
 	}
 
 	/**
@@ -26,20 +26,20 @@ class LinkClipboardTest {
 	 */
 	@Test
 	void anEarlierUploadThatFinishesLateLeavesTheClipboardAlone() {
-		int large = LinkClipboard.begin();
-		int small = LinkClipboard.begin();
+		int large = LateShare.beginUpload();
+		int small = LateShare.beginUpload();
 
-		assertTrue(LinkClipboard.mayCopy(small, true), "the popup in front of the player gets its link copied");
-		assertFalse(LinkClipboard.mayCopy(large, false), "the upload left behind does not replace it");
-		assertFalse(LinkClipboard.mayCopy(large, true), "whatever became of its popup");
+		assertTrue(LateShare.mayCopyLink(small, true), "the popup in front of the player gets its link copied");
+		assertFalse(LateShare.mayCopyLink(large, false), "the upload left behind does not replace it");
+		assertFalse(LateShare.mayCopyLink(large, true), "whatever became of its popup");
 	}
 
 	/** With one popup: a link that arrives after the player backed out would replace whatever they
 	 * have copied since. */
 	@Test
 	void aLinkThatArrivesAfterItsPopupWasLeftIsNotCopied() {
-		int upload = LinkClipboard.begin();
+		int upload = LateShare.beginUpload();
 
-		assertFalse(LinkClipboard.mayCopy(upload, false));
+		assertFalse(LateShare.mayCopyLink(upload, false));
 	}
 }
