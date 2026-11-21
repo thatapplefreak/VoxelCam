@@ -54,10 +54,14 @@ class BigScreenshotTest {
 
 	// --- what the restore puts back ---------------------------------------------------------------
 
+	private static final BigScreenshot.Size WINDOWED = new BigScreenshot.Size(854, 480);
+	private static final BigScreenshot.Size BIG = new BigScreenshot.Size(3840, 2160);
+	private static final BigScreenshot.Size FULLSCREEN = new BigScreenshot.Size(1920, 1080);
+
 	/** The ordinary end of a capture: the window still has the size the capture gave it. */
 	@Test
 	void aWindowStillAtTheBigScreenshotSizeIsPutBack() {
-		assertTrue(BigScreenshot.owesRestore(3840, 2160, 3840, 2160, 854, 480));
+		assertTrue(BigScreenshot.owesRestore(BIG, BIG, WINDOWED));
 	}
 
 	/**
@@ -68,13 +72,13 @@ class BigScreenshotTest {
 	 */
 	@Test
 	void aWindowThePlatformResizedMeanwhileIsLeftAlone() {
-		assertFalse(BigScreenshot.owesRestore(1920, 1080, 3840, 2160, 854, 480));
+		assertFalse(BigScreenshot.owesRestore(FULLSCREEN, BIG, WINDOWED));
 	}
 
 	@Test
 	void aWindowAlreadyAtItsSavedSizeNeedsNothing() {
-		assertFalse(BigScreenshot.owesRestore(854, 480, 3840, 2160, 854, 480));
-		assertFalse(BigScreenshot.owesRestore(854, 480, 854, 480, 854, 480),
+		assertFalse(BigScreenshot.owesRestore(WINDOWED, BIG, WINDOWED));
+		assertFalse(BigScreenshot.owesRestore(WINDOWED, WINDOWED, WINDOWED),
 				"a big screenshot size equal to the window resized nothing to begin with");
 	}
 
@@ -82,8 +86,8 @@ class BigScreenshotTest {
 	 * screenshot but a different width was resized by something else. */
 	@Test
 	void bothDimensionsHaveToMatchTheAppliedSize() {
-		assertFalse(BigScreenshot.owesRestore(1920, 2160, 3840, 2160, 854, 480));
-		assertFalse(BigScreenshot.owesRestore(3840, 1080, 3840, 2160, 854, 480));
+		assertFalse(BigScreenshot.owesRestore(new BigScreenshot.Size(1920, 2160), BIG, WINDOWED));
+		assertFalse(BigScreenshot.owesRestore(new BigScreenshot.Size(3840, 1080), BIG, WINDOWED));
 	}
 
 	@Test

@@ -59,10 +59,10 @@ public final class BigScreenshot {
 	// Render-thread state only: request() runs from the screenshot key handler, the rest
 	// from the two render(boolean) injections.
 	private static State state = State.IDLE;
-	private static int savedWidth;
-	private static int savedHeight;
-	private static int appliedWidth;
-	private static int appliedHeight;
+	/** The window's size before the capture resized it, or null with no capture in flight. */
+	private static Size saved;
+	/** The size the capture resized the window to, or null with no capture in flight. */
+	private static Size applied;
 	private static int framesInState;
 
 	// Identifies the readback a consumer belongs to. Consumers arrive from a fenced task and
@@ -157,15 +157,15 @@ public final class BigScreenshot {
 		}
 
 		Minecraft client = Minecraft.getInstance();
-		Window window = client.getWindow();
-		if (window.getWidth() != appliedWidth || window.getHeight() != appliedHeight) {
+		Size window = sizeOf(client.getWindow());
+		if (!window.equals(applied)) {
 			// A fullscreen change is applied a few instructions after beforeFrame() in the same
 			// renderFrame, and overwrites the size it had just set. This frame was then drawn at
 			// the new window size, and read back it would be saved and announced as the big
 			// screenshot it is not. The window is already right, so the deferred restore finds
 			// nothing of this capture's to put back.
-			VoxelCamClient.LOGGER.warn("Window changed to {}x{} under a {}x{} big screenshot, not saving it",
-					window.getWidth(), window.getHeight(), appliedWidth, appliedHeight);
+			VoxelCamClient.LOGGER.warn("Window changed to {} under a {} big screenshot, not saving it",
+					window, applied);
 			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.bigshot.failed");
 			deferRestore();
 			return;
@@ -236,11 +236,24 @@ public final class BigScreenshot {
 	 * size, and restoring the saved one over it leaves the game rendering at the old size: nothing
 	 * rewrites the stored size until the next real resize.
 	 */
-	static boolean owesRestore(int width, int height, int appliedWidth, int appliedHeight,
-			int savedWidth, int savedHeight) {
-		boolean stillAsApplied = width == appliedWidth && height == appliedHeight;
-		boolean alreadyAsSaved = width == savedWidth && height == savedHeight;
-		return stillAsApplied && !alreadyAsSaved;
+	static boolean owesRestore(Size window, Size applied, Size saved) {
+		return window.equals(applied) && !window.equals(saved);
+	}
+
+	/**
+	 * A framebuffer size. Its own type because a restore weighs three of them, and six bare ints
+	 * are easy to pass in the wrong order and awkward to compare.
+	 */
+	record Size(int width, int height) {
+
+		@Override
+		public String toString() {
+			return width + "x" + height;
+		}
+	}
+
+	private static Size sizeOf(Window window) {
+		return new Size(window.getWidth(), window.getHeight());
 	}
 
 	private static void beginCapture() {
@@ -262,8 +275,7 @@ public final class BigScreenshot {
 		// Snapshotted only on this transition. A second request mid-capture is refused in
 		// request(), because overwriting these with the oversized values would make every
 		// restore path "restore" the window to the big size permanently.
-		savedWidth = window.getWidth();
-		savedHeight = window.getHeight();
+		saved = sizeOf(window);
 
 		state = State.CAPTURING;
 		framesInState = 0;
@@ -271,13 +283,11 @@ public final class BigScreenshot {
 		BigScreenshotSize.Resolved target = size.resolve(window);
 		// Remembered so the blit and the restore can tell this capture's own resize from one the
 		// platform made since.
-		appliedWidth = target.width();
-		appliedHeight = target.height();
+		applied = new Size(target.width(), target.height());
 		try {
-			applySize(client, target.width(), target.height());
+			applySize(client, applied);
 		} catch (Throwable t) {
-			VoxelCamClient.LOGGER.error("Failed to resize for a {}x{} screenshot",
-					target.width(), target.height(), t);
+			VoxelCamClient.LOGGER.error("Failed to resize for a {} screenshot", applied, t);
 			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.bigshot.failed");
 			finish();
 		}
@@ -295,27 +305,25 @@ public final class BigScreenshot {
 		state = State.IDLE;
 		framesInState = 0;
 
-		if (savedWidth <= 0 || savedHeight <= 0) {
+		if (saved == null || saved.width() <= 0 || saved.height() <= 0) {
 			return;
 		}
 		Minecraft client = Minecraft.getInstance();
 		try {
-			Window window = client.getWindow();
-			if (owesRestore(window.getWidth(), window.getHeight(), appliedWidth, appliedHeight,
-					savedWidth, savedHeight)) {
-				applySize(client, savedWidth, savedHeight);
+			if (owesRestore(sizeOf(client.getWindow()), applied, saved)) {
+				applySize(client, saved);
 			}
 		} catch (Throwable t) {
-			VoxelCamClient.LOGGER.error("Failed to restore the window to {}x{}", savedWidth, savedHeight, t);
+			VoxelCamClient.LOGGER.error("Failed to restore the window to {}", saved, t);
 		} finally {
-			savedWidth = 0;
-			savedHeight = 0;
-			appliedWidth = 0;
-			appliedHeight = 0;
+			saved = null;
+			applied = null;
 		}
 	}
 
-	private static void applySize(Minecraft client, int width, int height) {
+	private static void applySize(Minecraft client, Size target) {
+		int width = target.width();
+		int height = target.height();
 		Window window = client.getWindow();
 		window.setWidth(width);
 		window.setHeight(height);
