@@ -55,9 +55,11 @@ public class SharePopup extends Screen {
 	private boolean revealing;
 	/** Set once the player backs out. Anything that finishes after this must not start something new. */
 	private boolean closed;
-	/** The size prompt this popup last opened, or null. Kept so that only its own prompt, and not
+	/** The size prompt this popup has open, or null. Kept so that only its own prompt, and not
 	 * some later popup's, counts as the player still being here. */
 	private ShareSizePopup sizePrompt;
+	/** Set when another screen took this popup's place without the player backing out of it. */
+	private boolean replaced;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -315,12 +317,42 @@ public class SharePopup extends Screen {
 	}
 
 	/**
-	 * Deletes the smaller copy once the popup is closed and nothing is still reading it. A save
-	 * dialog or an upload that was already under way when the player backed out still finishes;
-	 * the copy goes when the last of them does, rather than out from under it.
+	 * The popup is on screen: for the first time, back from its own size prompt, or put back by
+	 * whatever had covered it. Either way the size prompt is done with and the player is here.
+	 */
+	@Override
+	public void added() {
+		super.added();
+		sizePrompt = null;
+		replaced = false;
+	}
+
+	/**
+	 * Vanilla calls this whenever the popup stops being the screen, and for a screen that takes its
+	 * place (a death, a disconnect) it is the only call: {@code onClose()} is for Done and Escape.
+	 * So this is where the smaller copy is cleaned up for a popup that was replaced.
+	 *
+	 * <p>Opening its own size prompt is the one departure that is not leaving. The prompt is
+	 * assigned before the switch, which is how it is told apart here. If that prompt is itself
+	 * replaced by another screen, nothing tells this popup, and a copy it had already made stays
+	 * until the game exits, when {@code deleteOnExit} takes it.
+	 */
+	@Override
+	public void removed() {
+		super.removed();
+		if (sizePrompt == null) {
+			replaced = true;
+			discardSmallCopyIfDone();
+		}
+	}
+
+	/**
+	 * Deletes the smaller copy once the player has left the popup and nothing is still reading it.
+	 * A save dialog or an upload that was already under way when they left still finishes; the
+	 * copy goes when the last of them does, rather than out from under it.
 	 */
 	private void discardSmallCopyIfDone() {
-		if (closed && !saving && !uploading && smallCopy != null) {
+		if ((closed || replaced) && !saving && !uploading && smallCopy != null) {
 			SmallerShareCopy.discard(smallCopy);
 			smallCopy = null;
 		}

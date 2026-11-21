@@ -370,6 +370,9 @@ resolution, Escape and Cancel sending nothing. The smaller copy is re-rendered f
 composited frames, area-averaged down to a scale estimated from the full copy's size (side ∝ √bytes,
 15% headroom) and retried smaller if it misses; it lives in a temp folder as
 `<name>_discord.webp`, is reused for a second send, and is deleted when the share popup closes.
+A popup that another screen replaces (a death, a disconnect) gets `removed()` and never
+`onClose()`, so the cleanup hangs off `removed()` too, with opening its own size prompt as the one
+departure that is not leaving. A late link or a pending send asks `LateShare.popupStillOpen` first.
 Reveal and Copy path never ask: they point at the file on disk.
 
 Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
