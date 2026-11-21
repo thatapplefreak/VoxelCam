@@ -477,7 +477,7 @@ public class GuiScreenShotManager extends Screen {
 		actionError = null;
 		updateButtonStates();
 		Util.ioPool().execute(() -> {
-			File written;
+			File written = null;
 			try {
 				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf, (done, total) -> {
 					exportFramesDone = done;
@@ -485,11 +485,16 @@ public class GuiScreenShotManager extends Screen {
 				}).apng();
 			} catch (IOException | RuntimeException e) {
 				VoxelCamClient.LOGGER.error("Failed to export {} as an animation", key, e);
-				written = null;
+			} finally {
+				// From finally, so that an Error hands back too. The export holds whole frames and
+				// the whole WebP on the heap, so running out of memory is the likeliest way for it
+				// to die, and the flag is static: left set, it would hold Export and Set as key off
+				// for every burst until the game was restarted. The Error itself still reaches the
+				// pool's handler, which logs it; here it reads as a failed export.
+				File result = written;
+				Minecraft client = Minecraft.getInstance();
+				client.execute(() -> exportFinished(client, key, result));
 			}
-			File result = written;
-			Minecraft client = Minecraft.getInstance();
-			client.execute(() -> exportFinished(client, key, result));
 		});
 	}
 
