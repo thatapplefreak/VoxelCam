@@ -825,6 +825,75 @@ class VoxelCamIOTest {
 		assertEquals("shot_burst1.png", VoxelCamIO.rename(dir.toFile(), "shot_burst1").getName());
 	}
 
+	/**
+	 * The same end state reached the other way round. With no {@code dragon.png} in the folder
+	 * a burst can be named {@code dragon_burst2}, and it is an ordinary row. Naming another
+	 * screenshot {@code dragon} afterwards is what would fold that key frame under it, strand
+	 * the burst's own frames, and let a delete of {@code dragon} take the key frame.
+	 */
+	@Test
+	void renamingAScreenshotToTheNameAnExistingBurstKeyWouldFoldUnderIsRefused() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		shot("burst_burst01.png", 1_000L);
+		shot("burst_burst02.png", 1_000L);
+		File other = shot("other.png", 2_000L);
+		VoxelCamIO.selectPhoto(key);
+		File renamedKey = VoxelCamIO.rename(dir.toFile(), "dragon_burst2");
+		assertEquals("dragon_burst2.png", renamedKey.getName(), "nothing to fold under yet, so this one is fine");
+		VoxelCamIO.selectPhoto(other);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon"));
+
+		assertTrue(other.exists(), "the screenshot keeps its name");
+		assertEquals(other, VoxelCamIO.getSelectedPhoto());
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		assertEquals(List.of("other.png", "dragon_burst2.png"), names());
+		assertEquals(2, VoxelCamIO.burstFrameCount(renamedKey), "the burst is still one reachable row");
+	}
+
+	/** What the rename dialog asks for this direction. */
+	@Test
+	void aNameTakesInAnotherScreenshotWhenAnExistingFileWouldFoldUnderIt() throws IOException {
+		shot("dragon_burst2.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "dragon", other));
+		assertTrue(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "DRAGON", other),
+				"the list folds by lowercased name");
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "wyvern", other));
+	}
+
+	/**
+	 * A burst's own frames already fold under it and are carried along by the rename, so a
+	 * name that differs from the key's only in case takes in nothing it did not have.
+	 */
+	@Test
+	void recapitalisingABurstKeyIsNotRefusedForItsOwnFrames() throws IOException {
+		File key = shot("sunset.png", 1_000L);
+		shot("sunset_burst01.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "Sunset", key));
+		assertEquals("Sunset.png", VoxelCamIO.rename(dir.toFile(), "Sunset").getName());
+		assertTrue(dir.resolve("Sunset_burst01.png").toFile().exists());
+	}
+
+	/**
+	 * A key frame that is itself named like a frame can take its base name: the file that
+	 * would fold under {@code dragon} is the one being renamed to it, and its own frames come
+	 * with it to {@code dragon_burstNN}.
+	 */
+	@Test
+	void aBurstKeyNamedLikeAFrameCanBeRenamedToItsBaseName() throws IOException {
+		File key = shot("dragon_burst2.png", 1_000L);
+		shot("dragon_burst2_burst01.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "dragon", key));
+		assertEquals("dragon.png", VoxelCamIO.rename(dir.toFile(), "dragon").getName());
+		assertTrue(dir.resolve("dragon_burst01.png").toFile().exists());
+	}
+
 	// --- Set as key ----------------------------------------------------------------------------
 
 	@Test

@@ -318,6 +318,8 @@ bytes, not names. Rename and delete take the whole group, with rollback.
 The collapse is one level deep, so rename refuses any name that would fold the renamed file under
 another screenshot (`VoxelCamIO.nameFoldsUnderAnotherScreenshot`, also what `RenamePopup` asks): a
 key frame hidden that way would strand its own frames in no row and no filmstrip.
+It refuses the other order too (`nameTakesInAnotherScreenshot`): a name that a screenshot already
+in the folder would fold under ends in the same place.
 
 **Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
 `<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the

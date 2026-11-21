@@ -76,7 +76,8 @@ public class RenamePopup extends Screen {
 		setInitialFocus(nameField);
 	}
 
-	/** Blocks names that are empty, unchanged, or would collide with an existing file. */
+	/** Blocks names that are empty, unchanged, hold a path character, would collide with an
+	 * existing file, or would fold this screenshot and another into one burst, either way round. */
 	private void updateConfirmState() {
 		validationError = validate();
 		confirmButton.active = canConfirm();
@@ -101,6 +102,9 @@ public class RenamePopup extends Screen {
 		}
 		if (VoxelCamIO.nameFoldsUnderAnotherScreenshot(screenshotsDir, name, currentFile)) {
 			return "voxelcam.rename.burstframe";
+		}
+		if (VoxelCamIO.nameTakesInAnotherScreenshot(screenshotsDir, name, currentFile)) {
+			return "voxelcam.rename.takesframe";
 		}
 		return null;
 	}
