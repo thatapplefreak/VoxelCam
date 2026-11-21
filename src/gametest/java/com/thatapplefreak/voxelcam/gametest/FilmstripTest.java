@@ -195,13 +195,8 @@ public class FilmstripTest implements FabricClientGameTest {
 			Screen screen = client.gui.screen();
 			Button setAsKey = button(screen, "voxelcam.burst.setaskey");
 			Button export = button(screen, "voxelcam.burst.exportanimation");
-			Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
 
-			// The second cell: a gap after the left scroll button, one cell and its gap along,
-			// then half a cell in. Its frame is not the key, which is what arms Set as key.
-			double cellX = scrollLeft.getRight() + 6 + (34 + 3) + 17;
-			double cellY = scrollLeft.getY() + scrollLeft.getHeight() / 2.0;
-			screen.mouseClicked(new MouseButtonEvent(cellX, cellY, LEFT_CLICK), false);
+			pickTheSecondCell(screen);
 			if (!setAsKey.active) {
 				return "picking a frame that is not the key should enable Set as key";
 			}
@@ -218,6 +213,19 @@ public class FilmstripTest implements FabricClientGameTest {
 				return "a Set as key that got through mid-export should do nothing, but the key's path now holds frame "
 						+ keyIndex;
 			}
+
+			// Closed and opened again with the export still running. Every open builds a new
+			// manager, and it must not come up offering what the first one was holding off.
+			screen.onClose();
+			GuiScreenShotManager reopened = new GuiScreenShotManager(dir);
+			client.setScreenAndShow(reopened);
+			pickTheSecondCell(reopened);
+			if (button(reopened, "voxelcam.burst.exportanimation").active) {
+				return "a manager reopened mid-export should not offer Export again";
+			}
+			if (button(reopened, "voxelcam.burst.setaskey").active) {
+				return "a manager reopened mid-export should not offer Set as key";
+			}
 			return null;
 		});
 		if (problem != null) {
@@ -225,7 +233,37 @@ public class FilmstripTest implements FabricClientGameTest {
 		}
 
 		// The export selects the animation it wrote, which is how its end is seen from here.
+		// The manager that started it is gone by now, so this is also the export reporting to
+		// whichever manager is open.
 		context.waitFor(client -> !key.equals(VoxelCamIO.getSelectedPhoto()), 400);
+
+		// And the hold has to end with the export, though the manager that began it never
+		// heard: the same pick on a fresh manager arms Set as key again. This is also what
+		// shows the pick above landed on a cell, so the disabled button there meant something.
+		openManagerOn(context, dir, key);
+		String afterwards = context.computeOnClient(client -> {
+			Screen screen = client.gui.screen();
+			pickTheSecondCell(screen);
+			if (!button(screen, "voxelcam.burst.exportanimation").active) {
+				return "Export should be offered again once the export has finished";
+			}
+			if (!button(screen, "voxelcam.burst.setaskey").active) {
+				return "Set as key should be offered again once the export has finished";
+			}
+			return null;
+		});
+		if (afterwards != null) {
+			throw new AssertionError(afterwards);
+		}
+	}
+
+	/** The second cell: a gap after the left scroll button, one cell and its gap along, then
+	 * half a cell in. Its frame is not the key, which is what arms Set as key. */
+	private static void pickTheSecondCell(Screen screen) {
+		Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
+		double cellX = scrollLeft.getRight() + 6 + (34 + 3) + 17;
+		double cellY = scrollLeft.getY() + scrollLeft.getHeight() / 2.0;
+		screen.mouseClicked(new MouseButtonEvent(cellX, cellY, LEFT_CLICK), false);
 	}
 
 	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {

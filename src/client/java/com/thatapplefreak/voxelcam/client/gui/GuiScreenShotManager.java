@@ -12,6 +12,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -94,11 +95,17 @@ public class GuiScreenShotManager extends Screen {
 	private int filmstripScroll;
 	/** A failed file action, shown in place of the details line until the selection moves. */
 	private Component actionError;
-	/** An animation export is being written off the render thread; its button waits for it. */
-	private boolean exporting;
+	/**
+	 * An animation export is being written off the render thread; Export and Set as key wait
+	 * for it. Static, because the export outlives the screen that started it: every open builds
+	 * a new manager, and one that began with this false would offer both buttons again in the
+	 * middle of an export, for a swap or a second export of the files still being read. Only
+	 * ever touched on the render thread, set on the click and cleared by {@link #exportFinished}.
+	 */
+	private static boolean exporting;
 	/** How far the export has got, written from the IO thread after each frame, for its bar. */
-	private volatile int exportFramesDone;
-	private volatile int exportFramesTotal;
+	private static volatile int exportFramesDone;
+	private static volatile int exportFramesTotal;
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
@@ -482,16 +489,27 @@ public class GuiScreenShotManager extends Screen {
 				written = null;
 			}
 			File result = written;
-			minecraft.execute(() -> exportFinished(key, result));
+			Minecraft client = Minecraft.getInstance();
+			client.execute(() -> exportFinished(client, key, result));
 		});
 	}
 
-	private void exportFinished(File key, File written) {
+	/**
+	 * Static, and handed the client instead of using a screen's own: the manager that started
+	 * the export may have been closed since, and the flag has to be cleared whether or not it
+	 * was. The result is shown by whichever manager is open now, which after a close and
+	 * reopen is not the one that started it.
+	 */
+	private static void exportFinished(Minecraft client, File key, File written) {
 		exporting = false;
-		if (minecraft.gui.screen() != this) {
-			// Closed meanwhile: the file is on disk and the next open lists it; nothing to show.
-			return;
+		if (client.gui.screen() instanceof GuiScreenShotManager open) {
+			open.showExportResult(key, written);
 		}
+		// Otherwise it is closed, and the file is on disk for the next open to list, or it is
+		// under a popup, and is rebuilt on the way back from it.
+	}
+
+	private void showExportResult(File key, File written) {
 		if (written == null) {
 			if (Objects.equals(selected, key)) {
 				actionError = Component.translatable("voxelcam.burst.exportanimation.failed");
