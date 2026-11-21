@@ -30,11 +30,13 @@ import net.minecraft.client.gui.screens.TitleScreen;
  * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the four
  * decisions not to capture produce no file at all.
  *
- * <p>Triggers are fired directly rather than through their hooks. Earning an advancement, killing a
- * boss and dying are all server-side events a client game test cannot stage, and staging them would
- * be testing Minecraft rather than VoxelCam; the mixins that turn those into a {@code fire} call
- * are covered by launching the client at all, since {@code defaultRequire: 1} fails a mis-targeted
- * injector at load.
+ * <p>Triggers are fired directly rather than through their hooks, with one exception. Earning an
+ * advancement, dying and walking a portal are server-side events this test does not stage, since
+ * staging them would be testing Minecraft rather than VoxelCam; the mixins that turn those into a
+ * {@code fire} call are covered by launching the client at all, since {@code defaultRequire: 1}
+ * fails a mis-targeted injector at load. The exception is a boss: the integrated server takes
+ * commands, so a Wither is summoned and killed for real, and that capture arrives through {@code
+ * BossBarSignal} with nothing here calling {@code fire}.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
