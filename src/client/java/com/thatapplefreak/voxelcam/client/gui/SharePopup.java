@@ -46,7 +46,7 @@ public class SharePopup extends Screen {
 	private File smallCopy;
 	/*
 	 * What is still running. Kept here rather than read off the buttons: init() rebuilds every
-	 * button on the way back from the size popup, which would forget a save dialog or upload that
+	 * button on the way back from the size prompt, which would forget a save dialog or upload that
 	 * is still in flight and offer to start a second one.
 	 */
 	private boolean shrinking;
@@ -58,8 +58,9 @@ public class SharePopup extends Screen {
 	/** The size prompt this popup has open, or null. Kept so that only its own prompt, and not
 	 * some later popup's, counts as the player still being here. */
 	private ShareSizePopup sizePrompt;
-	/** Set when another screen took this popup's place without the player backing out of it. */
-	private boolean replaced;
+	/** Set whenever the popup stops being the screen for anything but its own size prompt: Done and
+	 * Escape as well as another screen taking its place. Cleared when it is put back. */
+	private boolean left;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -91,7 +92,7 @@ public class SharePopup extends Screen {
 		y += BUTTON_HEIGHT + GAP * 2;
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
-		// init() runs again on the way back from the size popup, with fresh buttons.
+		// init() runs again on the way back from the size prompt, with fresh buttons.
 		refreshButtons();
 	}
 
@@ -324,7 +325,7 @@ public class SharePopup extends Screen {
 	public void added() {
 		super.added();
 		sizePrompt = null;
-		replaced = false;
+		left = false;
 	}
 
 	/**
@@ -341,7 +342,7 @@ public class SharePopup extends Screen {
 	public void removed() {
 		super.removed();
 		if (sizePrompt == null) {
-			replaced = true;
+			left = true;
 			discardSmallCopyIfDone();
 		}
 	}
@@ -352,7 +353,7 @@ public class SharePopup extends Screen {
 	 * copy goes when the last of them does, rather than out from under it.
 	 */
 	private void discardSmallCopyIfDone() {
-		if ((closed || replaced) && !saving && !uploading && smallCopy != null) {
+		if ((closed || left) && !saving && !uploading && smallCopy != null) {
 			SmallerShareCopy.discard(smallCopy);
 			smallCopy = null;
 		}

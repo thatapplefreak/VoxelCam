@@ -372,7 +372,8 @@ composited frames, area-averaged down to a scale estimated from the full copy's 
 `<name>_discord.webp`, is reused for a second send, and is deleted when the share popup closes.
 A popup that another screen replaces (a death, a disconnect) gets `removed()` and never
 `onClose()`, so the cleanup hangs off `removed()` too, with opening its own size prompt as the one
-departure that is not leaving. A late link or a pending send asks `LateShare.popupStillOpen` first.
+departure that is not leaving. If that prompt is itself replaced, a copy already made stays until
+the game exits. A late link or a pending send asks `LateShare.popupStillOpen` first.
 Reveal and Copy path never ask: they point at the file on disk.
 
 Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
@@ -424,6 +425,8 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   a dead boss's bar looks like. The Ender Dragon's bar is driven to zero and removed 200 ticks
   later, so a bar that *changed* to empty within `DEFEATED_WINDOW_TICKS` (400) is a kill. The
   window is what keeps a won raid out: its bar empties at the win and is removed 600 ticks later.
+  Not entirely: a player who leaves or enters the raid's range inside the window still reads as a
+  kill, which the Javadoc on `DEFEATED_WINDOW_TICKS` spells out as a known gap.
   It runs from the last change and not from the first low reading, or a dragon left on a sliver
   before the final blow would time out. The Wither stops writing its bar at the killing blow
   (`customServerAiStep` does not run for a dying mob), so its bar goes still showing the health
@@ -473,6 +476,8 @@ notice suppression) while `moment` carries only tags and a notice key.
 **Capture status HUD** — every capture's feedback (busy, saved, failed, refused) is a notice
 posted to `CaptureStatus` and drawn top-left by `CaptureStatusHud` (ADR-0013). Completions are
 *posted*, never polled, because the save counter drops to zero on the IO pool between two frames.
+The one save that posts nothing is one that dies with an `Error`; the catch in
+`ScreenshotHandler.write` says why.
 The ambient "Saving screenshot…" line, with a spinner, is the one derived state. It shows from a
 save's first frame and is held for at least `BUSY_MIN_SHOW_MILLIS`, so a quick plain shot does not
 flicker it. The save's own result notice ends that hold early. While a save really is running it

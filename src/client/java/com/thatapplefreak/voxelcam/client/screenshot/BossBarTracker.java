@@ -53,7 +53,9 @@ public final class BossBarTracker {
 	 * for a minute; that blow and its death still move the bar. A raid's bar does not move again
 	 * once it is empty.
 	 *
-	 * <p><strong>Known gaps,</strong> both a raid's, both still taken for a kill:
+	 * <p><strong>Known gap:</strong> a won raid's empty bar is still taken for a kill whenever it is
+	 * removed within this window of the last time this client saw it change, and an add counts as
+	 * a change. That happens three ways:
 	 * <ul>
 	 *   <li>Leaving the raid's range within this window of winning it. The server removes the
 	 *       player from the bar, and the bar emptied less than 400 ticks ago.</li>
@@ -61,8 +63,10 @@ public final class BossBarTracker {
 	 *       window starts at any observation of the bar, and the first one is {@link #added}: a bar
 	 *       that arrives already empty counts as having just emptied, and the celebration ends
 	 *       inside the window.</li>
+	 *   <li>Arriving at any point in the celebration and leaving range again within 400 ticks of
+	 *       arriving, for the same reason.</li>
 	 * </ul>
-	 * The second would go if a bar first seen empty were not stamped until it changed. That is a
+	 * The last two would go if a bar first seen empty were not stamped until it changed. That is a
 	 * change to what an add means here (a bar added at zero and then removed has always read as a
 	 * kill, and a player who joins as the dragon dies relies on it), so it is left for a decision.
 	 */

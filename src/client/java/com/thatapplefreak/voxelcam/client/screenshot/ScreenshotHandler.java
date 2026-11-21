@@ -277,9 +277,11 @@ public final class ScreenshotHandler {
 			// uncaught it would end this task with no notice at all.
 			//
 			// Known gap: an Error is not caught, so a single screenshot that fails with one (an
-			// OutOfMemoryError, in practice) has its file removed by writeOrDiscard and its slot
-			// released below, but posts no failure notice; the pool logs it. Posting one from the
-			// finally block would cover it, but that is allocating on the way out of an
+			// OutOfMemoryError, in practice) has its slot released below but posts no notice of
+			// either kind; the pool logs it. If it came from the encode, writeOrDiscard has removed
+			// the file; if it came from embedMetadata, which reads the whole file back to splice
+			// its tags in, the screenshot is on disk untagged and unannounced. Posting a notice
+			// from the finally block would cover both, but that is allocating on the way out of an
 			// out-of-memory failure, ahead of the endSave() that must not be skipped.
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			if (burst == null) {

@@ -32,11 +32,13 @@ import net.minecraft.client.gui.screens.TitleScreen;
  *
  * <p>Triggers are fired directly rather than through their hooks, with one exception. Earning an
  * advancement, dying and walking a portal are server-side events this test does not stage, since
- * staging them would be testing Minecraft rather than VoxelCam; the mixins that turn those into a
- * {@code fire} call are covered by launching the client at all, since {@code defaultRequire: 1}
- * fails a mis-targeted injector at load. The exception is a boss: the integrated server takes
- * commands, so a Wither is summoned and killed for real, and that capture arrives through {@code
- * BossBarSignal} with nothing here calling {@code fire}.
+ * staging them would be testing Minecraft rather than VoxelCam. Of their hooks, only the
+ * advancement's is a mixin, and launching the client at all covers that it resolves, since {@code
+ * defaultRequire: 1} fails a mis-targeted injector at load. Death and a new dimension are watches
+ * in {@code AutoCapture.tick} with no injector to resolve, so nothing here exercises them. The
+ * exception is a boss: the integrated server takes commands, so a Wither is summoned and killed
+ * for real, and that capture arrives through {@code BossBarSignal} with nothing here calling
+ * {@code fire}.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
