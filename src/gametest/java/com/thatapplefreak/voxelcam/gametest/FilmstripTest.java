@@ -7,6 +7,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.components.Button;
@@ -37,6 +38,7 @@ public class FilmstripTest implements FabricClientGameTest {
 
 		// Before the export, which moves the selection onto the animation it writes.
 		assertTheStripHasRoomForACellAtTheSmallestWindow(context, dir, key);
+		assertTheFolderIsNotListedAgainForEveryFrame(context, dir, key);
 		assertSetAsKeyIsHeldOffWhileAnExportRuns(context, dir, key);
 
 		context.runOnClient(client -> VoxelCamIO.selectPhoto(null));
@@ -90,6 +92,90 @@ public class FilmstripTest implements FabricClientGameTest {
 		} finally {
 			context.getInput().resizeWindow(original[0], original[1]);
 			context.waitTicks(5);
+		}
+	}
+
+	/** The screenshots folder, counting how often it is listed. {@code File} is not final, and
+	 * a directory read is the one thing here that cannot be seen from outside any other way. */
+	private static final class CountingDir extends File {
+
+		final AtomicInteger listings = new AtomicInteger();
+
+		CountingDir(File of) {
+			super(of.getPath());
+		}
+
+		@Override
+		public File[] listFiles() {
+			listings.incrementAndGet();
+			return super.listFiles();
+		}
+
+		@Override
+		public String[] list() {
+			listings.incrementAndGet();
+			return super.list();
+		}
+	}
+
+	/**
+	 * Drawing the strip used to list the whole screenshots folder, match every name against
+	 * the burst pattern and sort the result, on every extracted frame, for as long as a burst
+	 * stayed selected. With nothing changing, no frame should list it at all.
+	 *
+	 * <p>The second half is what caching the cells could break. Set as key swaps two files'
+	 * bytes, tags included, so the strip's capture order puts different paths in its cells
+	 * afterwards: the first cell becomes the frame that was the key. Picking that cell arms Set
+	 * as key only if the strip was worked out again, and pressing it puts the fixture back.
+	 */
+	private static void assertTheFolderIsNotListedAgainForEveryFrame(ClientGameTestContext context, File dir, File key) {
+		CountingDir counted = new CountingDir(dir);
+		openManagerOn(context, counted, key);
+
+		boolean hasFilmstrip = context.computeOnClient(client ->
+				key.equals(VoxelCamIO.getSelectedPhoto()) && VoxelCamIO.burstFrameCount(key) > 0);
+		if (!hasFilmstrip) {
+			throw new AssertionError("the manager should be showing the fixture burst's filmstrip");
+		}
+
+		int before = counted.listings.get();
+		context.waitTicks(20);
+		int during = counted.listings.get() - before;
+		if (during != 0) {
+			throw new AssertionError("the screenshots folder was listed " + during
+					+ " times in 20 ticks with a burst selected and nothing changing");
+		}
+
+		String problem = context.computeOnClient(client -> {
+			Screen screen = client.gui.screen();
+			Button setAsKey = button(screen, "voxelcam.burst.setaskey");
+			Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
+			double firstCellX = scrollLeft.getRight() + 6 + 17;
+			double secondCellX = firstCellX + 34 + 3;
+			double cellY = scrollLeft.getY() + scrollLeft.getHeight() / 2.0;
+
+			screen.mouseClicked(new MouseButtonEvent(secondCellX, cellY, LEFT_CLICK), false);
+			if (!setAsKey.active) {
+				return "picking a frame that is not the key should enable Set as key";
+			}
+			setAsKey.onPress(LEFT_CLICK);
+			if (BurstFrame.fromTags(PngTextChunk.read(key)).index() != 1) {
+				return "Set as key should have put the second frame under the key's path";
+			}
+
+			screen.mouseClicked(new MouseButtonEvent(firstCellX, cellY, LEFT_CLICK), false);
+			if (!setAsKey.active) {
+				return "after Set as key the first cell should be the frame that was the key, and pickable; "
+						+ "the strip is still in its old order";
+			}
+			setAsKey.onPress(LEFT_CLICK);
+			if (BurstFrame.fromTags(PngTextChunk.read(key)).index() != 0) {
+				return "setting the first frame as key again should have restored the burst";
+			}
+			return null;
+		});
+		if (problem != null) {
+			throw new AssertionError(problem);
 		}
 	}
 

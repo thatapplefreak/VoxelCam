@@ -667,6 +667,9 @@ Below ~362px the filmstrip's Set as key / Export animation column narrows too
 (`filmstripActionWidth`), so that one cell always fits between the scroll buttons. The cells are
 drawn after the widgets, so a cell the row has no room for is painted over a button; the cell count
 is never forced up to one. `FilmstripLayoutTest` sweeps the widths.
+The cells themselves are kept between frames (`filmstripCells`): working them out lists the whole
+folder, and extraction asks every frame. `forgetFilmstripCells()` goes wherever the folder is
+listed again and after Set as key, which changes the strip's order.
 
 ## Known dead ends
 

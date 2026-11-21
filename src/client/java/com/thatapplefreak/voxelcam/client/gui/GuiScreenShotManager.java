@@ -102,6 +102,10 @@ public class GuiScreenShotManager extends Screen {
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
+	/** What {@link #filmstripCells()} last worked out, and the burst key it was for; null when
+	 * it has to be worked out again. See {@link #forgetFilmstripCells()}. */
+	private List<File> filmstripCells;
+	private File filmstripCellsOf;
 
 	private int previewX;
 	private int previewY;
@@ -131,6 +135,7 @@ public class GuiScreenShotManager extends Screen {
 		// the old path would show nothing. Simplest correct answer: always fall back to the key.
 		previewFrame = null;
 		filmstripScroll = 0;
+		forgetFilmstripCells();
 
 		// Split the content area so preview : list == phi : 1, which holds the two
 		// panes in proportion at every GUI scale instead of the preview swallowing
@@ -277,6 +282,7 @@ public class GuiScreenShotManager extends Screen {
 		// comes back to the file it was on rather than to the head of the list.
 		selected = VoxelCamIO.selectionFor(files, selected);
 		visibleFiles = files;
+		forgetFilmstripCells();
 		list.setScreenshots(files, selected);
 		updateButtonStates();
 	}
@@ -378,9 +384,8 @@ public class GuiScreenShotManager extends Screen {
 		}
 
 		// The key plus its frames — burstFrameCount is already the free, cached count from the
-		// listing pass, so this clamps without a second directory read the way filmstripCells()
-		// (used only for drawing and hit-testing, where the tag-sorted order is worth the read)
-		// would cost.
+		// listing pass, so this clamps without the directory read filmstripCells() costs the
+		// first time it is asked about a burst.
 		int cellCount = hasFilmstrip ? VoxelCamIO.burstFrameCount(selected) + 1 : 0;
 		clampFilmstripScroll(cellCount);
 		filmstripScrollLeftButton.visible = hasFilmstrip;
@@ -440,6 +445,7 @@ public class GuiScreenShotManager extends Screen {
 		// only rewrites a chunk and leaves the rest of the file alone.
 		ScreenshotMetadata.forgetFile(selected);
 		ScreenshotMetadata.forgetFile(frame);
+		forgetFilmstripCells();
 		// selected's path now holds what previewFrame was showing, so "no frame highlighted"
 		// already points at the promoted content.
 		previewFrame = null;
@@ -516,12 +522,31 @@ public class GuiScreenShotManager extends Screen {
 		if (selected == null || VoxelCamIO.burstFrameCount(selected) == 0) {
 			return List.of();
 		}
-		List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, selected);
-		List<File> cells = new ArrayList<>(frames.size() + 1);
-		cells.add(selected);
-		cells.addAll(frames);
-		cells.sort(Comparator.comparingInt(this::captureIndexOf));
-		return cells;
+		// Kept between frames. Working it out lists the whole screenshots folder, and the
+		// strip is drawn on every extracted frame for as long as a burst stays selected.
+		if (filmstripCells == null || !selected.equals(filmstripCellsOf)) {
+			List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, selected);
+			List<File> cells = new ArrayList<>(frames.size() + 1);
+			cells.add(selected);
+			cells.addAll(frames);
+			cells.sort(Comparator.comparingInt(this::captureIndexOf));
+			filmstripCells = cells;
+			filmstripCellsOf = selected;
+		}
+		return filmstripCells;
+	}
+
+	/**
+	 * Has the strip worked out again the next time it is asked for. Called wherever the folder
+	 * is listed again ({@link #init()}, which every popup return and a finished export come
+	 * through, and {@link #refreshFiles()}) and after Set as key, which changes the order: the
+	 * tags the cells are sorted by change places along with the bytes. A different selection
+	 * needs no call, since the cells remember which key they are for. That makes the strip as
+	 * fresh as the list beside it, whose frame counts come from the same listings.
+	 */
+	private void forgetFilmstripCells() {
+		filmstripCells = null;
+		filmstripCellsOf = null;
 	}
 
 	/** A file with no burst tags at all — should not happen for anything this is asked about —
