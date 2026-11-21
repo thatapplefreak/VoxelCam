@@ -330,6 +330,14 @@ reserved for it, so no generation tag is needed. The end-of-burst notice waits i
 mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
+The collapse is one level deep, so rename refuses any name that would fold the renamed file under
+another screenshot (`VoxelCamIO.nameFoldsUnderAnotherScreenshot`, also what `RenamePopup` asks): a
+key frame hidden that way would strand its own frames in no row and no filmstrip.
+It refuses the other order too (`nameTakesInAnotherScreenshot`): a name that a screenshot already
+in the folder would fold under ends in the same place.
+The byte swap has one exception, recorded in ADR-0006: `VoxelCamIO.setAsKey` writes each file's
+favorite flag back to the path it was on. The star is the burst's and is read from the key's path,
+so it is the one tag that does not travel with the image.
 
 **Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
 `<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the
@@ -509,6 +517,11 @@ rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display
 embedded capture context, and the starred flag. Everything the extract pass shows goes through it —
 nothing else in the GUI calls `Favorite` or `PngDimensions` itself, and `VoxelCamIO.isSelectedFavorite`
 stays uncached only because the game test wants the flag from the file rather than from the cache.
+That cache is keyed by path, and a path can change hands while the manager is open, so the popups
+rename and delete through `ScreenshotMetadata.renameSelectedAndForget`/`deleteSelectedAndForget`,
+which evict every path the operation leaves or lands on, burst frames included. Calling
+`VoxelCamIO.rename`/`delete` straight from a screen brings back a row drawn with another file's
+star, size and dimensions.
 
 Five invariants that are easy to break:
 
@@ -536,7 +549,17 @@ Five invariants that are easy to break:
   whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
   and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the
   list instead moves the player onto whichever screenshot the sort puts first — the one the next
-  Delete would be aimed at.
+  Delete would be aimed at. A delete is the same case: `VoxelCamIO.delete(listed)` leaves its
+  selection on the row beside the deleted one, taken from the rows the manager passes in, because
+  favorites only is the manager's filter and the next file in the folder may have no row.
+
+**A screen shortcut on a key vanilla binds globally never reaches `Screen.keyPressed` by itself.**
+`KeyboardHandler.keyPress` offers each press to `Minecraft.handleGlobalKeyPress` first (fullscreen,
+the screenshot key) and returns if it is taken, so the manager's F2 rename shortcut used to take a
+screenshot of the manager instead. `MinecraftClientMixin` answers false at the head of that method
+for the one press `GuiScreenShotManager.claimsFromGlobalKeys` claims, which is F2 under the same
+condition as the shortcut itself. `RenameShortcutTest` presses the real key for this reason: a test
+that calls `keyPressed` passes with or without the injection.
 
 **Sharing** — `SharePopup` offers four targets, none needing credentials: `NativeShare.saveCopy`
 (SDL's native Save-As — **asynchronous**, so the dialog is shown on the calling thread and only the
@@ -596,6 +619,12 @@ package-private `snapshot()` seam precisely so it can be tested without `FabricL
 Defaults are written as **field initialisers**, not applied after the parse: Gson leaves a field it
 finds no key for at whatever the constructor set, so a `voxelcam.json` written before a setting
 existed keeps that setting's default instead of reading as `false`/`0`.
+
+Each `saveCurrent()` is its own task on `Util.ioPool()`, which has several threads, so the writes
+carry a sequence number taken on the calling thread. `saveIfNewest` takes one lock, drops a
+snapshot older than the one on disk, and `save` writes `voxelcam.json.tmp` and moves it over the
+file. Unordered truncate-and-write could interleave two saves into JSON that no longer parsed, which
+`load` answers with defaults that the next change writes over every setting.
 
 `Burst.setSeconds`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
 `VoxelCamConfig.saveCurrent()` themselves — that would touch `FabricLoader.getInstance()` from
@@ -684,6 +713,15 @@ follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
+Below ~362px the filmstrip's Set as key / Export animation column narrows too
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
+are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
+count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
+free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`
+sweeps the widths without loading a `Screen`.
+The cells themselves are kept between frames (`filmstripCells`): working them out lists the whole
+folder, and extraction asks every frame. `forgetFilmstripCells()` goes wherever the folder is
+listed again and after Set as key, which changes the strip's order.
 
 ## Known dead ends
 

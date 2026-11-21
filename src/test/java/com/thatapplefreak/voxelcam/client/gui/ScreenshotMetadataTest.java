@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.client.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +39,8 @@ class ScreenshotMetadataTest {
 	void reset() {
 		// Every fact here is cached per File for the life of the process.
 		ScreenshotMetadata.forgetAll();
+		// So is the selection the rename and delete below act on.
+		VoxelCamIO.selectPhoto(null);
 	}
 
 	/**
@@ -417,6 +422,105 @@ class ScreenshotMetadataTest {
 		ScreenshotMetadata.forget(file);
 
 		assertTrue(ScreenshotMetadata.isStarred(file));
+	}
+
+	// --- a path that changes hands while the manager is open ------------------------------------
+
+	/** What a list row and the preview caption have asked of a file by the time anyone renames it. */
+	private static void showInTheManager(File file) {
+		ScreenshotMetadata.isStarred(file);
+		ScreenshotMetadata.dimensions(file);
+		ScreenshotMetadata.fileSize(file);
+		ScreenshotMetadata.displayName(file);
+	}
+
+	/**
+	 * Every fact is cached by path, so a path that passes from one file to another has to be
+	 * evicted on the way: rename a starred {@code castle} away, give another screenshot its
+	 * name, and the new {@code castle} must not show a star, a size and dimensions that belong
+	 * to the old one. Favorites only would keep it listed, and the first click on its star
+	 * would flip the real flag unseen.
+	 */
+	@Test
+	void aScreenshotRenamedOntoAFreedNameShowsItsOwnFacts() throws IOException {
+		File castle = png("castle.png", 16, 16);
+		Favorite.setStarred(castle, true);
+		File other = png("other.png", 4, 8);
+		showInTheManager(castle);
+		showInTheManager(other);
+
+		VoxelCamIO.selectPhoto(castle);
+		assertNotNull(ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "castle_old"));
+		VoxelCamIO.selectPhoto(other);
+		File renamed = ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "castle");
+
+		assertEquals(castle, renamed, "the second file now has the first one's old path");
+		assertFalse(ScreenshotMetadata.isStarred(renamed));
+		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(renamed));
+		assertEquals("33 B", ScreenshotMetadata.fileSize(renamed), "a bare header, with no star chunk in it");
+		assertTrue(ScreenshotMetadata.isStarred(new File(dir.toFile(), "castle_old.png")), "the star went with its file");
+	}
+
+	@Test
+	void aScreenshotRenamedOntoADeletedFilesNameShowsItsOwnFacts() throws IOException {
+		File castle = png("castle.png", 16, 16);
+		Favorite.setStarred(castle, true);
+		File other = png("other.png", 4, 8);
+		showInTheManager(castle);
+
+		VoxelCamIO.selectPhoto(castle);
+		assertTrue(ScreenshotMetadata.deleteSelectedAndForget(List.of(castle, other)));
+		assertEquals(other, VoxelCamIO.getSelectedPhoto(), "the delete moves the selection to the row beside it");
+		File renamed = ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "castle");
+
+		assertFalse(ScreenshotMetadata.isStarred(renamed));
+		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(renamed));
+	}
+
+	/** A burst's frames change paths with their key, and each of those paths is cached too. */
+	@Test
+	void renamingABurstForgetsWhatWasCachedUnderItsFramesOldPaths() throws IOException {
+		File key = png("burst.png", 16, 16);
+		File frame = png("burst_burst01.png", 16, 16);
+		showInTheManager(frame);
+
+		VoxelCamIO.selectPhoto(key);
+		assertNotNull(ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "sunset"));
+		File newcomer = png("burst_burst01.png", 4, 8);
+
+		assertEquals(frame, newcomer);
+		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(newcomer));
+	}
+
+	@Test
+	void deletingABurstForgetsWhatWasCachedUnderItsFramesPaths() throws IOException {
+		File key = png("burst.png", 16, 16);
+		File frame = png("burst_burst01.png", 16, 16);
+		showInTheManager(frame);
+
+		VoxelCamIO.selectPhoto(key);
+		assertTrue(ScreenshotMetadata.deleteSelectedAndForget(List.of(key)));
+		File newcomer = png("burst_burst01.png", 4, 8);
+
+		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(newcomer));
+	}
+
+	/**
+	 * The path a rename lands on is evicted as well as the one it leaves. A file can lose its
+	 * name without the manager's doing (another window, a cloud sync), and whatever was cached
+	 * under it would otherwise be waiting for the next screenshot given that name.
+	 */
+	@Test
+	void theNameARenameLandsOnIsReadAfresh() throws IOException {
+		File castle = png("castle.png", 16, 16);
+		File other = png("other.png", 4, 8);
+		showInTheManager(castle);
+		Files.delete(castle.toPath());
+
+		VoxelCamIO.selectPhoto(other);
+		File renamed = ScreenshotMetadata.renameSelectedAndForget(dir.toFile(), "castle");
+
+		assertEquals(new ScreenshotMetadata.Dimensions(4, 8), ScreenshotMetadata.dimensions(renamed));
 	}
 
 	/** Nothing here should depend on the platform default charset. */

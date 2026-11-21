@@ -87,6 +87,8 @@
 
 	"voxelcam.rename.exists": "A screenshot with that name already exists",
 	"voxelcam.rename.invalid": "That name contains characters that aren't allowed",
+	"voxelcam.rename.burstframe": "That name would make this a frame of another screenshot's burst",
+	"voxelcam.rename.takesframe": "That name would make another screenshot a frame of this one's burst",
 	"voxelcam.rename.failed": "Could not rename this screenshot — try another name",
 
 	"voxelcam.capturemenu.screenshot": "Screenshot",

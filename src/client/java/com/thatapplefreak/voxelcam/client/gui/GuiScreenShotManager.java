@@ -12,6 +12,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.ScreenshotImageCache;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -53,12 +54,10 @@ public class GuiScreenShotManager extends Screen {
 	/** Reserved at the bottom of the preview only while the selection is a burst key; a plain
 	 * screenshot's preview uses the whole area. */
 	private static final int FILMSTRIP_HEIGHT = 40;
-	private static final int FILMSTRIP_CELL_SIZE = 34;
-	private static final int FILMSTRIP_GAP = 3;
-	private static final int FILMSTRIP_SCROLL_BUTTON_WIDTH = 16;
-	/** Set as key and Export animation share one column at the strip's right end, stacked, so a
-	 * second burst action costs the strip no cells; wide enough for the longer of the two labels. */
-	private static final int FILMSTRIP_ACTION_WIDTH = 96;
+	/** The row's widths are {@link FilmstripLayout}'s, which works out how they share the preview. */
+	private static final int FILMSTRIP_CELL_SIZE = FilmstripLayout.CELL_SIZE;
+	private static final int FILMSTRIP_GAP = FilmstripLayout.CELL_GAP;
+	private static final int FILMSTRIP_SCROLL_BUTTON_WIDTH = FilmstripLayout.SCROLL_BUTTON_WIDTH;
 	/** Two of these plus their gap fill the 40px band; the search row's controls are this tall too. */
 	private static final int FILMSTRIP_ACTION_HEIGHT = 18;
 	private static final int FILMSTRIP_ACTION_GAP = 2;
@@ -93,14 +92,26 @@ public class GuiScreenShotManager extends Screen {
 	private int filmstripScroll;
 	/** A failed file action, shown in place of the details line until the selection moves. */
 	private Component actionError;
-	/** An animation export is being written off the render thread; its button waits for it. */
-	private boolean exporting;
+	/**
+	 * An animation export is being written off the render thread; Export and Set as key wait
+	 * for it. Static, because the export outlives the screen that started it: every open builds
+	 * a new manager, and one that began with this false would offer both buttons again in the
+	 * middle of an export, for a swap or a second export of the files still being read. Only
+	 * ever touched on the render thread, set on the click and cleared by {@link #exportFinished}.
+	 */
+	private static boolean exporting;
 	/** How far the export has got, written from the IO thread after each frame, for its bar. */
-	private volatile int exportFramesDone;
-	private volatile int exportFramesTotal;
+	private static volatile int exportFramesDone;
+	private static volatile int exportFramesTotal;
 	/** The list after the name filter and, if active, the favorites-only filter — what the
 	 * row count and the list widget both have to agree on. */
 	private List<File> visibleFiles = List.of();
+	/** What {@link #filmstripCells()} last worked out; null when it has to be worked out again.
+	 * See {@link #forgetFilmstripCells()}. */
+	private List<File> filmstripCells;
+	/** The key frame of the burst {@link #filmstripCells} was worked out for: the selection at
+	 * the time. A different selection means the cells are another burst's. */
+	private File filmstripCellsKeyFrame;
 
 	private int previewX;
 	private int previewY;
@@ -130,6 +141,7 @@ public class GuiScreenShotManager extends Screen {
 		// the old path would show nothing. Simplest correct answer: always fall back to the key.
 		previewFrame = null;
 		filmstripScroll = 0;
+		forgetFilmstripCells();
 
 		// Split the content area so preview : list == phi : 1, which holds the two
 		// panes in proportion at every GUI scale instead of the preview swallowing
@@ -206,23 +218,26 @@ public class GuiScreenShotManager extends Screen {
 		// can change without a rebuild, from clicking a different row in the list.
 		int filmstripTop = previewY + previewHeight - FILMSTRIP_HEIGHT;
 		int filmstripButtonY = filmstripTop + (FILMSTRIP_HEIGHT - BUTTON_HEIGHT) / 2;
-		int actionX = previewX + previewWidth - FILMSTRIP_ACTION_WIDTH;
+		// The same width the cell count is worked out against, so the buttons and the cells
+		// drawn between them cannot disagree about where the column starts.
+		int burstActionWidth = FilmstripLayout.actionWidth(previewWidth);
+		int actionX = previewX + previewWidth - burstActionWidth;
 		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
 		setAsKeyButton = addRenderableWidget(button("voxelcam.burst.setaskey", "voxelcam.tooltip.setaskey",
-				b -> setSelectedFrameAsKey(), actionX, actionTop, FILMSTRIP_ACTION_WIDTH));
+				b -> setSelectedFrameAsKey(), actionX, actionTop, burstActionWidth));
 		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		// A fixed label, with the frame count in the tooltip: a label that changed with the burst
 		// would be one a test (and clickScreenButton) could never find by its translation.
 		exportAnimationButton = addRenderableWidget(button("voxelcam.burst.exportanimation",
 				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
-				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, FILMSTRIP_ACTION_WIDTH));
+				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, burstActionWidth));
 		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		filmstripScrollLeftButton = addRenderableWidget(button("voxelcam.burst.scrollleft",
 				"voxelcam.tooltip.burstscroll", b -> scrollFilmstrip(-1),
 				previewX, filmstripButtonY, FILMSTRIP_SCROLL_BUTTON_WIDTH));
 		filmstripScrollRightButton = addRenderableWidget(button("voxelcam.burst.scrollright",
 				"voxelcam.tooltip.burstscroll", b -> scrollFilmstrip(1),
-				actionX - GAP - FILMSTRIP_SCROLL_BUTTON_WIDTH,
+				actionX - FilmstripLayout.ROW_GAP - FILMSTRIP_SCROLL_BUTTON_WIDTH,
 				filmstripButtonY, FILMSTRIP_SCROLL_BUTTON_WIDTH));
 
 		int leftWidth = Math.round((listWidth - GAP) / 2F);
@@ -273,6 +288,7 @@ public class GuiScreenShotManager extends Screen {
 		// comes back to the file it was on rather than to the head of the list.
 		selected = VoxelCamIO.selectionFor(files, selected);
 		visibleFiles = files;
+		forgetFilmstripCells();
 		list.setScreenshots(files, selected);
 		updateButtonStates();
 	}
@@ -334,6 +350,12 @@ public class GuiScreenShotManager extends Screen {
 		updateButtonStates();
 	}
 
+	/** The rows as shown, for {@link DeletePopup}: a delete moves the selection to the row next
+	 * to the deleted one, and with favorites only on that is not the next file in the folder. */
+	List<File> listedFiles() {
+		return visibleFiles;
+	}
+
 	/**
 	 * Set by {@link DeletePopup} on its way out, since the popup itself is gone by the
 	 * time anyone could read it.
@@ -357,8 +379,9 @@ public class GuiScreenShotManager extends Screen {
 		setAsKeyButton.visible = hasFilmstrip;
 		// Active only once a non-key frame is actually highlighted: promoting the key to itself
 		// is a no-op VoxelCamIO.setAsKey already refuses, so the button starts disabled instead
-		// of accepting a click that does nothing.
-		setAsKeyButton.active = hasFilmstrip && previewFrame != null;
+		// of accepting a click that does nothing. And not during an export, for the reason
+		// setSelectedFrameAsKey() gives.
+		setAsKeyButton.active = hasFilmstrip && previewFrame != null && !exporting;
 		exportAnimationButton.visible = hasFilmstrip;
 		exportAnimationButton.active = hasFilmstrip && !exporting;
 		if (hasFilmstrip) {
@@ -367,9 +390,8 @@ public class GuiScreenShotManager extends Screen {
 		}
 
 		// The key plus its frames — burstFrameCount is already the free, cached count from the
-		// listing pass, so this clamps without a second directory read the way filmstripCells()
-		// (used only for drawing and hit-testing, where the tag-sorted order is worth the read)
-		// would cost.
+		// listing pass, so this clamps without the directory read filmstripCells() costs the
+		// first time it is asked about a burst.
 		int cellCount = hasFilmstrip ? VoxelCamIO.burstFrameCount(selected) + 1 : 0;
 		clampFilmstripScroll(cellCount);
 		filmstripScrollLeftButton.visible = hasFilmstrip;
@@ -410,7 +432,13 @@ public class GuiScreenShotManager extends Screen {
 	 * so capture order stays intact for a future export; see {@code VoxelCamIO.setAsKey}.
 	 */
 	private void setSelectedFrameAsKey() {
-		if (selected == null || previewFrame == null) {
+		// Not while an export runs. AnimatedPng.export fixes the frame order from every file's
+		// tags first and reads each file's pixels later, one at a time, so it relies on a path
+		// still holding the frame whose tags it read. A swap in between writes two frames in
+		// each other's place, or one of them twice, into both the APNG and the WebP. Checked
+		// here as well as on the button, because one export flag covers every burst and the
+		// button is only refreshed when something calls updateButtonStates().
+		if (selected == null || previewFrame == null || exporting) {
 			return;
 		}
 		File frame = previewFrame;
@@ -423,6 +451,7 @@ public class GuiScreenShotManager extends Screen {
 		// only rewrites a chunk and leaves the rest of the file alone.
 		ScreenshotMetadata.forgetFile(selected);
 		ScreenshotMetadata.forgetFile(frame);
+		forgetFilmstripCells();
 		// selected's path now holds what previewFrame was showing, so "no frame highlighted"
 		// already points at the promoted content.
 		previewFrame = null;
@@ -448,7 +477,7 @@ public class GuiScreenShotManager extends Screen {
 		actionError = null;
 		updateButtonStates();
 		Util.ioPool().execute(() -> {
-			File written;
+			File written = null;
 			try {
 				written = AnimatedPng.export(key, frames, AnimationPreview::argbOf, (done, total) -> {
 					exportFramesDone = done;
@@ -456,19 +485,35 @@ public class GuiScreenShotManager extends Screen {
 				}).apng();
 			} catch (IOException | RuntimeException e) {
 				VoxelCamClient.LOGGER.error("Failed to export {} as an animation", key, e);
-				written = null;
+			} finally {
+				// From finally, so that an Error hands back too. The export holds whole frames and
+				// the whole WebP on the heap, so running out of memory is the likeliest way for it
+				// to die, and the flag is static: left set, it would hold Export and Set as key off
+				// for every burst until the game was restarted. The Error itself still reaches the
+				// pool's handler, which logs it; here it reads as a failed export.
+				File result = written;
+				Minecraft client = Minecraft.getInstance();
+				client.execute(() -> exportFinished(client, key, result));
 			}
-			File result = written;
-			minecraft.execute(() -> exportFinished(key, result));
 		});
 	}
 
-	private void exportFinished(File key, File written) {
+	/**
+	 * Static, and handed the client instead of using a screen's own: the manager that started
+	 * the export may have been closed since, and the flag has to be cleared whether or not it
+	 * was. The result is shown by whichever manager is open now, which after a close and
+	 * reopen is not the one that started it.
+	 */
+	private static void exportFinished(Minecraft client, File key, File written) {
 		exporting = false;
-		if (minecraft.gui.screen() != this) {
-			// Closed meanwhile: the file is on disk and the next open lists it; nothing to show.
-			return;
+		if (client.gui.screen() instanceof GuiScreenShotManager open) {
+			open.showExportResult(key, written);
 		}
+		// Otherwise it is closed, and the file is on disk for the next open to list, or it is
+		// under a popup, and is rebuilt on the way back from it.
+	}
+
+	private void showExportResult(File key, File written) {
 		if (written == null) {
 			if (Objects.equals(selected, key)) {
 				actionError = Component.translatable("voxelcam.burst.exportanimation.failed");
@@ -499,12 +544,31 @@ public class GuiScreenShotManager extends Screen {
 		if (selected == null || VoxelCamIO.burstFrameCount(selected) == 0) {
 			return List.of();
 		}
-		List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, selected);
-		List<File> cells = new ArrayList<>(frames.size() + 1);
-		cells.add(selected);
-		cells.addAll(frames);
-		cells.sort(Comparator.comparingInt(this::captureIndexOf));
-		return cells;
+		// Kept between frames. Working it out lists the whole screenshots folder, and the
+		// strip is drawn on every extracted frame for as long as a burst stays selected.
+		if (filmstripCells == null || !selected.equals(filmstripCellsKeyFrame)) {
+			List<File> frames = VoxelCamIO.burstFrames(screenshotsDir, selected);
+			List<File> cells = new ArrayList<>(frames.size() + 1);
+			cells.add(selected);
+			cells.addAll(frames);
+			cells.sort(Comparator.comparingInt(this::captureIndexOf));
+			filmstripCells = cells;
+			filmstripCellsKeyFrame = selected;
+		}
+		return filmstripCells;
+	}
+
+	/**
+	 * Has the strip worked out again the next time it is asked for. Called wherever the folder
+	 * is listed again ({@link #init()}, which every popup return and a finished export come
+	 * through, and {@link #refreshFiles()}) and after Set as key, which changes the order: the
+	 * tags the cells are sorted by change places along with the bytes. A different selection
+	 * needs no call, since the cells remember which key they are for. That makes the strip as
+	 * fresh as the list beside it, whose frame counts come from the same listings.
+	 */
+	private void forgetFilmstripCells() {
+		filmstripCells = null;
+		filmstripCellsKeyFrame = null;
 	}
 
 	/** A file with no burst tags at all — should not happen for anything this is asked about —
@@ -518,15 +582,14 @@ public class GuiScreenShotManager extends Screen {
 	 * Set as key and Export animation — a burst longer than this needs {@link #filmstripScroll} to
 	 * reach the rest. */
 	private int maxFilmstripCells() {
-		int scrollButtons = (FILMSTRIP_SCROLL_BUTTON_WIDTH + GAP) * 2;
-		int available = previewWidth - FILMSTRIP_ACTION_WIDTH - GAP - scrollButtons;
-		return Math.max(1, (available + FILMSTRIP_GAP) / (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP));
+		return FilmstripLayout.cellCapacity(previewWidth);
 	}
 
 	/** {@code visibleIndex} is relative to the left scroll button and to {@link
 	 * #filmstripScroll} — callers add the scroll offset to a cell list index themselves. */
 	private int filmstripCellX(int visibleIndex) {
-		return previewX + FILMSTRIP_SCROLL_BUTTON_WIDTH + GAP + visibleIndex * (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP);
+		return previewX + FILMSTRIP_SCROLL_BUTTON_WIDTH + FilmstripLayout.ROW_GAP
+				+ visibleIndex * (FILMSTRIP_CELL_SIZE + FILMSTRIP_GAP);
 	}
 
 	@Override
@@ -560,10 +623,30 @@ public class GuiScreenShotManager extends Screen {
 		return false;
 	}
 
+	/** Shortcuts only make sense when not typing a search query. */
+	private boolean shortcutsApply() {
+		return !searchBar.isFocused() && selected != null;
+	}
+
+	/**
+	 * Whether a press of {@code key} belongs to this screen's rename shortcut and so has to be
+	 * kept from vanilla's global keys, which {@code MinecraftClientMixin} asks on every press.
+	 *
+	 * <p>{@code KeyboardHandler.keyPress} offers a press to {@code Minecraft.handleGlobalKeyPress}
+	 * before the open screen and returns if it is taken. The screenshot key is one of the global
+	 * keys and is F2 by default, so the F2 case in {@link #keyPressed} was never reached: the
+	 * press took a screenshot of the manager instead. Under the same condition as the shortcut
+	 * itself, so that F2 in the search field, or with nothing to rename, still takes the
+	 * screenshot it always did.
+	 */
+	public boolean claimsFromGlobalKeys(InputConstants.Key key) {
+		return key.getType() == InputConstants.Type.KEYBOARD && key.getValue() == InputConstants.KEY_F2
+				&& shortcutsApply();
+	}
+
 	@Override
 	public boolean keyPressed(KeyEvent input) {
-		// Shortcuts only make sense when not typing a search query.
-		if (!searchBar.isFocused() && selected != null) {
+		if (shortcutsApply()) {
 			switch (input.input()) {
 				case InputConstants.KEY_DELETE, InputConstants.KEY_BACKSPACE -> {
 					minecraft.setScreenAndShow(DeletePopup.create(this));

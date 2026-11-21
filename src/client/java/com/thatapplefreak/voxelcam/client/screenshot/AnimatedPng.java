@@ -8,7 +8,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -72,9 +71,10 @@ public final class AnimatedPng {
 	 * Writes the burst under {@code key} as a new APNG next to it, and an animated WebP of the
 	 * same frames beside that ({@link #webpBeside}): the APNG is what the manager lists and plays,
 	 * the WebP is what Share hands out, since Discord plays a WebP and shows an APNG as a still.
-	 * Both go under names no file has yet, and atomically: a refusal partway through (frames of
-	 * different sizes, a frame that went missing) leaves neither behind. Every frame is decoded
-	 * once, one at a time, and fed to both encoders.
+	 * Both go under names no file has yet, and whole or not at all: a refusal partway through
+	 * (frames of different sizes, a frame that went missing, a file that took either name while
+	 * the export ran) leaves neither behind and overwrites nothing. Every frame is decoded once,
+	 * one at a time, and fed to both encoders.
 	 *
 	 * @param frames the key's sub-frames, in any order; capture order comes from their tags.
 	 */
@@ -142,11 +142,17 @@ public final class AnimatedPng {
 			// No REPLACE_EXISTING: targetFor() picked names that were free, and if something took
 			// one since, failing is better than overwriting a file the player made. The WebP goes
 			// first so that a failure leaves no APNG claiming a sharing copy it does not have.
+			//
+			// And no ATOMIC_MOVE, which is what lets that hold. The JDK leaves it to the
+			// platform whether an atomic move replaces an existing target, and rename(2)
+			// replaces, so with it a screenshot renamed to the target's name mid-export was
+			// overwritten in silence. Temp file and target share a directory, so a plain move
+			// is still a rename, and without REPLACE_EXISTING it throws for a taken name.
 			if (webpWritten) {
-				Files.move(webpTmp, webpTarget.toPath(), StandardCopyOption.ATOMIC_MOVE);
+				Files.move(webpTmp, webpTarget.toPath());
 			}
 			try {
-				Files.move(tmp, target.toPath(), StandardCopyOption.ATOMIC_MOVE);
+				Files.move(tmp, target.toPath());
 			} catch (IOException e) {
 				if (webpWritten) {
 					Files.deleteIfExists(webpTarget.toPath());

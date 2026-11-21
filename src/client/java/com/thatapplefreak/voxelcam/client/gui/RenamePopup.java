@@ -24,6 +24,10 @@ public class RenamePopup extends Screen {
 	private EditBox nameField;
 	private Button confirmButton;
 	private boolean renameFailed;
+	/** The validation line for the name as typed, or null. Worked out when the text changes
+	 * and not on every extracted frame, because the burst frame check reads the folder;
+	 * {@code VoxelCamIO.rename} makes every one of these checks again before it moves anything. */
+	private String validationError;
 
 	public RenamePopup(GuiScreenShotManager parent, File screenshotsDir, File currentFile) {
 		super(Component.translatable("voxelcam.rename"));
@@ -72,12 +76,14 @@ public class RenamePopup extends Screen {
 		setInitialFocus(nameField);
 	}
 
-	/** Blocks names that are empty, unchanged, or would collide with an existing file. */
+	/** Blocks names that are empty, unchanged, hold a path character, would collide with an
+	 * existing file, or would fold this screenshot and another into one burst, either way round. */
 	private void updateConfirmState() {
+		validationError = validate();
 		confirmButton.active = canConfirm();
 	}
 
-	private String validationError() {
+	private String validate() {
 		String name = nameField.getValue().trim();
 		if (name.isEmpty()) {
 			return null; // Nothing typed yet: just disabled, no scolding.
@@ -94,19 +100,25 @@ public class RenamePopup extends Screen {
 		if (VoxelCamIO.nameCollides(screenshotsDir, name, currentFile)) {
 			return "voxelcam.rename.exists";
 		}
+		if (VoxelCamIO.nameFoldsUnderAnotherScreenshot(screenshotsDir, name, currentFile)) {
+			return "voxelcam.rename.burstframe";
+		}
+		if (VoxelCamIO.nameTakesInAnotherScreenshot(screenshotsDir, name, currentFile)) {
+			return "voxelcam.rename.takesframe";
+		}
 		return null;
 	}
 
 	private boolean canConfirm() {
 		String name = nameField.getValue().trim();
-		return !name.isEmpty() && !name.equals(originalName) && validationError() == null;
+		return !name.isEmpty() && !name.equals(originalName) && validationError == null;
 	}
 
 	private void confirm() {
 		if (!canConfirm()) {
 			return;
 		}
-		if (VoxelCamIO.rename(screenshotsDir, nameField.getValue().trim()) == null) {
+		if (ScreenshotMetadata.renameSelectedAndForget(screenshotsDir, nameField.getValue().trim()) == null) {
 			// The file kept its old name and the manager would re-list it with nothing to
 			// say why, so the dialog stays up instead — holding the typed name for a retry,
 			// which is all a Windows-forbidden character or a moved file needs. The reason
@@ -134,7 +146,7 @@ public class RenamePopup extends Screen {
 
 		// A rename the filesystem refused outranks the validation line: the name in the
 		// field passed every check this screen can make, so there is nothing else to say.
-		String error = renameFailed ? "voxelcam.rename.failed" : validationError();
+		String error = renameFailed ? "voxelcam.rename.failed" : validationError;
 		if (error != null) {
 			context.centeredText(font,
 					Component.translatable(error).withStyle(ChatFormatting.RED), width / 2, fieldY - 14, 0xFFFF5555);

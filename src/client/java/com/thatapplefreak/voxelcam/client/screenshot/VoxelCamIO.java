@@ -159,6 +159,76 @@ public final class VoxelCamIO {
 	}
 
 	/**
+	 * Whether a file named {@code newName} would be folded under another screenshot as one of
+	 * its burst frames: the name ends in a burst frame's tag and the key it points at exists.
+	 *
+	 * <p>{@link ScreenshotNamer#burstKeyName} accepts a hand-named {@code holiday_burst01.png}
+	 * grouping under {@code holiday.png} because that only hides the file. A rename from the
+	 * manager is different. The row the player just named vanishes into another row's
+	 * filmstrip, and when it was a burst's key frame its own frames follow it to
+	 * {@code <newName>_burstNN} and fold under a key the list no longer shows, since
+	 * {@link #updateScreenShotFilesList} folds one level only. They are then in no row and no
+	 * filmstrip, and deleting the other screenshot takes the renamed key frame with it.
+	 *
+	 * <p>The key is looked up the way the fold does it, by lowercased name over the directory,
+	 * so the answer matches the list on a case-sensitive filesystem too. That costs a
+	 * directory read, paid only for a name that already ends in the tag. {@code currentFile}
+	 * does not count as the key: it will not have that name once it is renamed.
+	 */
+	public static boolean nameFoldsUnderAnotherScreenshot(File screenshotsDir, String newName, File currentFile) {
+		String keyName = ScreenshotNamer.burstKeyName(newName.toLowerCase(Locale.ROOT) + ".png");
+		if (keyName == null) {
+			return false;
+		}
+		String[] namesInDir = screenshotsDir.list();
+		if (namesInDir == null) {
+			return false;
+		}
+		for (String name : namesInDir) {
+			boolean isTheFileBeingRenamed = currentFile != null && name.equals(currentFile.getName());
+			if (!isTheFileBeingRenamed && name.toLowerCase(Locale.ROOT).equals(keyName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * {@link #nameFoldsUnderAnotherScreenshot} from the other side: whether a file named
+	 * {@code newName} would become the key that a screenshot already in the folder folds
+	 * under. With no {@code dragon.png}, a burst may be named {@code dragon_burst2} and is an
+	 * ordinary row; naming another screenshot {@code dragon} afterwards is what hides that key
+	 * frame, strands its frames and lets a delete of {@code dragon} take it. Either order ends
+	 * in the same folder, so both are refused.
+	 *
+	 * <p>Two files that would fold under the new name are no reason to refuse. The file being
+	 * renamed can be named like a frame itself ({@code dragon_burst2} to {@code dragon}): it
+	 * is leaving that name. And when the new name differs from the current one only in case,
+	 * whatever folds under it is this screenshot's own burst, which already does and is
+	 * carried along.
+	 *
+	 * <p>Unlike the other direction this cannot be ruled out from the name alone, so it reads
+	 * the folder every time it is asked.
+	 */
+	public static boolean nameTakesInAnotherScreenshot(File screenshotsDir, String newName, File currentFile) {
+		String wouldBeKey = newName.toLowerCase(Locale.ROOT) + ".png";
+		if (currentFile != null && wouldBeKey.equals(currentFile.getName().toLowerCase(Locale.ROOT))) {
+			return false;
+		}
+		String[] namesInDir = screenshotsDir.list();
+		if (namesInDir == null) {
+			return false;
+		}
+		for (String name : namesInDir) {
+			boolean isTheFileBeingRenamed = currentFile != null && name.equals(currentFile.getName());
+			if (!isTheFileBeingRenamed && wouldBeKey.equals(ScreenshotNamer.burstKeyName(name.toLowerCase(Locale.ROOT)))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * The screenshot a browser listing {@code files} should have selected, given the
 	 * {@code current} one it is already showing.
 	 *
@@ -213,6 +283,10 @@ public final class VoxelCamIO {
 		if (nameCollides(screenshotsDir, newName, selected)) {
 			return null;
 		}
+		if (nameFoldsUnderAnotherScreenshot(screenshotsDir, newName, selected)
+				|| nameTakesInAnotherScreenshot(screenshotsDir, newName, selected)) {
+			return null;
+		}
 
 		List<File> frames = burstFrames(screenshotsDir, selected);
 		List<File> frameTargets = new ArrayList<>(frames.size());
@@ -261,7 +335,11 @@ public final class VoxelCamIO {
 			return null;
 		}
 
-		for (File frame : movedTo) {
+		// The old paths: that is where the textures and claims are. The new ones hold nothing
+		// yet, and releasing those instead left a renamed burst's thumbnails resident until
+		// the manager closed. What ScreenshotMetadata has cached under the same paths is the
+		// caller's to evict, as it is for setAsKey below.
+		for (File frame : movedFrom) {
 			ScreenshotImageCache.release(frame);
 		}
 		ScreenshotImageCache.release(selected);
@@ -290,12 +368,19 @@ public final class VoxelCamIO {
 	 * tags record capture history, and a future export needs the latter regardless of which
 	 * frame is shown first.
 	 *
+	 * <p>The favorite flag is the one tag that is put back where it was. It is a chunk in the
+	 * same bytes, so it changes places with them, but what the player starred is the burst: the
+	 * row, the star button and favorites only all read the key's path. Left to travel, a star
+	 * would end up on a frame the list folds away, where nothing shows it or can clear it.
+	 *
 	 * @return true if the swap happened.
 	 */
 	public static boolean setAsKey(File frame) {
 		if (selected == null || frame == null || frame.equals(selected)) {
 			return false;
 		}
+		boolean keyStarred = Favorite.isStarred(selected);
+		boolean frameStarred = Favorite.isStarred(frame);
 		File dir = selected.getParentFile();
 		File tmp;
 		try {
@@ -327,12 +412,30 @@ public final class VoxelCamIO {
 			return false;
 		}
 
+		// Only when they differ: equal flags already agree with their paths after the swap,
+		// and a rewrite is a second chance to fail on a file that needed none.
+		if (keyStarred != frameStarred) {
+			restoreStar(selected, keyStarred);
+			restoreStar(frame, frameStarred);
+		}
+
 		// Cache invalidation is the caller's job, the same as toggleSelectedFavorite()'s: this
 		// class only touches files, and ScreenshotMetadata lives in the gui package that calls
 		// into this one, not the other way around.
 		ScreenshotImageCache.release(selected);
 		ScreenshotImageCache.release(frame);
 		return true;
+	}
+
+	/** Each path on its own, so that one file refusing the rewrite does not leave the other
+	 * with the wrong flag as well. The swap itself has already happened and is not undone for
+	 * this: it is logged, like any other lost star toggle. */
+	private static void restoreStar(File file, boolean starred) {
+		try {
+			Favorite.setStarred(file, starred);
+		} catch (IOException e) {
+			VoxelCamClient.LOGGER.error("Failed to keep the favorite flag on {} across Set as key", file, e);
+		}
 	}
 
 	/**
@@ -373,11 +476,25 @@ public final class VoxelCamIO {
 	 * one of them actually went. Deleting the key after a frame failure would both manufacture
 	 * orphans and make a "deleted" report a lie about a file that is still there; this way a
 	 * partial failure leaves an honest row behind with a smaller badge.
+	 *
+	 * <p>The selection moves to the row after the deleted one, or the one before it when it was
+	 * last, and is only cleared when it was the only row. The manager's own copy of the
+	 * selection still names the deleted file when the confirm dialog hands back to it, so
+	 * {@link #selectionFor} asks here next; with nothing here it took the head of the list, and
+	 * a player who had scrolled down to delete one screenshot was left aiming the next Delete
+	 * at the first.
+	 *
+	 * @param listed the rows the caller is showing, in their order. Not always {@link
+	 *        #getScreenShotFiles()}: favorites only is the manager's own filter, and the next
+	 *        file in the folder may be one it is not showing.
 	 */
-	public static boolean delete() {
+	public static boolean delete(List<File> listed) {
 		if (selected == null) {
 			return false;
 		}
+		// Worked out before anything goes: listed can be screenShotFiles itself, which loses
+		// the deleted row below, and with it the place to look either side of.
+		File neighbour = neighbourOf(listed, selected);
 		File dir = selected.getParentFile();
 		List<File> frames = new ArrayList<>(burstFrames(dir, selected));
 		// An exported animation's WebP copy goes with it, first, for the same reason frames do.
@@ -403,7 +520,18 @@ public final class VoxelCamIO {
 		}
 		ScreenshotImageCache.release(selected);
 		screenShotFiles.remove(selected);
-		selected = null;
+		selected = neighbour;
 		return true;
+	}
+
+	private static File neighbourOf(List<File> listed, File file) {
+		int index = listed.indexOf(file);
+		if (index < 0) {
+			return null;
+		}
+		if (index + 1 < listed.size()) {
+			return listed.get(index + 1);
+		}
+		return index > 0 ? listed.get(index - 1) : null;
 	}
 }

@@ -91,7 +91,10 @@ public final class ScreenshotNamer {
 	 * <p>A hand-named {@code holiday_burst01.png} groups under {@code holiday.png} if that file
 	 * happens to exist — accepted rather than guarded against, since requiring the key part to
 	 * look like a capture name would break group rename (a renamed key is just whatever the
-	 * player typed). The file is only ever hidden by this, never unreachable.
+	 * player typed). The file is only ever hidden by this, never unreachable. That holds for
+	 * the file itself and not for frames of its own, which the one-level fold would strand, so
+	 * the manager's rename does guard this, from both sides: see {@code
+	 * VoxelCamIO.nameFoldsUnderAnotherScreenshot} and {@code nameTakesInAnotherScreenshot}.
 	 */
 	public static String burstKeyName(String pngFileName) {
 		Matcher matcher = BURST_FRAME_SUFFIX.matcher(pngFileName);
