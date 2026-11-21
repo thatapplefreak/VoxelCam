@@ -101,10 +101,8 @@ public final class PngTextChunk {
 			String type = new String(png, pos + 4, 4, StandardCharsets.US_ASCII);
 			int dataStart = pos + 8;
 			long dataEnd = (long) dataStart + length;
-			// A length with its top bit set is damage too, and has to be caught by sign:
-			// -12 puts the "next" chunk exactly where this one started, so the walk would
-			// never advance, and any other negative makes the copy below a negative count.
-			if (length < 0 || dataEnd + 4 > png.length) {
+			if (isDamaged(length, dataEnd, png)) {
+				// Copied through as it is: nothing from here on can be trusted to be chunks.
 				out.write(png, pos, png.length - pos);
 				return out.toByteArray();
 			}
@@ -138,11 +136,7 @@ public final class PngTextChunk {
 			String type = new String(png, pos + 4, 4, StandardCharsets.US_ASCII);
 			int dataStart = pos + 8;
 			long dataEnd = (long) dataStart + length;
-			// The sign check is not redundant with the bound: a negative length passes the
-			// bound and sends the walk backwards or, at -12, nowhere at all. This runs on the
-			// render thread for every row the manager shows, and an endless loop throws
-			// nothing for read(File) to catch.
-			if (length < 0 || dataEnd + 4 > png.length) {
+			if (isDamaged(length, dataEnd, png)) {
 				break; // truncated or corrupt; stop rather than read past the array
 			}
 			if ("iTXt".equals(type)) {
@@ -153,6 +147,21 @@ public final class PngTextChunk {
 			pos = (int) dataEnd + 4;
 		}
 		return tags;
+	}
+
+	/**
+	 * Whether a chunk walk has to stop at this chunk, because its length field is damage: the
+	 * chunk would run off the end of the file, or the length is negative. Both walks, {@link
+	 * #read(byte[])} and {@link #strip}, ask here so that neither can drift from the other.
+	 *
+	 * <p>The sign is not covered by the bound. A length with its top bit set passes it, and
+	 * then sends the walk backwards, where {@code strip} would copy a negative count, or, at
+	 * -12, puts the "next" chunk exactly where this one started, so that the walk never
+	 * advances. {@code read} runs on the render thread for every row the manager shows, and an
+	 * endless loop throws nothing for {@code read(File)} to catch.
+	 */
+	private static boolean isDamaged(int length, long dataEnd, byte[] png) {
+		return length < 0 || dataEnd + 4 > png.length;
 	}
 
 	/** Everything {@link #ihdrEnd} takes on trust: the signature, and a first chunk that is a
