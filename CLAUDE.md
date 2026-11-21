@@ -320,6 +320,9 @@ another screenshot (`VoxelCamIO.nameFoldsUnderAnotherScreenshot`, also what `Ren
 key frame hidden that way would strand its own frames in no row and no filmstrip.
 It refuses the other order too (`nameTakesInAnotherScreenshot`): a name that a screenshot already
 in the folder would fold under ends in the same place.
+The byte swap has one exception, recorded in ADR-0006: `VoxelCamIO.setAsKey` writes each file's
+favorite flag back to the path it was on. The star is the burst's and is read from the key's path,
+so it is the one tag that does not travel with the image.
 
 **Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
 `<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the
