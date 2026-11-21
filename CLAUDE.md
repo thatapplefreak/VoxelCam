@@ -410,7 +410,9 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   so any content mod granting one through the vanilla system arrives with no adapter.
 - `BossHealthOverlayMixin` at `HEAD` of `update`, handing the packet to `BossBarSignal`.
   `ClientboundBossEventPacket.Handler` is a public interface whose methods all have defaults, so
-  `packet.dispatch(...)` reaches add/progress/remove with no accessor and no reflection.
+  `packet.dispatch(...)` reaches add/progress/name/remove with no accessor and no reflection.
+  The name is followed because it is what a bar's owner is recognised by, and what the
+  screenshot is tagged with.
   **`HEAD`, not the more obvious `TAIL`:** the moment is the *removal*, and whether it was a kill
   depends on the bar's progress just before it vanished — vanilla drops the entry, and that
   progress with it, while handling the packet, so running afterwards leaves nothing to judge by.
