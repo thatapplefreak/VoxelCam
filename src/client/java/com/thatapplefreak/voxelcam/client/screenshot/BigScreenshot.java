@@ -235,6 +235,15 @@ public final class BigScreenshot {
 	 * {@code renderFrame}). If either ran during the capture, the window already holds the real new
 	 * size, and restoring the saved one over it leaves the game rendering at the old size: nothing
 	 * rewrites the stored size until the next real resize.
+	 *
+	 * <p><strong>Known gap.</strong> Size is the only evidence used, so a platform resize that lands
+	 * on exactly the applied size cannot be told from no resize at all. A 960x540 window taking a
+	 * {@code 2x} big screenshot applies 1920x1080; press F11 during it on a 1080p display in
+	 * exclusive fullscreen and the window reports 1920x1080 again, reads as untouched, and the
+	 * stale 960x540 is restored after all. Closing it needs a second piece of evidence, such as
+	 * whether the window's fullscreen state changed since the capture began. That is not done
+	 * here: it would be more state in a machine whose every transition was found by a bug, for a
+	 * coincidence of sizes, and no test can time a fullscreen change into the capture's two frames.
 	 */
 	static boolean owesRestore(Size window, Size applied, Size saved) {
 		return window.equals(applied) && !window.equals(saved);
