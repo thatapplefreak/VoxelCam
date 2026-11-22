@@ -50,16 +50,28 @@ public final class ScreenshotMetadata {
 	public record Dimensions(int width, int height) {
 	}
 
+	/**
+	 * A row's name, as {@link #displayName(File)} says it, with a capture's day kept apart from
+	 * its time so a row too narrow for both can drop the day and keep the seconds.
+	 *
+	 * @param day "Today", "Yesterday" or "17 Aug,"; null for a name the player gave.
+	 * @param name the time to the second after {@code day}, or the whole name if there is none.
+	 */
+	public record DisplayName(String day, String name, String full) {
+	}
+
 	private static final Map<File, Optional<Dimensions>> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Optional<BurstFrame>> BURST_FRAMES = new HashMap<>();
 	private static final Map<File, Optional<MomentTag>> MOMENTS = new HashMap<>();
 	private static final Map<File, Integer> ANIMATION_FRAMES = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
-	private static final Map<File, String> NAMES = new HashMap<>();
+	private static final Map<File, DisplayName> NAMES = new HashMap<>();
 	private static final Map<File, String> SIZES = new HashMap<>();
-	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
-	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
+	// To the second: an automatic capture, a burst's neighbours and a player tapping F2 all land
+	// several files in one minute, and a minute-only label gives every one of them the same name.
+	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
+	private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM,");
 	// String.replaceFirst and String.matches compile a fresh Pattern on every call. The
 	// NAMES cache means that is a compile per file rather than per frame, but the fill path
 	// still runs for every file whose row is scrolled into view, once per manager session —
@@ -310,33 +322,45 @@ public final class ScreenshotMetadata {
 	 * left open across midnight, which lasts until the manager closes.
 	 */
 	public static String displayName(File file) {
-		String cached = NAMES.get(file);
+		return displayNameParts(file).full();
+	}
+
+	/** {@link #displayName(File)} in the parts a row fits separately, from the same cache. */
+	public static DisplayName displayNameParts(File file) {
+		DisplayName cached = NAMES.get(file);
 		if (cached != null) {
 			return cached;
 		}
 		String name = PNG_SUFFIX.matcher(file.getName()).replaceFirst("");
-		String display = CAPTURE_NAME.matcher(name).matches()
-				? relativeTime(file)
-				: name;
+		DisplayName display = CAPTURE_NAME.matcher(name).matches()
+				? relativeName(file)
+				: new DisplayName(null, name, name);
 		NAMES.put(file, display);
 		return display;
 	}
 
 	/**
-	 * "Today 14:32", "Yesterday 14:32", otherwise "17 Aug, 14:32". Deliberately left as an
+	 * "Today 14:32:05", "Yesterday 14:32:05", otherwise "17 Aug, 14:32:05". Deliberately left as an
 	 * uncached formatting primitive — {@link #displayName(File)} is the per-frame caller and
 	 * caches its own result, so a caller that wants a freshly stat'd label still has one.
 	 */
 	public static String relativeTime(File file) {
+		return relativeName(file).full();
+	}
+
+	private static DisplayName relativeName(File file) {
 		LocalDateTime when = modifiedAt(file);
 		LocalDate today = LocalDate.now();
+		String day;
 		if (when.toLocalDate().equals(today)) {
-			return "Today " + TIME.format(when);
+			day = "Today";
+		} else if (when.toLocalDate().equals(today.minusDays(1))) {
+			day = "Yesterday";
+		} else {
+			day = DATE.format(when);
 		}
-		if (when.toLocalDate().equals(today.minusDays(1))) {
-			return "Yesterday " + TIME.format(when);
-		}
-		return DATE_TIME.format(when);
+		String time = TIME.format(when);
+		return new DisplayName(day, time, day + " " + time);
 	}
 
 	private static LocalDateTime modifiedAt(File file) {

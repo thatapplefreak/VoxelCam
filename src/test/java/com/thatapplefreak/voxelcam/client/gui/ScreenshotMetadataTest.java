@@ -228,7 +228,7 @@ class ScreenshotMetadataTest {
 		ScreenshotMetadata.forget(file);
 
 		assertEquals("2 KB", ScreenshotMetadata.fileSize(file));
-		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(file));
 	}
 
@@ -246,13 +246,35 @@ class ScreenshotMetadataTest {
 		File burstFrame = sized("2026-08-27_10.00.00_burst02.png", 1);
 		File renamed = sized("sunset over base.png", 1);
 
-		assertTrue(ScreenshotMetadata.displayName(capture).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(capture).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(capture));
-		assertTrue(ScreenshotMetadata.displayName(collision).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(collision).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(collision));
-		assertTrue(ScreenshotMetadata.displayName(burstFrame).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(burstFrame).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(burstFrame));
 		assertEquals("sunset over base", ScreenshotMetadata.displayName(renamed));
+	}
+
+	/**
+	 * The playtest's "Today 19:01" four rows running: an automatic capture, a burst and a few taps
+	 * of F2 land in the same minute, and a name to the minute made them indistinguishable. The
+	 * day and the time come apart as well, so a row too narrow for both keeps the time.
+	 */
+	@Test
+	void capturesFromTheSameMinuteGetDifferentNames() throws IOException {
+		File first = sized("2026-08-27_10.00.05.png", 1);
+		File second = sized("2026-08-27_10.00.15.png", 1);
+		LocalDateTime minute = LocalDateTime.now().withSecond(0).withNano(0);
+		assertTrue(first.setLastModified(minute.withSecond(5).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+		assertTrue(second.setLastModified(minute.withSecond(15).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+
+		assertFalse(ScreenshotMetadata.displayName(first).equals(ScreenshotMetadata.displayName(second)),
+				ScreenshotMetadata.displayName(first));
+		ScreenshotMetadata.DisplayName parts = ScreenshotMetadata.displayNameParts(second);
+		assertEquals("Today", parts.day());
+		assertTrue(parts.name().endsWith(":15"), parts.name());
+		assertEquals(parts.day() + " " + parts.name(), parts.full());
+		assertNull(ScreenshotMetadata.displayNameParts(sized("castle.png", 1)).day());
 	}
 
 	@Test
@@ -272,7 +294,7 @@ class ScreenshotMetadataTest {
 		File capture = sized("2026-08-27_10.00.00.PNG", 1);
 
 		assertTrue(ScreenshotMetadata.displayName(capture)
-						.matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+						.matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(capture));
 	}
 
@@ -298,7 +320,7 @@ class ScreenshotMetadataTest {
 		assertTrue(file.setLastModified(lastMonth));
 
 		String label = ScreenshotMetadata.relativeTime(file);
-		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}"), label);
+		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"), label);
 	}
 
 	@Test

@@ -713,6 +713,11 @@ follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
+That floor leaves a row's text about 80px at the default 854x480 window, so the rows and the details
+line are never cut at the pixel: `CaptionFit` drops whole facts, lowest-ranked first, leaving `…`
+where they were, and only free text (a name, an advancement title) is ever cut inside. The ranks
+live in its three builders — a capture's time to the second outranks its day, dimensions outrank
+size, and the details line runs animation, moment, location, dimensions, size, file name.
 Below ~362px the filmstrip's Set as key / Export animation column narrows too
 (`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
 are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
