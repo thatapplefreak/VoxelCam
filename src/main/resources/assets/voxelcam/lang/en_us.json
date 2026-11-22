@@ -12,6 +12,7 @@
 
 	"voxelcam.screenshots": "Screenshots",
 	"voxelcam.search": "Search",
+	"voxelcam.search.short": "Search",
 
 	"voxelcam.sort.date.desc": "Date ↓",
 	"voxelcam.sort.date.asc": "Date ↑",
@@ -24,6 +25,7 @@
 
 	"voxelcam.done": "Done",
 	"voxelcam.rename": "Rename",
+	"voxelcam.rename.short": "Rename",
 	"voxelcam.delete": "Delete",
 	"voxelcam.openscreenshotsfolder.short": "Folder",
 	"voxelcam.share": "Share…",
@@ -106,8 +108,10 @@
 	"voxelcam.burst.unavailable": "Bursts need a world open and no menu on screen",
 	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
 	"voxelcam.burst.setaskey": "Set as Key",
+	"voxelcam.burst.setaskey.short": "Set Key",
 	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
 	"voxelcam.burst.exportanimation": "Export Animation",
+	"voxelcam.burst.exportanimation.short": "Export",
 	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
 	"voxelcam.burst.exporting": "Exporting animation…",
 	"voxelcam.animation.loading": "Loading animation…",

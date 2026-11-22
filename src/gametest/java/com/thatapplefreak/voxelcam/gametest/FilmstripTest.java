@@ -51,6 +51,8 @@ public class FilmstripTest implements FabricClientGameTest {
 	 * anyway covered the right scroll button and the edge of Set as key and Export animation.
 	 * The cells are not widgets, so what is measured is the room the widgets leave for them;
 	 * {@code FilmstripLayoutTest} holds the cell arithmetic to the same row at every width.
+	 * The column that gives way for the cell then takes the short wording of both its labels,
+	 * so they fit rather than scroll; {@code LabelFitTest} holds them to it in both languages.
 	 */
 	private static void assertTheStripHasRoomForACellAtTheSmallestWindow(ClientGameTestContext context, File dir,
 			File key) {
@@ -65,10 +67,20 @@ public class FilmstripTest implements FabricClientGameTest {
 				Screen screen = client.gui.screen();
 				Button scrollLeft = button(screen, "voxelcam.burst.scrollleft");
 				Button scrollRight = button(screen, "voxelcam.burst.scrollright");
-				Button setAsKey = button(screen, "voxelcam.burst.setaskey");
-				Button export = button(screen, "voxelcam.burst.exportanimation");
+				// The column is 54 wide here, too narrow for either full label.
+				Button setAsKey = button(screen, "voxelcam.burst.setaskey.short");
+				Button export = button(screen, "voxelcam.burst.exportanimation.short");
 				if (!scrollLeft.visible || !scrollRight.visible || !setAsKey.visible || !export.visible) {
 					return "a selected burst should show its filmstrip buttons";
+				}
+				// Vanilla scrolls a label wider than the button less 2 on each side, and the
+				// playtest read "t Animation" off one caught mid-scroll.
+				for (Button action : new Button[] { setAsKey, export }) {
+					int labelWidth = client.font.width(action.getMessage());
+					if (labelWidth > action.getWidth() - 4) {
+						return "\"" + action.getMessage().getString() + "\" is " + labelWidth
+								+ " wide on a " + action.getWidth() + " wide button, so it scrolls";
+					}
 				}
 				// A 34-wide cell with the 6 the row keeps either side of it.
 				int room = scrollRight.getX() - scrollLeft.getRight();

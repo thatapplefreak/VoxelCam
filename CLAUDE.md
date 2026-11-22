@@ -714,7 +714,12 @@ follow the player's system locale are the exception, not the rule.
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
 Below ~362px the filmstrip's Set as key / Export animation column narrows too
-(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons, and its
+two buttons take their `.short` labels where the full ones no longer fit. A button label that does not fit is not clipped:
+vanilla scrolls it inside the button. So only a label that would scroll by a large part of itself
+has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is cut
+rather than scrolled), picked in `init()` when `LabelFit` says the full one does not fit;
+Delete and Share overflow by a few pixels at 320 and are left to scroll. The cells
 are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
 count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
 free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`
