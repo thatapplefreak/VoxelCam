@@ -2,6 +2,7 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.RenamePopup;
+import com.thatapplefreak.voxelcam.client.gui.ScreenshotListWidget;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
@@ -27,6 +28,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 public class RenameSelectionTest implements FabricClientGameTest {
 
 	private static final String RENAMED_TO = "zz-renamed";
+	private static final long DAY = 24L * 60 * 60 * 1000;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -68,10 +70,10 @@ public class RenameSelectionTest implements FabricClientGameTest {
 		// Renders the details line and the highlighted row for the renamed file.
 		context.takeScreenshot("manager-selection-after-rename");
 
-		context.runOnClient(client -> {
-			SortMode.setCurrent(SortMode.DATE_NEWEST);
-			VoxelCamIO.selectPhoto(null);
-		});
+		context.runOnClient(client -> SortMode.setCurrent(SortMode.DATE_NEWEST));
+		assertAFreshOpeningLandsOnTheNewestScreenshot(context, dir);
+
+		context.runOnClient(client -> VoxelCamIO.selectPhoto(null));
 		context.setScreen(TitleScreen::new);
 		context.waitForScreen(TitleScreen.class);
 	}
@@ -104,6 +106,68 @@ public class RenameSelectionTest implements FabricClientGameTest {
 		});
 		if (!RENAMED_TO.equals(value)) {
 			throw new AssertionError("the name field should hold " + RENAMED_TO + ", it held " + value);
+		}
+	}
+
+	/**
+	 * The other half of the selection outliving the screen: what survives a popup's rebuild
+	 * must not survive a close. The playtest opened the manager after four new screenshots
+	 * and landed on a week-old file deep in the list, because the last session had left it
+	 * selected and it was still listed. Opened again, the manager should be on the
+	 * screenshot just taken, the head of the list under the default sort.
+	 */
+	private static void assertAFreshOpeningLandsOnTheNewestScreenshot(ClientGameTestContext context, File dir) {
+		long now = System.currentTimeMillis();
+		// Set by hand rather than left to the clock the fixtures were written under: what
+		// matters is which is newest, and under WSL fresh files have carried odd mtimes.
+		File oldest = new File(dir, RENAMED_TO + ".png");
+		context.runOnClient(client -> {
+			setModified(oldest, now - 3 * DAY);
+			setModified(new File(dir, "b-second.png"), now - 2 * DAY);
+			setModified(new File(dir, "c-third.png"), now - DAY);
+		});
+
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+		context.waitTicks(20);
+		// What a click on the bottom row does: oldest first is last under newest first.
+		context.runOnClient(client -> {
+			for (GuiEventListener child : client.gui.screen().children()) {
+				if (child instanceof ScreenshotListWidget list) {
+					list.setSelected(list.children().get(list.children().size() - 1));
+					return;
+				}
+			}
+			throw new AssertionError("the manager should have a list");
+		});
+		assertSelected(context, oldest.getName(), "picking the bottom row should select the oldest file");
+
+		context.clickScreenButton("voxelcam.done");
+		context.waitForScreen(TitleScreen.class);
+
+		File justTaken = new File(dir, "just-taken.png");
+		context.runOnClient(client -> {
+			try {
+				writePng(justTaken, 160, 90);
+			} catch (IOException e) {
+				throw new AssertionError("could not write the new screenshot", e);
+			}
+			setModified(justTaken, now);
+		});
+
+		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.waitForScreen(GuiScreenShotManager.class);
+		context.waitTicks(20);
+		assertSelected(context, justTaken.getName(),
+				"a fresh opening should land on the newest screenshot, not the last session's selection");
+
+		// Renders the reopened manager with the head of the list highlighted.
+		context.takeScreenshot("manager-reopened-on-newest");
+	}
+
+	private static void setModified(File file, long when) {
+		if (!file.setLastModified(when)) {
+			throw new AssertionError("could not set the modification time of " + file.getName());
 		}
 	}
 

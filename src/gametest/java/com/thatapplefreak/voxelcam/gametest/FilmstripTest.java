@@ -217,6 +217,9 @@ public class FilmstripTest implements FabricClientGameTest {
 			// manager, and it must not come up offering what the first one was holding off.
 			screen.onClose();
 			GuiScreenShotManager reopened = new GuiScreenShotManager(dir);
+			// Back on the burst: the opening would otherwise land on the head of the list, which
+			// is the animation if the export has already written it, and has no filmstrip.
+			VoxelCamIO.selectPhoto(key);
 			client.setScreenAndShow(reopened);
 			pickTheSecondCell(reopened);
 			if (button(reopened, "voxelcam.burst.exportanimation").active) {
@@ -266,8 +269,11 @@ public class FilmstripTest implements FabricClientGameTest {
 	}
 
 	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {
+		// Selected after the manager is built, since building one is an opening and forgets the
+		// selection; its init() then finds this one listed and keeps it.
+		GuiScreenShotManager manager = context.computeOnClient(client -> new GuiScreenShotManager(dir));
 		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
-		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.setScreen(() -> manager);
 		context.waitForScreen(GuiScreenShotManager.class);
 		context.waitTicks(20);
 	}
