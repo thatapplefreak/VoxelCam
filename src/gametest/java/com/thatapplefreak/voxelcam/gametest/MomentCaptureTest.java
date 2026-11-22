@@ -8,6 +8,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -30,15 +32,15 @@ import net.minecraft.client.gui.screens.TitleScreen;
  * actually produces a plain-size, correctly tagged PNG — and, just as importantly, that the four
  * decisions not to capture produce no file at all.
  *
- * <p>Triggers are fired directly rather than through their hooks, with one exception. Earning an
- * advancement, dying and walking a portal are server-side events this test does not stage, since
- * staging them would be testing Minecraft rather than VoxelCam. Of their hooks, only the
- * advancement's is a mixin, and launching the client at all covers that it resolves, since {@code
- * defaultRequire: 1} fails a mis-targeted injector at load. Death and a new dimension are watches
- * in {@code AutoCapture.tick} with no injector to resolve, so nothing here exercises them. The
- * exception is a boss: the integrated server takes commands, so a Wither is summoned and killed
- * for real, and that capture arrives through {@code BossBarSignal} with nothing here calling
- * {@code fire}.
+ * <p>Triggers are fired directly rather than through their hooks, with two exceptions. Earning an
+ * advancement and dying are server-side events this test does not stage, since staging them would
+ * be testing Minecraft rather than VoxelCam. Of their hooks, only the advancement's is a mixin, and
+ * launching the client at all covers that it resolves, since {@code defaultRequire: 1} fails a
+ * mis-targeted injector at load. Death is a watch in {@code AutoCapture.tick} with no injector to
+ * resolve, so nothing here exercises it. The exceptions are a boss and a portal, because what the
+ * capture looks like there depends on what the client is doing around it. The integrated server
+ * takes commands, so a Wither is summoned and killed for real, and a Nether portal is built and
+ * walked into, and neither capture comes from anything here calling {@code fire}.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
@@ -60,6 +62,113 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
 			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
 			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
+			assertAPortalArrivalIsCapturedWithTheWorldInView(context, singleplayer.getServer(), dir);
+		}
+	}
+
+	/**
+	 * A real portal, walked in survival so its overlay builds to full strength, both ways a player
+	 * meets it. The first trip is a fresh world's first Nether visit, which also grants "We Need to
+	 * Go Deeper" under the loading screen, so whichever of the two moments arms first is the one
+	 * taken. The second, after the session's dimensions are forgotten, is the new-dimension moment
+	 * on its own, the shape every later session's first trip takes.
+	 *
+	 * <p>Vanilla closes the loading screen once the player's own section is ready, not the world
+	 * around it, and the overlay is still fading out then. What a player expects is a picture of
+	 * where they arrived, so each capture is compared with the same view once everything has
+	 * settled: the moment is the place, not the fog it was drawn out of.
+	 */
+	private static void assertAPortalArrivalIsCapturedWithTheWorldInView(ClientGameTestContext context,
+			TestServerContext server, File dir) {
+		server.runCommand("gamemode survival @a");
+		server.runCommand("difficulty peaceful");
+		server.runCommand("execute at @p run fill ~-1 ~-1 ~3 ~2 ~3 ~3 minecraft:obsidian");
+		server.runCommand("execute at @p run fill ~ ~ ~3 ~1 ~2 ~3 minecraft:nether_portal[axis=x]");
+		int[] home = context.computeOnClient(client -> new int[] {
+				client.player.getBlockX(), client.player.getBlockY(), client.player.getBlockZ()});
+		String inFrontOfThePortal = (home[0] + 0.5) + " " + home[1] + " " + (home[2] + 0.5);
+		String intoThePortal = (home[0] + 0.5) + " " + home[1] + " " + (home[2] + 3.5);
+		context.waitTicks(5);
+
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+		server.runCommand("tp @p " + intoThePortal);
+		File first = awaitArrival(context, dir, before, "the first trip to the Nether");
+		assertLooksLikeTheSettledView(context, first, "the first trip to the Nether");
+
+		// Back beside the portal rather than into it: a dimension change puts the player on portal
+		// cooldown, and standing in a portal keeps renewing it.
+		server.runCommand("execute in minecraft:overworld run tp @p " + inFrontOfThePortal);
+		context.waitFor(client -> client.level != null && client.gui.screen() == null
+				&& client.level.dimension().identifier().getPath().equals("overworld"), 600);
+		context.waitTicks(40);
+		// Forgotten from the overworld, so that is the session's login dimension and the Nether is
+		// new again, with its advancement already earned.
+		resetAutoCapture(context);
+		before = listing(dir);
+		server.runCommand("tp @p " + intoThePortal);
+		File second = awaitArrival(context, dir, before, "a later session's first trip to the Nether");
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(second));
+		if (tag == null || tag.trigger() != MomentTrigger.NEW_DIMENSION
+				|| !"minecraft:the_nether".equals(tag.subject())) {
+			throw new AssertionError("expected the new-dimension moment for the Nether, got " + tag);
+		}
+		assertLooksLikeTheSettledView(context, second, "a later session's first trip to the Nether");
+	}
+
+	/** Eighty ticks in the portal in survival, the load, and then however long the view takes to
+	 * come in, with room for the encode and the tags after. */
+	private static File awaitArrival(ClientGameTestContext context, File dir, Set<String> before, String what) {
+		context.waitFor(client -> !newNames(dir, before).isEmpty(), 900);
+		context.waitTicks(40);
+		return theOnlyNewFile(dir, before, what);
+	}
+
+	/**
+	 * Measured against the empty first frame vanilla hands over, which differed from the settled
+	 * view by 96 per channel through the portal overlay; a capture of the drawn world differs only
+	 * by the portal particles drifting through it.
+	 */
+	private static final double SETTLED_VIEW_TOLERANCE = 10.0;
+
+	private static void assertLooksLikeTheSettledView(ClientGameTestContext context, File moment, String what) {
+		// Long enough for every chunk in render distance to arrive, build and be drawn.
+		context.waitTicks(200);
+		File settled = context.takeScreenshot("arrival-settled").toFile();
+		double difference = meanDifference(moment, settled);
+		if (difference > SETTLED_VIEW_TOLERANCE) {
+			throw new AssertionError("the moment taken on " + what + " should show where the player arrived, but"
+					+ " differs from the settled view by " + difference + " per channel: compare "
+					+ moment.getName() + " with " + settled.getName());
+		}
+		// The test's own screenshot lands in the same folder, and is not a moment.
+		settled.delete();
+	}
+
+	/** Mean absolute difference per channel over the middle of the frame, clear of the HUD: notices
+	 * and toasts along the top, and the chat, hotbar and hand along the bottom. */
+	private static double meanDifference(File a, File b) {
+		try {
+			BufferedImage left = ImageIO.read(a);
+			BufferedImage right = ImageIO.read(b);
+			if (left.getWidth() != right.getWidth() || left.getHeight() != right.getHeight()) {
+				throw new AssertionError(a.getName() + " and " + b.getName() + " differ in size");
+			}
+			long total = 0;
+			long samples = 0;
+			for (int y = left.getHeight() / 6; y < left.getHeight() * 3 / 4; y++) {
+				for (int x = left.getWidth() / 4; x < left.getWidth() * 3 / 4; x++) {
+					int p = left.getRGB(x, y);
+					int q = right.getRGB(x, y);
+					for (int shift = 0; shift <= 16; shift += 8) {
+						total += Math.abs(((p >> shift) & 0xFF) - ((q >> shift) & 0xFF));
+						samples++;
+					}
+				}
+			}
+			return (double) total / samples;
+		} catch (IOException e) {
+			throw new AssertionError("could not read " + a + " or " + b, e);
 		}
 	}
 

@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.util.Util;
 
 import java.util.HashSet;
@@ -74,6 +75,10 @@ public final class AutoCapture {
 	enum ScreenKind {
 		NONE,
 		LEVEL_LOADING,
+		/** No screen, but the level was loaded moments ago and is not in view yet: the terrain
+		 * around the player is still being drawn, or the portal overlay is still fading. See {@link
+		 * #viewSettled}. */
+		ARRIVING,
 		DEATH,
 		OTHER
 	}
@@ -104,6 +109,21 @@ public final class AutoCapture {
 	private static boolean wasAlive;
 
 	private static final BossBarTracker BOSS_BARS = new BossBarTracker();
+
+	/**
+	 * Ticks a newly loaded level is given to come into view before a capture held for it is taken
+	 * anyway. Reached only when the view never settles by {@link #viewSettled}'s measure, as when
+	 * the player runs straight out of the portal and the chunk loads never stop; what is on screen
+	 * by then is mostly drawn, and the arrival is still the moment.
+	 */
+	static final int ARRIVAL_TIMEOUT_TICKS = 100;
+
+	/** The level whose arrival {@link #watchArrival} is following, held only to notice the next
+	 * one: a dimension change builds a new {@code ClientLevel}. Cleared on disconnect, so it never
+	 * outlives the connection it belongs to. */
+	private static ClientLevel arrivalLevel;
+	private static int arrivalTicks;
+	private static boolean arrivalInView = true;
 
 	private AutoCapture() {
 	}
@@ -144,6 +164,9 @@ public final class AutoCapture {
 
 		Minecraft client = Minecraft.getInstance();
 		ScreenKind screen = screenKind(client.gui.screen());
+		if (screen == ScreenKind.NONE && !arrivalInView) {
+			screen = ScreenKind.ARRIVING;
+		}
 		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
 				screen)) {
 			case DROP -> dropPending();
@@ -168,6 +191,7 @@ public final class AutoCapture {
 		}
 		watchDeath(player);
 		watchDimension(client);
+		watchArrival(client, player);
 	}
 
 	/** From {@code ClientPlayConnectionEvents.DISCONNECT}: everything here is scoped to one
@@ -182,6 +206,9 @@ public final class AutoCapture {
 		visitedDimensions.clear();
 		wasAlive = false;
 		BOSS_BARS.reset();
+		arrivalLevel = null;
+		arrivalTicks = 0;
+		arrivalInView = true;
 	}
 
 	// --- the watches ------------------------------------------------------------------------
@@ -211,7 +238,59 @@ public final class AutoCapture {
 		}
 	}
 
+	/**
+	 * Vanilla closes the loading screen once the player's own section is ready, not the world
+	 * around it, and a portal's overlay is still fading out then. A capture taken on that first
+	 * frame is fog or purple. Followed per level rather than per trigger, so an advancement granted
+	 * on arrival waits for the view as well; once a level has settled, nothing here holds a
+	 * capture again until the next one loads.
+	 */
+	private static void watchArrival(Minecraft client, LocalPlayer player) {
+		ClientLevel level = client.level;
+		if (level == null) {
+			return;
+		}
+		if (level != arrivalLevel) {
+			arrivalLevel = level;
+			arrivalTicks = 0;
+			arrivalInView = false;
+		}
+		if (arrivalInView) {
+			return;
+		}
+		// Not counted under the loading screen, which is bounded by its own completion; the
+		// arrival starts when the world is first on screen.
+		if (!(client.gui.screen() instanceof LevelLoadingScreen)) {
+			arrivalTicks++;
+		}
+		LevelRenderer renderer = client.levelRenderer;
+		arrivalInView = viewSettled(arrivalTicks, renderer.visibleSections().size(),
+				!renderer.hasRenderedAllSections() || !renderer.expectedChunks().isEmpty(),
+				Math.max(player.portalEffectIntensity, player.oPortalEffectIntensity));
+	}
+
 	// --- pure seams, unit-testable with no client --------------------------------------------
+
+	/**
+	 * Whether a newly loaded level is in view enough to be a picture of where the player arrived.
+	 * All three are things the client already knows for free: the sections the renderer is drawing,
+	 * whether any are still waiting to be built or waiting on a chunk the server has not sent, and
+	 * the portal overlay's strength, which vanilla fades out on its own once the player has
+	 * arrived. Waiting on them is the same policy as waiting out a loading screen: the obstruction
+	 * clears by itself and is not the player's doing.
+	 *
+	 * <p>Bounded by {@link #ARRIVAL_TIMEOUT_TICKS}, after which the view counts as settled and a
+	 * held capture is taken rather than dropped. Dropping would lose the arrival silently on a slow
+	 * machine, the failure the loading-screen rule exists to avoid; a mostly drawn arrival is
+	 * still the moment.
+	 */
+	static boolean viewSettled(int ticksSinceArrival, int visibleSections, boolean sectionsPending,
+			float portalOverlay) {
+		if (ticksSinceArrival >= ARRIVAL_TIMEOUT_TICKS) {
+			return true;
+		}
+		return visibleSections > 0 && !sectionsPending && portalOverlay <= 0.0F;
+	}
 
 	/**
 	 * @return whether arriving in {@code dimension} is a moment. The first dimension of a session is
@@ -292,7 +371,8 @@ public final class AutoCapture {
 	 * never finishes ends in a disconnect, which {@link #forgetSession()} handles.
 	 */
 	static boolean advancePending(ScreenKind screen) {
-		if (screen == ScreenKind.LEVEL_LOADING) {
+		// An arrival has its own bound, after which it captures rather than gives up.
+		if (screen == ScreenKind.LEVEL_LOADING || screen == ScreenKind.ARRIVING) {
 			return false;
 		}
 		int budget = pendingTrigger == MomentTrigger.DEATH
@@ -330,7 +410,7 @@ public final class AutoCapture {
 			return Gate.DROP;
 		}
 		return switch (screen) {
-			case LEVEL_LOADING -> Gate.WAIT;
+			case LEVEL_LOADING, ARRIVING -> Gate.WAIT;
 			case DEATH -> trigger == MomentTrigger.DEATH ? Gate.CAPTURE : Gate.DROP;
 			case NONE -> trigger == MomentTrigger.DEATH ? Gate.WAIT : Gate.CAPTURE;
 			// The player opened this one, and did so after the moment. Held rather than dropped, it

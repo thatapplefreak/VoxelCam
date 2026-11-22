@@ -88,14 +88,17 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are the automatic triggers' own hooks, all but one.** `MomentCaptureTest` calls
-`AutoCapture.fire` directly, because earning an advancement, dying and walking a portal are
-server-driven events a client game test does not stage — staging them would be testing Minecraft. So
-`ToastManagerMixin`'s `instanceof AdvancementToast` branch and the `watchDeath`/`watchDimension`
-tick watches have never executed under test, even though the injectors themselves are proven to
-resolve (`defaultRequire: 1` fails the launch otherwise). The exception is a Wither: the integrated
-server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest` summons one
-and kills it, which runs `BossBarSignal`'s add and remove and its search for a dying owner. The
+**So are the automatic triggers' own hooks, all but two.** `MomentCaptureTest` calls
+`AutoCapture.fire` directly, because earning an advancement and dying are server-driven events a
+client game test does not stage — staging them would be testing Minecraft. So `ToastManagerMixin`'s
+`instanceof AdvancementToast` branch has never been asserted on and the `watchDeath` tick watch
+has never executed under test, even though the injectors themselves are proven to resolve
+(`defaultRequire: 1` fails the launch otherwise). The exceptions are a Wither and a portal: the
+integrated server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest`
+summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and its search for a
+dying owner. It also builds a Nether portal and walks it twice in survival, and compares each
+arrival's capture with the same view 200 ticks later. The first trip grants an advancement under
+the loading screen, so whichever moment arms first is taken; the second is `watchDimension`'s. The
 Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
@@ -443,14 +446,14 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   clock is the level's game time, since both vanilla delays are counted in server ticks.
 - Death and new-dimension need no mixin: both are plain client state.
 
-Four things here are load-bearing:
+Five things here are load-bearing:
 
 - **The gate drops rather than defers.** An automatic capture that fires at the wrong moment is
   worse than one that never fires — a shot of the inventory screen the player opened ten seconds
   later is not the moment, and a feature producing those is one nobody leaves switched on. So a
-  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`)
-  and dropped when it is the player's own doing (any other screen), or when the level or player is
-  gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
+  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`,
+  or a level just loaded that is not in view yet) and dropped when it is the player's own doing
+  (any other screen), or when the level or player is gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
   A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
   term in both places: `shouldArm` refuses from key-down, and `gateFor` drops a moment the menu
@@ -460,6 +463,17 @@ Four things here are load-bearing:
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing
   said about why. A load that never finishes ends in a disconnect, which `forgetSession()` handles.
+- **An arrival waits for the world to be drawn, whatever armed it.** Vanilla closes the loading
+  screen once the player's own section is ready, so the first frame after it is fog, or the
+  portal overlay at nearly full strength. `watchArrival` follows each new `ClientLevel` until
+  `viewSettled`: sections visible, none waiting to be built or on a chunk
+  (`hasRenderedAllSections`, `expectedChunks`), and `portalEffectIntensity` back at zero. Until
+  then an open frame reads as `ScreenKind.ARRIVING`, which every trigger waits out, because the
+  advancement a first trip grants arms under the loading screen and wins the cooldown. It is
+  bounded by `ARRIVAL_TIMEOUT_TICKS`, counted from the screen closing, and the bound captures
+  rather than drops: a player who runs straight out keeps chunks loading, and a mostly drawn
+  arrival is still the moment. The frame countdown does not run under it, for the same reason
+  as under the loading screen.
 - **`DEATH` waits for `DeathScreen` rather than racing it.** `AutoCapture.tick` runs at
   `END_CLIENT_TICK`, but the screen is opened from `handlePlayerCombatKill`, a server-driven packet
   a variable number of ticks later. Shooting on the first open frame would give a clean shot or the
