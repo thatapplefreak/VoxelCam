@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -255,6 +257,23 @@ class SortModeTest {
 		List<File> files = List.of(bogus, real);
 
 		assertEquals(List.of("real.png", "bogus.png"), sortedNames(files, SortMode.DIMENSIONS_LARGEST));
+	}
+
+	/**
+	 * A JPEG named {@code .png} sorts as 0×0 like every other unreadable file, not below them on
+	 * the garbage its bytes make as a header. "a fake" ahead of "zero" is the name tie-break, so
+	 * it only holds if both keys are the same 0.
+	 */
+	@Test
+	void aJpegNamedPngSortsWithTheOtherUnreadableFiles() throws IOException {
+		File jpeg = dir.resolve("a fake jpeg.png").toFile();
+		ImageIO.write(new BufferedImage(64, 36, BufferedImage.TYPE_INT_RGB), "jpg", jpeg);
+		File empty = file("zero.png", 1_000L, 0);
+		File real = png("real.png", 10, 10);
+		List<File> files = List.of(empty, real, jpeg);
+
+		assertEquals(List.of("real.png", "a fake jpeg.png", "zero.png"), sortedNames(files, SortMode.DIMENSIONS_LARGEST));
+		assertEquals(List.of("a fake jpeg.png", "zero.png", "real.png"), sortedNames(files, SortMode.DIMENSIONS_SMALLEST));
 	}
 
 	@Test
