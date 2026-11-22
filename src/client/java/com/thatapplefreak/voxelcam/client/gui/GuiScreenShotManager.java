@@ -623,6 +623,20 @@ public class GuiScreenShotManager extends Screen {
 		return false;
 	}
 
+	/**
+	 * Vanilla's default, after an arrow key or Tab was the last input, tabs onto the first
+	 * focusable widget — the search field — and this runs on every rebuild, so each return from a
+	 * popup switched the shortcuts off for exactly the player using them. The list is where a
+	 * keyboard player was: arrows keep moving through it, and Tab or a click still reaches the
+	 * search field. With the mouse last, vanilla focuses nothing, and neither does this.
+	 */
+	@Override
+	protected void setInitialFocus() {
+		if (minecraft.getLastInputType().isKeyboard()) {
+			setFocused(list);
+		}
+	}
+
 	/** Shortcuts only make sense when not typing a search query. */
 	private boolean shortcutsApply() {
 		return !searchBar.isFocused() && selected != null;

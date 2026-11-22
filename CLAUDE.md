@@ -544,7 +544,9 @@ Five invariants that are easy to break:
   session.
 - **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
   manager overrides `repositionElements()` to `rebuildWidgets()` so it rebuilds — that is what picks
-  up files renamed or deleted while a popup was open, not just resize handling.
+  up files renamed or deleted while a popup was open, not just resize handling. The rebuild also
+  runs the no-arg `setInitialFocus()`, which the manager overrides to focus the list after a
+  keyboard input: vanilla's default would land on the search field and switch the shortcuts off.
 - **That rebuild is also why the manager's own `selected` field is not authoritative.** It predates
   whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
   and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the
