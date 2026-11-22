@@ -199,7 +199,7 @@ public final class ScreenshotHandler {
 			// in the completed count too, or the group's end-of-burst announcement waits
 			// forever for a frame that will never report in on its own.
 			Burst.frameCompleted(false);
-			Burst.abort("a readback failed");
+			Burst.abort("a readback failed", Burst.CUT_SHORT_BY_FAILURE);
 		}
 	}
 

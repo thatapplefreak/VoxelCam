@@ -103,6 +103,8 @@
 	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details",
 
 	"voxelcam.burst.saved": "Saved a %s-frame burst as: %s",
+	"voxelcam.burst.cutshort": "Cut short by a menu: saved a %s-frame burst as: %s",
+	"voxelcam.burst.cutshort.failed": "Cut short by a failed frame: saved a %s-frame burst as: %s",
 	"voxelcam.burst.unavailable": "Bursts need a world open and no menu on screen",
 	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
 	"voxelcam.burst.setaskey": "Set as Key",

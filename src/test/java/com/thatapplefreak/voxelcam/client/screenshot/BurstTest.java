@@ -2,10 +2,13 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 /**
  * The capture itself needs a live client — {@code beforeBlit()} reads {@code
@@ -203,5 +206,100 @@ class BurstTest {
 		Burst.frameCompleted(true);
 		Burst.finishBurst();
 		assertFalse(Burst.isBusy());
+	}
+
+	/** Drives a 3 s burst that keeps up with its schedule for its first {@code frames} slots. */
+	private static void issueFrames(int frames) {
+		Burst.beginBurst(Burst.framesFor(3), 0L);
+		for (int slot = 0; slot < frames; slot++) {
+			Burst.claimFrame(Burst.dueSlot((long) slot * STEP));
+		}
+	}
+
+	/** The playtest: a 3 s burst, the player killed about three quarters of a second in. The
+	 * death screen stops it by design; what the player is owed is being told so. */
+	@Test
+	void aBurstStoppedBeforeItsLengthSaysItWasCutShortWithItsRealFrameCount() {
+		issueFrames(8);
+		Burst.abortAt("the death screen opened", Burst.CUT_SHORT_BY_GATE, 750L);
+		for (int i = 0; i < 8; i++) {
+			Burst.frameCompleted(true);
+		}
+
+		CaptureStatus.Notice notice = Burst.completionNotice("key.png", 0L);
+		assertEquals(CaptureStatus.Kind.SAVED, notice.kind(), "the frames it did take were saved");
+		assertEquals("voxelcam.burst.cutshort", notice.key());
+		assertEquals(List.of(8, "key.png"), notice.args());
+	}
+
+	@Test
+	void aBurstStoppedByAFailedReadbackSaysSoToo() {
+		issueFrames(5);
+		Burst.frameCompleted(false);
+		Burst.abortAt("a readback failed", Burst.CUT_SHORT_BY_FAILURE, 450L);
+		for (int i = 0; i < 4; i++) {
+			Burst.frameCompleted(true);
+		}
+
+		CaptureStatus.Notice notice = Burst.completionNotice("key.png", 0L);
+		assertEquals(CaptureStatus.Kind.SAVED, notice.kind());
+		assertEquals("voxelcam.burst.cutshort.failed", notice.key());
+		assertEquals(List.of(4, "key.png"), notice.args(), "only the frames that landed are counted");
+	}
+
+	@Test
+	void aBurstThatRanItsLengthAnnouncesAsBeforeEvenWithSkippedSlots() {
+		Burst.beginBurst(Burst.framesFor(3), 0L);
+		int issued = 0;
+		for (int slot = 0; slot < Burst.framesFor(3); slot++) {
+			// Every third slot passes with the in-flight cap full: skipped, not an early end.
+			if (slot % 3 != 2) {
+				Burst.claimFrame(Burst.dueSlot((long) slot * STEP));
+				issued++;
+			}
+		}
+		assertEquals(Burst.DONE, Burst.dueSlot(3000L));
+		Burst.finishBurst();
+		for (int i = 0; i < issued; i++) {
+			Burst.frameCompleted(true);
+		}
+
+		CaptureStatus.Notice notice = Burst.completionNotice("key.png", 0L);
+		assertEquals(CaptureStatus.Kind.SAVED, notice.kind());
+		assertEquals("voxelcam.burst.saved", notice.key());
+		assertEquals(List.of(20, "key.png"), notice.args());
+	}
+
+	/** Stopped after its last slot had come due, a burst lost nothing to the stop: every slot it
+	 * had was already taken or skipped, so calling it cut short would be the wrong lie instead. */
+	@Test
+	void aBurstStoppedInItsLastSlotRanItsLength() {
+		issueFrames(Burst.framesFor(3));
+		Burst.abortAt("a screen opened", Burst.CUT_SHORT_BY_GATE, 2950L);
+		for (int i = 0; i < Burst.framesFor(3); i++) {
+			Burst.frameCompleted(true);
+		}
+
+		assertEquals("voxelcam.burst.saved", Burst.completionNotice("key.png", 0L).key());
+	}
+
+	@Test
+	void aBurstCutShortWithNothingSavedStillReportsAFailure() {
+		issueFrames(2);
+		Burst.abortAt("a screen opened", Burst.CUT_SHORT_BY_GATE, 150L);
+		Burst.frameCompleted(false);
+		Burst.frameCompleted(false);
+
+		CaptureStatus.Notice notice = Burst.completionNotice("key.png", 0L);
+		assertEquals(CaptureStatus.Kind.FAILED, notice.kind());
+		assertEquals("voxelcam.burst.failed", notice.key());
+	}
+
+	@Test
+	void aBurstStoppedBeforeItsFirstFrameHasNothingToAnnounce() {
+		Burst.beginBurst(Burst.framesFor(3), 0L);
+		Burst.abortAt("a screen opened", Burst.CUT_SHORT_BY_GATE, 0L);
+
+		assertNull(Burst.completionNotice("key.png", 0L));
 	}
 }

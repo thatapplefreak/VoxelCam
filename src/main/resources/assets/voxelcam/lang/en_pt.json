@@ -103,6 +103,8 @@
 	"voxelcam.bigshot.failed": "Big map charting failed, check th' log fer details",
 
 	"voxelcam.burst.saved": "Stowed a %s-map flurry as: %s",
+	"voxelcam.burst.cutshort": "Cut short by a menu, arr: stowed a %s-map flurry as: %s",
+	"voxelcam.burst.cutshort.failed": "Cut short by a map that wouldn't chart: stowed a %s-map flurry as: %s",
 	"voxelcam.burst.unavailable": "A flurry needs a world open and no menu on screen, arr",
 	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
 	"voxelcam.burst.setaskey": "Make th' Key",
