@@ -475,7 +475,7 @@ Four things here are load-bearing:
   trusted from the file — a hand-edited zero would turn a cascade into a screenshot per toast.
 
 `ScreenshotHandler.captureMoment` refuses **silently** rather than reusing `captureNow`, whose
-refusal path posts a `voxelcam.savingpleasewait` notice: nobody asked for this screenshot, so nobody
+refusal path posts a busy notice: nobody asked for this screenshot, so nobody
 wants to be told at length why it did not happen. `MomentTag` threads through
 `saveCapturedImage`/`write`/`embedMetadata` as a fourth nullable parameter, kept separate from
 `BurstFrame` rather than bagged with it because `burst` carries *behaviour* (completion accounting,

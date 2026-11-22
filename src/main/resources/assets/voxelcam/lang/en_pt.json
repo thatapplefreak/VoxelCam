@@ -6,7 +6,8 @@
 	"voxelcam.hud.saving": "Stowin' th' map…",
 	"voxelcam.hud.recording": "Keepin' watch, %ss t' go",
 
-	"voxelcam.savingpleasewait": "Stowin' yer map right now, hold yer horses",
+	"voxelcam.savingpleasewait": "Still stowin' th' map, hold yer horses",
+	"voxelcam.recordingpleasewait": "Still keepin' watch on a flurry, hold yer horses till it's done",
 	"voxelcam.savedscreenshotas": "Stowed th' map as: %s",
 	"voxelcam.savefailed": "Couldn't stow th' map, arr",
 

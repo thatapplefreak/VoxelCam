@@ -6,7 +6,8 @@
 	"voxelcam.hud.saving": "Saving screenshot…",
 	"voxelcam.hud.recording": "Recording, %ss left",
 
-	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
+	"voxelcam.savingpleasewait": "Still saving, try again in a moment",
+	"voxelcam.recordingpleasewait": "Still recording a burst, try again when it ends",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
 	"voxelcam.savefailed": "Could not save screenshot",
 

@@ -138,7 +138,7 @@ public final class CaptureMenu {
 			return;
 		}
 		if (ScreenshotHandler.isSaving() || BigScreenshot.isBusy() || Burst.isBusy()) {
-			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 
