@@ -551,7 +551,11 @@ Five invariants that are easy to break:
   list instead moves the player onto whichever screenshot the sort puts first — the one the next
   Delete would be aimed at. A delete is the same case: `VoxelCamIO.delete(listed)` leaves its
   selection on the row beside the deleted one, taken from the rows the manager passes in, because
-  favorites only is the manager's filter and the next file in the folder may have no row.
+  favorites only is the manager's filter and the next file in the folder may have no row. The
+  flip side is that `VoxelCamIO`'s selection outlives the screen, so the manager's constructor
+  calls `VoxelCamIO.forgetSelection()`: every way in builds a new manager and every return hands
+  back the same one, and without it a new opening landed on whatever the last session left
+  selected instead of the screenshot just taken.
 
 **A screen shortcut on a key vanilla binds globally never reaches `Screen.keyPressed` by itself.**
 `KeyboardHandler.keyPress` offers each press to `Minecraft.handleGlobalKeyPress` first (fullscreen,

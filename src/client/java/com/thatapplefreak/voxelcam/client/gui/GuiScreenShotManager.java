@@ -121,6 +121,10 @@ public class GuiScreenShotManager extends Screen {
 	public GuiScreenShotManager(File screenshotsDir) {
 		super(Component.translatable("voxelcam.screenshots"));
 		this.screenshotsDir = screenshotsDir;
+		// Every way in (title and pause buttons, the keybinding) builds a new manager, and
+		// every popup, the settings screen and the size prompt hand back this same one, so
+		// the constructor is exactly where an opening differs from a return.
+		VoxelCamIO.forgetSelection();
 	}
 
 	@Override
