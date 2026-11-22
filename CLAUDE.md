@@ -96,7 +96,9 @@ tick watches have never executed under test, even though the injectors themselve
 resolve (`defaultRequire: 1` fails the launch otherwise). The exception is a Wither: the integrated
 server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest` summons one
 and kills it, which runs `BossBarSignal`'s add and remove and its search for a dying owner. The
-Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
+Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. A
+`/kill` under `immediate_respawn` runs `watchDeath` too, but only to show that death is dropped at
+once; a death captured under `DeathScreen` is still a hand check. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
 measurement and its failure is silent.
@@ -466,7 +468,12 @@ Four things here are load-bearing:
   red-overlay shot depending on latency — the same trigger, two different screenshots. So `DEATH`
   alone inverts two rows of the gate: no screen means WAIT, `DeathScreen` means CAPTURE.
   `DeathScreen` draws the world behind itself rather than replacing it, so the moment is still in
-  the shot.
+  the shot. **So a death under the `immediate_respawn` gamerule is never captured, by design.**
+  `handlePlayerCombatKill` respawns instead of opening the screen when
+  `LocalPlayer.shouldShowDeathScreen()` is false, and the kill packet arrives before the
+  zero-health update that arms the moment, so the only frames left are a race between the dying
+  view and the spawn point. `gateFor` drops such a death on its first frame (`deathScreenComing`)
+  rather than holding the one pending slot for a screen that is never coming.
 - **The cooldown is global, charged at arm time, and handed back on a drop.** One automatic capture
   per window whatever caused it: first trigger in a window wins, the rest are dropped silently,
   because a cascade of advancements a second apart is one moment to the player and not five files.

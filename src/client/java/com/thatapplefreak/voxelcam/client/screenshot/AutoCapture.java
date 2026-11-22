@@ -144,8 +144,9 @@ public final class AutoCapture {
 
 		Minecraft client = Minecraft.getInstance();
 		ScreenKind screen = screenKind(client.gui.screen());
-		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
-				screen)) {
+		LocalPlayer player = client.player;
+		switch (gateFor(pendingTrigger, client.level != null, player != null, CaptureMenu.isArmed(),
+				player != null && player.shouldShowDeathScreen(), screen)) {
 			case DROP -> dropPending();
 			case WAIT -> {
 				if (advancePending(screen)) {
@@ -315,9 +316,18 @@ public final class AutoCapture {
 	 * different screenshots. Waiting <em>for</em> the death screen instead gives one consistent
 	 * result every time, and {@code DeathScreen} draws the world behind itself rather than replacing
 	 * it, so the moment is still in the shot.
+	 *
+	 * <p>{@code deathScreenComing} is {@code LocalPlayer.shouldShowDeathScreen()}, which vanilla sets
+	 * from the {@code immediate_respawn} gamerule (at login, on the {@code IMMEDIATE_RESPAWN} game
+	 * event, and copied across a respawn) and reads in {@code handlePlayerCombatKill} to choose
+	 * between opening {@code DeathScreen} and respawning on the spot. When it is false a death is
+	 * dropped at once: the kill packet precedes the zero-health update that arms the moment, so by
+	 * the first frame the respawn is already requested, and any frame shot from then on is a race
+	 * between the dying view and the spawn point — the latency-dependent shot waiting for the
+	 * screen exists to avoid. A death under that gamerule is therefore never captured, by design.
 	 */
 	static Gate gateFor(MomentTrigger trigger, boolean hasLevel, boolean hasPlayer, boolean captureMenuArmed,
-			ScreenKind screen) {
+			boolean deathScreenComing, ScreenKind screen) {
 		if (!hasLevel || !hasPlayer) {
 			return Gate.DROP;
 		}
@@ -327,6 +337,12 @@ public final class AutoCapture {
 		// the menu that came up after the moment armed: one waiting out a level load, or a death
 		// waiting for its screen.
 		if (captureMenuArmed) {
+			return Gate.DROP;
+		}
+		// immediate_respawn: the kill packet respawned the player instead of opening the screen, and
+		// they are standing at their spawn point a tick later. There is nothing left to wait for,
+		// and no frame left that is the death.
+		if (trigger == MomentTrigger.DEATH && !deathScreenComing && screen != ScreenKind.DEATH) {
 			return Gate.DROP;
 		}
 		return switch (screen) {

@@ -22,6 +22,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.player.LocalPlayer;
 
 /**
  * The automatic capture path end to end: {@code AutoCapture.fire} through the blit, the write on
@@ -38,7 +39,8 @@ import net.minecraft.client.gui.screens.TitleScreen;
  * in {@code AutoCapture.tick} with no injector to resolve, so nothing here exercises them. The
  * exception is a boss: the integrated server takes commands, so a Wither is summoned and killed
  * for real, and that capture arrives through {@code BossBarSignal} with nothing here calling
- * {@code fire}.
+ * {@code fire}. A death is staged once too, under {@code immediate_respawn}, and only to show
+ * that it is dropped at once rather than captured.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
@@ -60,6 +62,7 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
 			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
 			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
+			assertADeathUnderImmediateRespawnIsNotCapturedAndBlocksNothing(context, singleplayer.getServer(), dir);
 		}
 	}
 
@@ -102,6 +105,44 @@ public class MomentCaptureTest implements FabricClientGameTest {
 		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(written));
 		if (tag == null || tag.trigger() != MomentTrigger.BOSS_DEFEATED || !"Wither".equals(tag.subject())) {
 			throw new AssertionError("expected the boss-defeated moment naming the Wither, got " + tag);
+		}
+	}
+
+	/**
+	 * A real death, staged with {@code /kill} so it arrives through the {@code watchDeath} tick watch,
+	 * under {@code immediate_respawn}. Vanilla answers the kill packet by respawning instead of
+	 * opening {@code DeathScreen}, so there is no frame of the death to take: the only shots left
+	 * are of the respawn point, and the death is dropped rather than captured.
+	 *
+	 * <p>What this guards is how soon. An advancement a few ticks after the respawn must be taken:
+	 * a death left waiting for a screen that is never coming holds the one pending slot for seconds
+	 * and refuses it.
+	 */
+	private static void assertADeathUnderImmediateRespawnIsNotCapturedAndBlocksNothing(
+			ClientGameTestContext context, TestServerContext server, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		try {
+			server.runCommand("gamerule immediate_respawn true");
+			context.waitFor(client -> client.player != null && !client.player.shouldShowDeathScreen(), 100);
+			LocalPlayer dying = context.computeOnClient(client -> client.player);
+			server.runCommand("kill @a");
+			// The watch arms on the one tick health reads zero, too brief to wait for. A respawn
+			// builds a new LocalPlayer, which is what says the death has come and gone.
+			context.waitFor(client -> client.player != null && client.player != dying
+					&& client.gui.screen() == null, 400);
+			context.waitTicks(5);
+			assertNothingNew(dir, before, "a death under immediate respawn");
+
+			fire(context, MomentTrigger.ADVANCEMENT, "Stone Age");
+			File written = theOnlyNewFile(dir, before, "an advancement just after a death under immediate respawn");
+			MomentTag tag = MomentTag.fromTags(PngTextChunk.read(written));
+			if (tag == null || tag.trigger() != MomentTrigger.ADVANCEMENT) {
+				throw new AssertionError("expected the advancement moment, not the death, got " + tag);
+			}
+		} finally {
+			server.runCommand("gamerule immediate_respawn false");
 		}
 	}
 

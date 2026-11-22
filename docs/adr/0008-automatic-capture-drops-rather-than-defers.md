@@ -14,7 +14,10 @@ Two exceptions, each because the obstruction is not the player's doing:
   portal arrival.
 - **Death** inverts the rule. It waits for the death screen and captures under it, since that
   screen arrives on a server packet after a variable delay. Racing it would give either a clean
-  frame or the red-overlay frame for the same trigger.
+  frame or the red-overlay frame for the same trigger. Under the `immediate_respawn` gamerule no
+  death screen comes, and the player is at their spawn point within a tick, so there is no frame
+  of the death left to take. Such a death is dropped at once and never captured. Waiting out the
+  timeout instead would hold the one pending slot and refuse any moment that followed.
 
 A dropped capture hands its cooldown window back, so a moment that never became a screenshot does
 not suppress the next one.

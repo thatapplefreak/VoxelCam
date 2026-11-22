@@ -126,9 +126,9 @@ class AutoCaptureTest {
 	@Test
 	void anOpenFrameIsTheMomentForEveryTriggerButDeath() {
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, true, AutoCapture.ScreenKind.NONE));
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, true, AutoCapture.ScreenKind.NONE));
 	}
 
 	/**
@@ -140,16 +140,50 @@ class AutoCaptureTest {
 	@Test
 	void deathWaitsForItsScreenAndThenCaptures() {
 		assertEquals(AutoCapture.Gate.WAIT,
-				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, AutoCapture.ScreenKind.NONE),
+				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, true, AutoCapture.ScreenKind.NONE),
 				"an open frame is not yet the death shot — the screen has not arrived");
 		assertEquals(AutoCapture.Gate.CAPTURE,
-				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, AutoCapture.ScreenKind.DEATH));
+				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, true, AutoCapture.ScreenKind.DEATH));
+	}
+
+	/**
+	 * Under {@code immediate_respawn} vanilla answers the kill packet by respawning instead of
+	 * opening {@code DeathScreen}, and the player is at their spawn point within a tick. Waiting
+	 * would hold the only pending slot for a screen that is never coming, refusing any moment in
+	 * those seconds; capturing would shoot the respawn. Neither is the death, so it is dropped on
+	 * the first frame — including under the respawn's level-loading screen, which is otherwise
+	 * waited out.
+	 */
+	@Test
+	void aDeathWithNoDeathScreenComingIsDroppedAtOnce() {
+		for (AutoCapture.ScreenKind screen : new AutoCapture.ScreenKind[] {
+				AutoCapture.ScreenKind.NONE, AutoCapture.ScreenKind.LEVEL_LOADING}) {
+			assertEquals(AutoCapture.Gate.DROP,
+					AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, false, screen),
+					"a death under immediate respawn must not wait for a death screen (" + screen + ")");
+		}
+	}
+
+	/** The flag only answers whether a death screen is coming; the other triggers are not waiting
+	 * for one, so it must change nothing for them. */
+	@Test
+	void noDeathScreenComingChangesNothingForTheOtherTriggers() {
+		for (MomentTrigger trigger : MomentTrigger.values()) {
+			if (trigger == MomentTrigger.DEATH) {
+				continue;
+			}
+			for (AutoCapture.ScreenKind screen : AutoCapture.ScreenKind.values()) {
+				assertEquals(AutoCapture.gateFor(trigger, true, true, false, true, screen),
+						AutoCapture.gateFor(trigger, true, true, false, false, screen),
+						trigger + " under " + screen);
+			}
+		}
 	}
 
 	@Test
 	void aDeathScreenIsNotAnyOtherTriggersMoment() {
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, AutoCapture.ScreenKind.DEATH));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, true, false, true, AutoCapture.ScreenKind.DEATH));
 	}
 
 	/** Held rather than dropped, this would shoot whatever the player was looking at when they
@@ -158,7 +192,7 @@ class AutoCaptureTest {
 	void aScreenThePlayerOpenedDropsTheMoment() {
 		for (MomentTrigger trigger : MomentTrigger.values()) {
 			assertEquals(AutoCapture.Gate.DROP,
-					AutoCapture.gateFor(trigger, true, true, false, AutoCapture.ScreenKind.OTHER),
+					AutoCapture.gateFor(trigger, true, true, false, true, AutoCapture.ScreenKind.OTHER),
 					trigger + " must not wait out a screen the player opened");
 		}
 	}
@@ -174,7 +208,7 @@ class AutoCaptureTest {
 		for (MomentTrigger trigger : MomentTrigger.values()) {
 			for (AutoCapture.ScreenKind screen : AutoCapture.ScreenKind.values()) {
 				assertEquals(AutoCapture.Gate.DROP,
-						AutoCapture.gateFor(trigger, true, true, true, screen),
+						AutoCapture.gateFor(trigger, true, true, true, true, screen),
 						trigger + " must not be captured or held under an armed capture menu (" + screen + ")");
 			}
 		}
@@ -184,15 +218,15 @@ class AutoCaptureTest {
 	@Test
 	void aLevelLoadIsWaitedOutRatherThanDropped() {
 		assertEquals(AutoCapture.Gate.WAIT,
-				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, AutoCapture.ScreenKind.LEVEL_LOADING));
+				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, true, AutoCapture.ScreenKind.LEVEL_LOADING));
 	}
 
 	@Test
 	void nothingSurvivesLosingTheWorldOrThePlayer() {
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, false, true, false, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, false, true, false, true, AutoCapture.ScreenKind.NONE));
 		assertEquals(AutoCapture.Gate.DROP,
-				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, false, false, AutoCapture.ScreenKind.NONE));
+				AutoCapture.gateFor(MomentTrigger.ADVANCEMENT, true, false, false, true, AutoCapture.ScreenKind.NONE));
 	}
 
 	// --- the pending countdown ----------------------------------------------------------------
