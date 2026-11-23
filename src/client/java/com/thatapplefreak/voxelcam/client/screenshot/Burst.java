@@ -171,7 +171,7 @@ public final class Burst {
 	/** Arms a burst for the next blit, explaining itself if it cannot. */
 	public static void request() {
 		if (state != State.IDLE || BigScreenshot.isBusy() || ScreenshotHandler.isSaving()) {
-			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 

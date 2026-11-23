@@ -155,11 +155,31 @@ public final class CaptureStatus {
 	}
 
 	/**
+	 * Refuses a capture because another is still running, saying which: a burst still recording
+	 * is not saving anything the player would call a save, and its recording cue is what is on
+	 * screen. Once it stops recording, its last frames are ordinary saves still encoding.
+	 */
+	public static void postBusy() {
+		post(Kind.BUSY, busyKey(Burst.isBusy()));
+	}
+
+	static String busyKey(boolean burstRecording) {
+		return burstRecording ? "voxelcam.recordingpleasewait" : "voxelcam.savingpleasewait";
+	}
+
+	/**
 	 * Posting a message that is already up replaces it rather than stacking a second copy: holding
 	 * the key against a busy capture would otherwise fill the corner with the same refusal.
+	 *
+	 * <p>Any other notice clears a busy refusal. The refusal is posted while the busy line is
+	 * already saying the same thing, so the HUD hides it; the next notice is the result it was
+	 * waiting on, and a "still saving" left showing beneath that result would be false.
 	 */
 	static synchronized void post(Notice notice) {
 		notices.removeIf(notice::sameMessageAs);
+		if (notice.kind() != Kind.BUSY) {
+			notices.removeIf(queued -> queued.kind() == Kind.BUSY);
+		}
 		notices.addFirst(notice);
 		lastPostedMillis = notice.postedAtMillis();
 		// Expired entries are pruned on read; this only bounds a queue nobody is reading, such as

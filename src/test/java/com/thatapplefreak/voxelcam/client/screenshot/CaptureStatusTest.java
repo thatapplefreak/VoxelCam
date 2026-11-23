@@ -60,6 +60,18 @@ class CaptureStatusTest {
 		assertEquals(1000L, visible.get(0).postedAtMillis());
 	}
 
+	/** A refusal is posted while the busy line already says the same thing, so the HUD hides it;
+	 * once the capture's own result arrives, a "still saving" left over beneath it would be false. */
+	@Test
+	void aCapturesResultClearsTheRefusalThatWasWaitingOnIt() {
+		CaptureStatus.post(notice(Kind.BUSY, "voxelcam.recordingpleasewait", 0L));
+		CaptureStatus.post(notice(Kind.SAVED, "voxelcam.burst.saved", 100L, 30, "a.png"));
+
+		List<Notice> visible = CaptureStatus.visibleAt(200L);
+		assertEquals(1, visible.size());
+		assertEquals(Kind.SAVED, visible.get(0).kind());
+	}
+
 	@Test
 	void differentArgumentsAreDifferentMessages() {
 		CaptureStatus.post(notice(Kind.SAVED, "voxelcam.savedscreenshotas", 0L, "a.png"));

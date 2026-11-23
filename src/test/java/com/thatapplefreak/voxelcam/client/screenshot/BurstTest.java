@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.util.Util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,7 @@ class BurstTest {
 	void settle() {
 		Burst.forgetBurst();
 		Burst.setSeconds(ORIGINAL_SECONDS);
+		CaptureStatus.forgetAll();
 	}
 
 	@Test
@@ -128,6 +130,17 @@ class BurstTest {
 
 		Burst.finishBurst();
 		assertFalse(Burst.isBusy(), "finishing returns the state machine to idle");
+	}
+
+	@Test
+	void aSecondBurstWhileOneIsRecordingIsRefusedAsRecording() {
+		Burst.beginBurst(3, 1000L);
+
+		Burst.request();
+
+		List<CaptureStatus.Notice> notices = CaptureStatus.visibleAt(Util.getMillis());
+		assertEquals(1, notices.size());
+		assertEquals("voxelcam.recordingpleasewait", notices.get(0).key());
 	}
 
 	@Test
