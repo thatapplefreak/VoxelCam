@@ -2,10 +2,19 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.ScreenshotMetadata;
+import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
+import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
+import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
+import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.Map;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -46,6 +55,7 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 
 		assertSelectionSurvivesRename(context, dir);
 		assertFavoriteTogglePersistsAndRenders(context, dir);
+		assertRowsAndDetailsSayWhatFits(context);
 
 		context.setScreen(TitleScreen::new);
 		context.waitForScreen(TitleScreen.class);
@@ -122,6 +132,81 @@ public class ScreenshotManagerTest implements FabricClientGameTest {
 			}
 			VoxelCamIO.selectPhoto(null);
 		});
+	}
+
+	/**
+	 * What the playtest saw at the default window: rows reading "854×480 · 95" with the unit cut
+	 * off, four rows all named "Today 19:01", and a details line ending before the advancement
+	 * that explains an automatic capture. The rows can only be judged from the screenshots; the
+	 * details line is read back as text as well, at the default window and at one twice as wide.
+	 */
+	private static void assertRowsAndDetailsSayWhatFits(ClientGameTestContext context) {
+		File dir = context.computeOnClient(client -> new File(client.gameDirectory, "voxelcam-gametest-rows"));
+		File moment = new File(dir, "2026-11-21_19.01.45.png");
+		try {
+			ScreenshotFixtures.emptyFolder(dir);
+			LocalDateTime minute = LocalDateTime.now().withSecond(0).withNano(0);
+			for (int second : new int[] { 5, 15, 30 }) {
+				File file = new File(dir, String.format(java.util.Locale.ROOT, "2026-11-21_19.01.%02d.png", second));
+				ScreenshotFixtures.writePng(file, 854, 480);
+				if (second == 30) {
+					// Megabytes rather than kilobytes: trailing bytes after IEND, which decoders ignore.
+					try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
+						raf.setLength(4_400_000);
+					}
+				}
+				setModified(file, minute.withSecond(second));
+			}
+			ScreenshotFixtures.writePng(moment, 854, 480);
+			Map<String, String> tags = new HashMap<>(new MomentTag(MomentTrigger.ADVANCEMENT, "We Need to Go Deeper").toTags());
+			tags.putAll(new CaptureContext("minecraft:overworld", 12, 64, -45, null).toTags());
+			PngTextChunk.embed(moment, tags);
+			setModified(moment, minute.withSecond(45));
+			File renamed = new File(dir, "0001_empty-manager-after-delete.png");
+			ScreenshotFixtures.writePng(renamed, 854, 480);
+			setModified(renamed, minute.minusMinutes(5));
+		} catch (IOException e) {
+			throw new AssertionError("could not write the row fixtures", e);
+		}
+
+		int[] original = context.computeOnClient(client ->
+				new int[] { client.getWindow().getScreenWidth(), client.getWindow().getScreenHeight() });
+		try {
+			context.getInput().resizeWindow(854, 480);
+			context.runOnClient(client -> VoxelCamIO.selectPhoto(moment));
+			context.setScreen(() -> new GuiScreenShotManager(dir));
+			context.waitForScreen(GuiScreenShotManager.class);
+			context.waitTicks(40);
+			context.takeScreenshot("manager-rows-default-window");
+			String narrow = detailsOf(context, moment);
+			if (!narrow.contains("We Need to Go Deeper")) {
+				throw new AssertionError("an automatic capture's reason is not on the details line at 854x480: " + narrow);
+			}
+
+			// The GUI scale is still 2, so this doubles the room every line has.
+			context.getInput().resizeWindow(1708, 480);
+			context.waitTicks(20);
+			context.takeScreenshot("manager-rows-wide-window");
+			String wide = detailsOf(context, moment);
+			if (!wide.contains("We Need to Go Deeper") || !wide.contains("12, 64, -45") || !wide.contains(moment.getName())) {
+				throw new AssertionError("the details line should hold every fact on a wide window: " + wide);
+			}
+		} finally {
+			context.getInput().resizeWindow(original[0], original[1]);
+			context.runOnClient(client -> VoxelCamIO.selectPhoto(null));
+			context.waitTicks(5);
+		}
+	}
+
+	private static String detailsOf(ClientGameTestContext context, File selected) {
+		return context.computeOnClient(client ->
+				((GuiScreenShotManager) client.gui.screen()).detailsLine(selected));
+	}
+
+	private static void setModified(File file, LocalDateTime when) {
+		if (!file.setLastModified(when.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())) {
+			throw new AssertionError("could not date " + file);
+		}
 	}
 
 	private static void writeFixtures(File dir) {

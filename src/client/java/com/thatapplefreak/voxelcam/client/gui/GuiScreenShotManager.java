@@ -823,35 +823,31 @@ public class GuiScreenShotManager extends Screen {
 			return;
 		}
 
-		// The list row already carries the capture time, so this line stays short
-		// enough not to be trimmed: the filename (which the row may show as a
-		// friendly time instead) plus the facts the row has no space for.
-		StringBuilder details = new StringBuilder();
-		// First, ahead of even the name: an animation previews as its first frame, so this is the
-		// one fact about it the image above cannot show, and the line is trimmed from the end.
-		int animationFrames = ScreenshotMetadata.animationFrames(selected);
-		if (animationFrames > 0) {
-			details.append(Component.translatable("voxelcam.animation.details", animationFrames).getString()).append("  ·  ");
-		}
-		details.append(selected.getName());
-		ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(selected);
-		if (size != null) {
-			details.append("  ·  ").append(size.width()).append('×').append(size.height());
-		}
-		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
-		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
-		if (captureContext != null) {
-			details.append("  ·  ").append(captureContext.describeLocation());
-		}
-		// Last, and only for the handful of screenshots that have one: an automatic capture is the
-		// only kind whose existence needs explaining after the fact.
-		MomentTag moment = ScreenshotMetadata.moment(selected);
-		if (moment != null) {
-			details.append("  ·  ").append(moment.describe().getString());
-		}
-		context.centeredText(font,
-				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
+		context.centeredText(font, Component.literal(detailsLine(selected)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
+	}
+
+	/**
+	 * The line under the preview, as wide as the preview, fitted by {@link CaptionFit#details}:
+	 * at the default window it has room for an advancement's title and little else, and the
+	 * title is the one fact that says why a file nobody asked for exists. Public so the client
+	 * game test can read what the line says rather than only photograph it.
+	 */
+	public String detailsLine(File selected) {
+		int animationFrames = ScreenshotMetadata.animationFrames(selected);
+		ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(selected);
+		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
+		MomentTag moment = ScreenshotMetadata.moment(selected);
+		return CaptionFit.fit(CaptionFit.details(
+						animationFrames > 0
+								? Component.translatable("voxelcam.animation.details", animationFrames).getString()
+								: null,
+						moment == null ? null : moment.describe().getString(),
+						captureContext == null ? null : captureContext.describeLocation(),
+						size == null ? null : size.width() + "×" + size.height(),
+						ScreenshotMetadata.fileSize(selected),
+						selected.getName()),
+				CaptionFit.DETAILS_SEPARATOR, previewWidth, font::width);
 	}
 
 	/**
