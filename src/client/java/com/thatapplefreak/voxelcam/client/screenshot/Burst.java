@@ -105,6 +105,9 @@ public final class Burst {
 	 * finishing normally or by {@link #abort}) to know when nothing is left outstanding. */
 	private static int completedFrames;
 	private static int succeededFrames;
+	/** The notice {@link #abort} chose for a burst it stopped before its length, or {@code null}
+	 * for one that ran its length — skipped slots included, which are not an early end. */
+	private static String cutShortKey;
 
 	private Burst() {
 	}
@@ -168,7 +171,7 @@ public final class Burst {
 	/** Arms a burst for the next blit, explaining itself if it cannot. */
 	public static void request() {
 		if (state != State.IDLE || BigScreenshot.isBusy() || ScreenshotHandler.isSaving()) {
-			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 
@@ -215,7 +218,7 @@ public final class Burst {
 
 		Minecraft client = Minecraft.getInstance();
 		if (!canCapture(client)) {
-			abort("a screen opened or the world went away mid-burst");
+			abort("a screen opened or the world went away mid-burst", CUT_SHORT_BY_GATE);
 			return;
 		}
 
@@ -283,23 +286,35 @@ public final class Burst {
 	 * count reported here is always what really landed, not what was originally planned.
 	 */
 	private static void announceCompletion() {
-		if (names == null || names.isEmpty() || nextIndex <= 0) {
+		if (names == null || names.isEmpty()) {
 			return;
 		}
-		if (succeededFrames > 0) {
-			CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.burst.saved", succeededFrames, names.get(0).getName());
-		} else {
-			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.burst.failed");
+		CaptureStatus.Notice notice = completionNotice(names.get(0).getName(), Util.getMillis());
+		if (notice != null) {
+			CaptureStatus.post(notice);
 		}
 	}
 
 	/**
-	 * Drops back to idle without issuing anything further. Frames already issued still land as
-	 * finished files — each has already claimed its own slot and will balance it on its own — so
-	 * nothing already written is undone.
+	 * Stops the burst without issuing anything further, and remembers whether that cost it the
+	 * rest of its length so the end-of-burst notice can say so: a player who asked for three
+	 * seconds and got under one should not be told the same thing as one who got all three.
+	 * Frames already issued still land as finished files — each has already claimed its own slot
+	 * and will balance it on its own — so nothing already written is undone.
+	 *
+	 * @param cutShortKey the notice to give if this did cut the burst short: {@link
+	 *                    #CUT_SHORT_BY_GATE} or {@link #CUT_SHORT_BY_FAILURE}
 	 */
-	static void abort(String reason) {
+	static void abort(String reason, String cutShortKey) {
+		abortAt(reason, cutShortKey, Util.getMillis());
+	}
+
+	/** {@link #abort} with the clock passed in, for the unit tests. */
+	static void abortAt(String reason, String cutShortKey, long nowMillis) {
 		VoxelCamClient.LOGGER.warn("Burst capture stopped: {}", reason);
+		if (state == State.RUNNING && slotsRemainAfter(nowMillis)) {
+			Burst.cutShortKey = cutShortKey;
+		}
 		state = State.IDLE;
 		maybeAnnounceCompletion();
 	}
@@ -317,6 +332,12 @@ public final class Burst {
 	 */
 	static final int DECIDE_AT_BLIT = -3;
 
+	/** The end-of-burst notice for a burst the capture gate stopped: a menu opened, or the world
+	 * went away. */
+	static final String CUT_SHORT_BY_GATE = "voxelcam.burst.cutshort";
+	/** The end-of-burst notice for a burst a failed readback stopped. */
+	static final String CUT_SHORT_BY_FAILURE = "voxelcam.burst.cutshort.failed";
+
 
 	static void beginBurst(int slots, long burstStartMillis) {
 		state = State.RUNNING;
@@ -327,6 +348,7 @@ public final class Burst {
 		frameSlot = DECIDE_AT_BLIT;
 		completedFrames = 0;
 		succeededFrames = 0;
+		cutShortKey = null;
 	}
 
 	/**
@@ -340,6 +362,32 @@ public final class Burst {
 			return DONE;
 		}
 		return slot >= nextSlot ? slot : WAIT;
+	}
+
+	/**
+	 * What the end-of-burst notice says, for the frames that actually landed; {@code null} for a
+	 * burst that issued nothing.
+	 */
+	static CaptureStatus.Notice completionNotice(String keyFileName, long nowMillis) {
+		if (nextIndex <= 0) {
+			return null;
+		}
+		if (succeededFrames > 0) {
+			// SAVED either way: the frames it did take are on disk, and that is what a player
+			// looks for in the notice; the cut-short wording carries the rest.
+			return new CaptureStatus.Notice(CaptureStatus.Kind.SAVED,
+					cutShortKey != null ? cutShortKey : "voxelcam.burst.saved",
+					List.of(succeededFrames, keyFileName), nowMillis);
+		}
+		return new CaptureStatus.Notice(CaptureStatus.Kind.FAILED, "voxelcam.burst.failed", List.of(), nowMillis);
+	}
+
+	/**
+	 * Whether a slot later than the one due at {@code nowMillis} was still to come. Stopped in its
+	 * last slot's time, a burst had nothing left to lose, so it is not cut short.
+	 */
+	private static boolean slotsRemainAfter(long nowMillis) {
+		return Math.max(0, (nowMillis - startMillis) / FRAME_INTERVAL_MILLIS) < runningSlots - 1;
 	}
 
 	/** Takes {@code slot} and returns the 0-based index of the frame that fills it. */
@@ -367,5 +415,6 @@ public final class Burst {
 		frameSlot = WAIT;
 		completedFrames = 0;
 		succeededFrames = 0;
+		cutShortKey = null;
 	}
 }

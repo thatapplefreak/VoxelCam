@@ -63,7 +63,7 @@ class wraps something untestable, the pattern has been to extract a package-priv
 (`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`/`openFolderCommand`,
 `ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
 `ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`,
-`AutoCapture.gateFor`/`shouldArm`/`markVisited`, `VoxelCamConfig.snapshot`) rather
+`AutoCapture.gateFor`/`shouldArm`/`markVisited`/`arrivingKind`, `ArrivalWatch`, `VoxelCamConfig.snapshot`) rather
 than mock the world. The last two pairs live on `VoxelCamIO` rather than in the popup that uses them
 for exactly this reason.
 
@@ -88,14 +88,21 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are the automatic triggers' own hooks, all but one.** `MomentCaptureTest` calls
-`AutoCapture.fire` directly, because earning an advancement, dying and walking a portal are
-server-driven events a client game test does not stage — staging them would be testing Minecraft. So
-`ToastManagerMixin`'s `instanceof AdvancementToast` branch and the `watchDeath`/`watchDimension`
-tick watches have never executed under test, even though the injectors themselves are proven to
-resolve (`defaultRequire: 1` fails the launch otherwise). The exception is a Wither: the integrated
-server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest` summons one
-and kills it, which runs `BossBarSignal`'s add and remove and its search for a dying owner. The
+**So is one of the automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
+directly for an advancement, because earning one is a server-driven event a client game test does
+not stage — staging it would be testing Minecraft. So `ToastManagerMixin`'s
+`instanceof AdvancementToast` branch has never been asserted on, even though the injector itself
+is proven to resolve (`defaultRequire: 1` fails the launch otherwise). The others are staged,
+because the integrated server takes commands (`singleplayer.getServer().runCommand`).
+`MomentCaptureTest` summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and
+its search for a dying owner. It kills the player with `/kill` twice: once ordinarily, asserting a
+DEATH capture taken under `DeathScreen` before Respawn is pressed, and once under
+`immediate_respawn`, asserting nothing is written and the next moment is not blocked. It also
+stages three arrivals and compares each capture with the same view 200
+ticks later: a Nether portal walked in survival, where the advancement it grants may win; a
+teleport into the Nether, `watchDimension`'s alone with no overlay; and an end portal. It stages
+them twice, at the framework's render distance of 5 and at vanilla's 12. At 5 the view fills
+in a few ticks, which is how the first fix for this passed there and failed at 12. The
 Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
@@ -330,7 +337,10 @@ playback true to time. Frames are numbered by issue order, so names stay contigu
 Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
 reserved for it, so no generation tag is needed. The end-of-burst notice waits in
 `frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
-mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
+mid-burst, since completions race across the IO pool. A burst the gate or a failed readback stops
+(`abort`) while a later slot was still to come says it was cut short in that same notice
+(`completionNotice`), naming no cause the gate does not know (a death, a portal and a menu all fail
+it alike), and kept short enough to fit the default window with its file name; a skipped slot is not an early end and keeps the plain wording. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
 The collapse is one level deep, so rename refuses any name that would fold the renamed file under
@@ -446,14 +456,14 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   clock is the level's game time, since both vanilla delays are counted in server ticks.
 - Death and new-dimension need no mixin: both are plain client state.
 
-Four things here are load-bearing:
+Five things here are load-bearing:
 
 - **The gate drops rather than defers.** An automatic capture that fires at the wrong moment is
   worse than one that never fires — a shot of the inventory screen the player opened ten seconds
   later is not the moment, and a feature producing those is one nobody leaves switched on. So a
-  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`)
-  and dropped when it is the player's own doing (any other screen), or when the level or player is
-  gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
+  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`,
+  or an arrival not yet in view) and dropped when it is the player's own doing
+  (any other screen), or when the level or player is gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
   A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
   term in both places: `shouldArm` refuses from key-down, and `gateFor` drops a moment the menu
@@ -463,13 +473,37 @@ Four things here are load-bearing:
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing
   said about why. A load that never finishes ends in a disconnect, which `forgetSession()` handles.
+- **A moment armed for an arrival waits for the arrival to come into view.** Vanilla closes the
+  loading screen once the player's own section is ready, so the first frame after it is fog, the
+  End's empty sky, or the portal overlay at nearly full strength. An arrival is a change of
+  dimension (joining a world is not one), and the moment armed for it is the new-dimension one,
+  or the advancement for entering the dimension, which arrives with it and usually wins the
+  cooldown. Anything armed before the view settles counts; anything armed later does not wait.
+  `ArrivalWatch` decides, from the renderer's visible-section count holding unchanged for
+  `STEADY_TICKS` (10) and the portal overlay back at zero. Until then the open frame reads as
+  `ScreenKind.ARRIVING`, which waits. The count climbs in bursts as chunks arrive and stops when
+  the view is in. The readings that look like better signals are not: `expectedChunks()` never
+  empties at render distance 5, and empties with a third of the view drawn at 16, and
+  `hasRenderedAllSections()` is true with nothing on screen. Nothing read on the first tick after
+  the screen closes counts, because the renderer can still describe the level just left. A
+  player who walks more than `WANDER_BLOCKS` (8) away first has made the moment their own doing,
+  and it is dropped. So is one whose view has not held still after `TIMEOUT_TICKS` (600), a
+  backstop well past the slowest arrival measured.
 - **`DEATH` waits for `DeathScreen` rather than racing it.** `AutoCapture.tick` runs at
   `END_CLIENT_TICK`, but the screen is opened from `handlePlayerCombatKill`, a server-driven packet
   a variable number of ticks later. Shooting on the first open frame would give a clean shot or the
   red-overlay shot depending on latency — the same trigger, two different screenshots. So `DEATH`
   alone inverts two rows of the gate: no screen means WAIT, `DeathScreen` means CAPTURE.
   `DeathScreen` draws the world behind itself rather than replacing it, so the moment is still in
-  the shot.
+  the shot. **So a death under the `immediate_respawn` gamerule is never captured, by design.**
+  `handlePlayerCombatKill` respawns instead of opening the screen when
+  `LocalPlayer.shouldShowDeathScreen()` is false, and `gateFor` drops such a death on its first
+  frame (`deathScreenComing`) rather than holding the one pending slot for a screen that is never
+  coming. That first frame does show the dying player at the death spot (empty hearts, the hurt
+  tilt, no red tint, no "You Died"): `runTick` renders straight after the tick that arms the
+  death. It is deliberately not taken. It is not the death-screen shot every other death gets,
+  and the kill packet has already requested the respawn, so whether the death arms at all and
+  every later frame depend on latency. Capturing it would make the trigger intermittent.
 - **The cooldown is global, charged at arm time, and handed back on a drop.** One automatic capture
   per window whatever caused it: first trigger in a window wins, the rest are dropped silently,
   because a cascade of advancements a second apart is one moment to the player and not five files.
@@ -478,7 +512,7 @@ Four things here are load-bearing:
   trusted from the file — a hand-edited zero would turn a cascade into a screenshot per toast.
 
 `ScreenshotHandler.captureMoment` refuses **silently** rather than reusing `captureNow`, whose
-refusal path posts a `voxelcam.savingpleasewait` notice: nobody asked for this screenshot, so nobody
+refusal path posts a busy notice: nobody asked for this screenshot, so nobody
 wants to be told at length why it did not happen. `MomentTag` threads through
 `saveCapturedImage`/`write`/`embedMetadata` as a fourth nullable parameter, kept separate from
 `BurstFrame` rather than bagged with it because `burst` carries *behaviour* (completion accounting,
@@ -503,7 +537,8 @@ Two things are load-bearing:
   frame it says will be read back.** Extraction precedes the blit every capture reads from, so
   anything drawn on a captured frame is in the PNG. Each path contributes its own condition:
   `BigScreenshot.isCapturing()`, `CaptureMenu.capturesThisFrame()`, `Burst.isBusy()` and
-  `AutoCapture.isPending()`. A new capture path has to add its own, or its frames carry
+  `AutoCapture.capturesThisFrame()`. That last one is the frame the moment's gate takes, not every
+  frame it is pending, which during an arrival can be seconds. A new capture path has to add its own, or its frames carry
   whatever notice is up. `CaptureStatusHudTest` checks pixels for this: it asserts the accent
   bar is in the presented frame, then asserts it is absent from a menu tap, every burst frame
   and a big screenshot.
@@ -547,14 +582,24 @@ Five invariants that are easy to break:
   session.
 - **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
   manager overrides `repositionElements()` to `rebuildWidgets()` so it rebuilds — that is what picks
-  up files renamed or deleted while a popup was open, not just resize handling.
+  up files renamed or deleted while a popup was open, not just resize handling. The rebuild also
+  runs the no-arg `setInitialFocus()`, and after an arrow key or Tab vanilla's default lands on
+  the search field and switches the shortcuts off. The manager overrides it to focus the
+  highlighted row through `setInitialFocus(list)`, not `setFocused(list)`: a list focused with no
+  focused row is outside the focus path, the next rebuild's `clearFocus()` misses it, and the
+  arrows then move a selection the highlight no longer shows. A search being typed keeps the field
+  and its cursor across a rebuild. `ManagerFocusTest` plays every return with real input.
 - **That rebuild is also why the manager's own `selected` field is not authoritative.** It predates
   whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
   and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the
   list instead moves the player onto whichever screenshot the sort puts first — the one the next
   Delete would be aimed at. A delete is the same case: `VoxelCamIO.delete(listed)` leaves its
   selection on the row beside the deleted one, taken from the rows the manager passes in, because
-  favorites only is the manager's filter and the next file in the folder may have no row.
+  favorites only is the manager's filter and the next file in the folder may have no row. The
+  flip side is that `VoxelCamIO`'s selection outlives the screen, so the manager's constructor
+  calls `VoxelCamIO.forgetSelection()`: every way in builds a new manager and every return hands
+  back the same one, and without it a new opening landed on whatever the last session left
+  selected instead of the screenshot just taken.
 
 **A screen shortcut on a key vanilla binds globally never reaches `Screen.keyPressed` by itself.**
 `KeyboardHandler.keyPress` offers each press to `Minecraft.handleGlobalKeyPress` first (fullscreen,
@@ -716,8 +761,19 @@ follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
+That floor leaves a row's text about 80px at the default 854x480 window, so the rows and the details
+line are never cut at the pixel: `CaptionFit` drops whole facts, lowest-ranked first, leaving `…`
+where they were, and only free text (a name, an advancement title) is ever cut inside. The ranks
+live in its three builders — a capture's time to the second outranks its day, dimensions outrank
+size, and the details line runs animation, moment, location, dimensions, size, file name.
 Below ~362px the filmstrip's Set as key / Export animation column narrows too
-(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons, and its
+two buttons take their `.short` labels where the full ones no longer fit. A button label that does not fit is not clipped:
+vanilla scrolls it inside the button. So only a label that would scroll by a large part of itself
+has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is
+neither scrolled nor clipped but runs on until the favorites star covers it), picked in `init()`
+by `LabelFit.keyFor` where the full one does not fit and the short one is shorter;
+Delete and Share overflow by a few pixels at 320 and are left to scroll. The cells
 are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
 count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
 free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`

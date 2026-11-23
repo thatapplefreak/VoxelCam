@@ -6,12 +6,14 @@
 	"voxelcam.hud.saving": "Saving screenshot…",
 	"voxelcam.hud.recording": "Recording, %ss left",
 
-	"voxelcam.savingpleasewait": "Saving Screenshot right now, please wait",
+	"voxelcam.savingpleasewait": "Still saving, try again in a moment",
+	"voxelcam.recordingpleasewait": "Still recording a burst, try again when it ends",
 	"voxelcam.savedscreenshotas": "Saved screenshot as: %s",
 	"voxelcam.savefailed": "Could not save screenshot",
 
 	"voxelcam.screenshots": "Screenshots",
 	"voxelcam.search": "Search",
+	"voxelcam.search.short": "Search",
 
 	"voxelcam.sort.date.desc": "Date ↓",
 	"voxelcam.sort.date.asc": "Date ↑",
@@ -24,6 +26,7 @@
 
 	"voxelcam.done": "Done",
 	"voxelcam.rename": "Rename",
+	"voxelcam.rename.short": "Rename",
 	"voxelcam.delete": "Delete",
 	"voxelcam.openscreenshotsfolder.short": "Folder",
 	"voxelcam.share": "Share…",
@@ -103,11 +106,15 @@
 	"voxelcam.bigshot.failed": "Big screenshot failed, see the log for details",
 
 	"voxelcam.burst.saved": "Saved a %s-frame burst as: %s",
+	"voxelcam.burst.cutshort": "Cut short, saved a %s-frame burst as: %s",
+	"voxelcam.burst.cutshort.failed": "Cut short by an error, saved a %s-frame burst as: %s",
 	"voxelcam.burst.unavailable": "Bursts need a world open and no menu on screen",
 	"voxelcam.burst.failed": "Burst capture failed, see the log for details",
 	"voxelcam.burst.setaskey": "Set as Key",
+	"voxelcam.burst.setaskey.short": "Set Key",
 	"voxelcam.burst.setaskey.failed": "Could not set this frame as the key",
 	"voxelcam.burst.exportanimation": "Export Animation",
+	"voxelcam.burst.exportanimation.short": "Export",
 	"voxelcam.burst.exportanimation.failed": "Could not export this burst, see the log for details",
 	"voxelcam.burst.exporting": "Exporting animation…",
 	"voxelcam.animation.loading": "Loading animation…",

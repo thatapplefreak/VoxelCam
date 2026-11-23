@@ -101,7 +101,7 @@ public final class BigScreenshot {
 		// checked at key-down, and a save can start during the hold that follows; beforeBlit joins
 		// the save counter without a cap on the strength of nothing else being in flight.
 		if (state != State.IDLE || ScreenshotHandler.isSaving()) {
-			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 

@@ -11,6 +11,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -146,6 +148,19 @@ class ScreenshotMetadataTest {
 	}
 
 	/**
+	 * A JPEG renamed to {@code .png} is long enough to have bytes where IHDR's width and height
+	 * would be, and its list row and details line showed them as 65536×-2424765. It has to be
+	 * the absent answer the rows already leave the dimensions out for.
+	 */
+	@Test
+	void aJpegNamedPngHasNoDimensions() throws IOException {
+		File jpeg = dir.resolve("fake jpeg.png").toFile();
+		ImageIO.write(new BufferedImage(64, 36, BufferedImage.TYPE_INT_RGB), "jpg", jpeg);
+
+		assertNull(ScreenshotMetadata.dimensions(jpeg));
+	}
+
+	/**
 	 * A failed header read has to be remembered too, or the one file that can never answer is
 	 * the one reopened per row per extracted frame. Counting the opens is not available here:
 	 * the read goes through {@code FileInputStream}, whose only seam on {@code File} is
@@ -228,7 +243,7 @@ class ScreenshotMetadataTest {
 		ScreenshotMetadata.forget(file);
 
 		assertEquals("2 KB", ScreenshotMetadata.fileSize(file));
-		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(file).matches("\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(file));
 	}
 
@@ -246,13 +261,35 @@ class ScreenshotMetadataTest {
 		File burstFrame = sized("2026-08-27_10.00.00_burst02.png", 1);
 		File renamed = sized("sunset over base.png", 1);
 
-		assertTrue(ScreenshotMetadata.displayName(capture).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(capture).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(capture));
-		assertTrue(ScreenshotMetadata.displayName(collision).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(collision).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(collision));
-		assertTrue(ScreenshotMetadata.displayName(burstFrame).matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+		assertTrue(ScreenshotMetadata.displayName(burstFrame).matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(burstFrame));
 		assertEquals("sunset over base", ScreenshotMetadata.displayName(renamed));
+	}
+
+	/**
+	 * The playtest's "Today 19:01" four rows running: an automatic capture, a burst and a few taps
+	 * of F2 land in the same minute, and a name to the minute made them indistinguishable. The
+	 * day and the time come apart as well, so a row too narrow for both keeps the time.
+	 */
+	@Test
+	void capturesFromTheSameMinuteGetDifferentNames() throws IOException {
+		File first = sized("2026-08-27_10.00.05.png", 1);
+		File second = sized("2026-08-27_10.00.15.png", 1);
+		LocalDateTime minute = LocalDateTime.now().withSecond(0).withNano(0);
+		assertTrue(first.setLastModified(minute.withSecond(5).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+		assertTrue(second.setLastModified(minute.withSecond(15).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+
+		assertFalse(ScreenshotMetadata.displayName(first).equals(ScreenshotMetadata.displayName(second)),
+				ScreenshotMetadata.displayName(first));
+		ScreenshotMetadata.DisplayName parts = ScreenshotMetadata.displayNameParts(second);
+		assertEquals("Today", parts.day());
+		assertTrue(parts.name().endsWith(":15"), parts.name());
+		assertEquals(parts.day() + " " + parts.name(), parts.full());
+		assertNull(ScreenshotMetadata.displayNameParts(sized("castle.png", 1)).day());
 	}
 
 	@Test
@@ -272,7 +309,7 @@ class ScreenshotMetadataTest {
 		File capture = sized("2026-08-27_10.00.00.PNG", 1);
 
 		assertTrue(ScreenshotMetadata.displayName(capture)
-						.matches("(Today|Yesterday) \\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}"),
+						.matches("(Today|Yesterday) \\d{2}:\\d{2}:\\d{2}|\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"),
 				ScreenshotMetadata.displayName(capture));
 	}
 
@@ -298,7 +335,7 @@ class ScreenshotMetadataTest {
 		assertTrue(file.setLastModified(lastMonth));
 
 		String label = ScreenshotMetadata.relativeTime(file);
-		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}"), label);
+		assertTrue(label.matches("\\d+ \\w+, \\d{2}:\\d{2}:\\d{2}"), label);
 	}
 
 	@Test

@@ -155,11 +155,31 @@ public final class CaptureStatus {
 	}
 
 	/**
+	 * Refuses a capture because another is still running, saying which: a burst still recording
+	 * is not saving anything the player would call a save, and its recording cue is what is on
+	 * screen. Once it stops recording, its last frames are ordinary saves still encoding.
+	 */
+	public static void postBusy() {
+		post(Kind.BUSY, busyKey(Burst.isBusy()));
+	}
+
+	static String busyKey(boolean burstRecording) {
+		return burstRecording ? "voxelcam.recordingpleasewait" : "voxelcam.savingpleasewait";
+	}
+
+	/**
 	 * Posting a message that is already up replaces it rather than stacking a second copy: holding
 	 * the key against a busy capture would otherwise fill the corner with the same refusal.
+	 *
+	 * <p>Any other notice clears a busy refusal. The refusal is posted while the busy line is
+	 * already saying the same thing, so the HUD hides it; the next notice is the result it was
+	 * waiting on, and a "still saving" left showing beneath that result would be false.
 	 */
 	static synchronized void post(Notice notice) {
 		notices.removeIf(notice::sameMessageAs);
+		if (notice.kind() != Kind.BUSY) {
+			notices.removeIf(queued -> queued.kind() == Kind.BUSY);
+		}
 		notices.addFirst(notice);
 		lastPostedMillis = notice.postedAtMillis();
 		// Expired entries are pruned on read; this only bounds a queue nobody is reading, such as
@@ -239,7 +259,8 @@ public final class CaptureStatus {
 	 *       press that bypassed the menu is queued the same way, so it is covered here too;</li>
 	 *   <li>a burst frame this frame's head settled on — only those, so the recording cue can
 	 *       show on every frame in between;</li>
-	 *   <li>an automatic moment, armed and waiting for the frame its gate accepts.</li>
+	 *   <li>an automatic moment whose gate takes this frame — only that frame, since a moment can
+	 *       wait seconds for an arrival to come into view.</li>
 	 * </ul>
 	 * Over-hiding costs a frame of a notice; under-hiding puts it in a PNG. So each term errs wide.
 	 */
@@ -255,7 +276,7 @@ public final class CaptureStatus {
 	 */
 	public static void beforeFrame() {
 		frameIsCaptured = capturesFrame(BigScreenshot.isCapturing(), CaptureMenu.capturesThisFrame(),
-				Burst.capturesThisFrame(), AutoCapture.isPending());
+				Burst.capturesThisFrame(), AutoCapture.capturesThisFrame());
 
 		long now = Util.getMillis();
 		boolean nowBusy = busyAt(ScreenshotHandler.savesInFlight(), BigScreenshot.isBusy(), Burst.isBusy());

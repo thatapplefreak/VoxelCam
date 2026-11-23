@@ -1,8 +1,10 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
@@ -10,8 +12,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Covers what /bigscreenshot accepts. resolve() is deliberately not tested here:
- * it clamps against RenderSystem.getDevice(), which needs a live GPU context.
+ * Covers what /bigscreenshot accepts and how a size is fitted to the GPU. resolve(Window) itself
+ * is not tested here, since it reads RenderSystem.getDevice() and needs a live GPU context; the
+ * fitting behind it is the Minecraft-free resolve(int, int, int).
  */
 class BigScreenshotSizeTest {
 
@@ -51,13 +54,70 @@ class BigScreenshotSizeTest {
 	}
 
 	/**
-	 * WxH is matched before Nx on purpose, so "2x2" is two pixels square rather than
+	 * WxH is matched before Nx on purpose, so "20x20" is twenty pixels square rather than
 	 * a mangled multiple. Getting this backwards would silently turn a tiny request
 	 * into a screen-multiple one.
 	 */
 	@Test
 	void widthByHeightWinsOverMultiple() {
-		assertEquals("2x2", BigScreenshotSize.parse("2x2").token());
+		assertEquals("20x20", BigScreenshotSize.parse("20x20").token());
+	}
+
+	/**
+	 * A size below the 16-pixel minimum is refused like any other unusable token rather than
+	 * quietly raised: the command would otherwise announce "0x0 (16x16)", and a hand-edited
+	 * voxelcam.json holding "0x0" falls back to the default the same way "banana" does.
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = { "0x0", "2x2", "15x15", "0x1080", "1920x0", "1920x15", "15*1080" })
+	void sizesBelowTheMinimumAreRejected(String token) {
+		assertNull(BigScreenshotSize.parse(token), token + " is smaller than anything that renders");
+	}
+
+	@Test
+	void theMinimumItselfIsAccepted() {
+		assertEquals("16x16", BigScreenshotSize.parse("16x16").token());
+	}
+
+	@Test
+	void aSizeThatFitsIsUntouched() {
+		BigScreenshotSize.Resolved resolved = BigScreenshotSize.resolve(1000, 1000, 16384);
+
+		assertEquals(1000, resolved.width());
+		assertEquals(1000, resolved.height());
+		assertFalse(resolved.clamped());
+	}
+
+	@Test
+	void anOversizedRequestShrinksToTheGpuMaximumKeepingItsAspect() {
+		BigScreenshotSize.Resolved resolved = BigScreenshotSize.resolve(32768, 16384, 16384);
+
+		assertEquals(16384, resolved.width());
+		assertEquals(8192, resolved.height());
+		assertTrue(resolved.clamped(), "the command says it was clamped to the maximum");
+	}
+
+	/**
+	 * "Clamped to this GPU's maximum texture size" is only true when the maximum shrank the size.
+	 * A multiple of a tiny window is raised to the floor instead, and must not claim the maximum.
+	 */
+	@Test
+	void raisingToTheFloorIsNotReportedAsClampedToTheMaximum() {
+		BigScreenshotSize.Resolved resolved = BigScreenshotSize.resolve(8, 4, 16384);
+
+		assertEquals(16, resolved.width());
+		assertEquals(16, resolved.height());
+		assertFalse(resolved.clamped());
+	}
+
+	/** Too large on one axis and, after the shrink, too small on the other: the maximum did shrink it. */
+	@Test
+	void shrinkingOneAxisPastTheFloorStillReportsTheMaximum() {
+		BigScreenshotSize.Resolved resolved = BigScreenshotSize.resolve(20000, 16, 16384);
+
+		assertEquals(16384, resolved.width());
+		assertEquals(16, resolved.height());
+		assertTrue(resolved.clamped());
 	}
 
 	/**

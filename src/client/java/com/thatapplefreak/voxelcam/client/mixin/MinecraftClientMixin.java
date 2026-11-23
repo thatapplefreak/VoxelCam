@@ -35,9 +35,11 @@ public class MinecraftClientMixin {
 		BigScreenshot.beforeFrame();
 		CaptureMenu.beforeFrame();
 		Burst.beforeFrame();
+		AutoCapture.beforeFrame();
 		// Last: it asks whether this frame will be read back, which every call above can change —
 		// BigScreenshot moves into CAPTURING here, CaptureMenu marks the frame it fires from, and
-		// Burst settles whether this frame is one of its slots.
+		// Burst settles whether this frame is one of its slots, AutoCapture whether its moment's gate
+		// takes this one.
 		// HUD extraction comes later in this same frame, before the blit that reads it.
 		CaptureStatus.beforeFrame();
 	}

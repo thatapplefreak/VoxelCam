@@ -80,6 +80,8 @@ public class GuiScreenShotManager extends Screen {
 	private Button filmstripScrollRightButton;
 
 	private String searchText = "";
+	/** The search field's cursor across a rebuild that happened while it had focus; -1 if none. */
+	private int searchCursorToRestore = -1;
 	private boolean favoritesOnly = false;
 	private File selected;
 	/** Which frame of the selected burst the preview is showing — null means the key itself.
@@ -121,6 +123,10 @@ public class GuiScreenShotManager extends Screen {
 	public GuiScreenShotManager(File screenshotsDir) {
 		super(Component.translatable("voxelcam.screenshots"));
 		this.screenshotsDir = screenshotsDir;
+		// Every way in (title and pause buttons, the keybinding) builds a new manager, and
+		// every popup, the settings screen and the size prompt hand back this same one, so
+		// the constructor is exactly where an opening differs from a return.
+		VoxelCamIO.forgetSelection();
 	}
 
 	@Override
@@ -153,7 +159,9 @@ public class GuiScreenShotManager extends Screen {
 
 		int searchWidth = listWidth - SORT_BUTTON_WIDTH - GAP - FILTER_BUTTON_SIZE - GAP;
 		searchBar = new EditBox(font, MARGIN, 26, searchWidth, 18, Component.translatable("voxelcam.search"));
-		searchBar.setHint(Component.translatable("voxelcam.search").withStyle(ChatFormatting.DARK_GRAY));
+		// The hint runs on past the box and is cut only by the favorites star painted over it.
+		searchBar.setHint(Component.translatable(fittingKey("voxelcam.search", LabelFit.hintRoom(searchWidth, GAP)))
+				.withStyle(ChatFormatting.DARK_GRAY));
 		searchBar.setValue(searchText);
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
@@ -205,7 +213,8 @@ public class GuiScreenShotManager extends Screen {
 		int deleteX = actionsX + actionWidth + GAP;
 		int postX = actionsX + (actionWidth + GAP) * 2;
 
-		renameButton = addRenderableWidget(button("voxelcam.rename", "voxelcam.tooltip.rename",
+		renameButton = addRenderableWidget(button(
+				fittingKey("voxelcam.rename", LabelFit.buttonRoom(actionWidth)), "voxelcam.tooltip.rename",
 				b -> renameSelected(), actionsX, actionsY, actionWidth));
 		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
 				b -> minecraft.setScreenAndShow(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
@@ -223,12 +232,16 @@ public class GuiScreenShotManager extends Screen {
 		int burstActionWidth = FilmstripLayout.actionWidth(previewWidth);
 		int actionX = previewX + previewWidth - burstActionWidth;
 		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
-		setAsKeyButton = addRenderableWidget(button("voxelcam.burst.setaskey", "voxelcam.tooltip.setaskey",
+		setAsKeyButton = addRenderableWidget(button(
+				fittingKey("voxelcam.burst.setaskey", LabelFit.buttonRoom(burstActionWidth)),
+				"voxelcam.tooltip.setaskey",
 				b -> setSelectedFrameAsKey(), actionX, actionTop, burstActionWidth));
 		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
-		// A fixed label, with the frame count in the tooltip: a label that changed with the burst
-		// would be one a test (and clickScreenButton) could never find by its translation.
-		exportAnimationButton = addRenderableWidget(button("voxelcam.burst.exportanimation",
+		// A fixed label for a given width, with the frame count in the tooltip: a label that
+		// changed with the burst would be one a test (and clickScreenButton) could never find by
+		// its translation.
+		exportAnimationButton = addRenderableWidget(button(
+				fittingKey("voxelcam.burst.exportanimation", LabelFit.buttonRoom(burstActionWidth)),
 				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
 				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, burstActionWidth));
 		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
@@ -252,6 +265,19 @@ public class GuiScreenShotManager extends Screen {
 		visibleFiles = files;
 		list.setScreenshots(files, selected);
 		updateButtonStates();
+	}
+
+	/**
+	 * {@code key}, or its {@code .short} wording where the full label does not fit in
+	 * {@code room} pixels ({@link LabelFit#keyFor}). Only Rename, the filmstrip's column and the
+	 * search hint have one: at the narrowest window Re-christen and Export Animation scroll by
+	 * nearly half their width, so what shows at any moment is a fragment. Delete and Share
+	 * overflow by a few pixels there and are left to vanilla's scrolling, which still shows most
+	 * of the word at every moment.
+	 */
+	private String fittingKey(String key, int room) {
+		return LabelFit.keyFor(key, room, font.width(Component.translatable(key)),
+				font.width(Component.translatable(key + ".short")));
 	}
 
 	private Button button(String labelKey, String tooltipKey, Button.OnPress action,
@@ -623,6 +649,39 @@ public class GuiScreenShotManager extends Screen {
 		return false;
 	}
 
+	/**
+	 * Remembers a search being typed, so {@link #setInitialFocus()} can put it back: the rebuild
+	 * replaces the field, and the export finishing or a resize can land mid-word.
+	 */
+	@Override
+	protected void rebuildWidgets() {
+		searchCursorToRestore = searchBar != null && searchBar.isFocused() ? searchBar.getCursorPosition() : -1;
+		// Vanilla's clearFocus() walks the focus path, and a list focused with no focused row has
+		// none, so without this the screen could keep the old list after the rebuild.
+		setFocused(null);
+		super.rebuildWidgets();
+	}
+
+	/**
+	 * Vanilla's default, after an arrow key or Tab, tabs onto the first focusable widget — the
+	 * search field — which switched the shortcuts off on every return from a popup. Instead the
+	 * focus goes to the highlighted row, whatever the last input was: the first arrow press then
+	 * moves the selection, the row shows as focused, and the next rebuild can clear it. A search
+	 * being typed when the rebuild came keeps the field, with its cursor where it was.
+	 */
+	@Override
+	protected void setInitialFocus() {
+		if (searchCursorToRestore >= 0) {
+			setInitialFocus(searchBar);
+			searchBar.moveCursorTo(searchCursorToRestore, false);
+			searchCursorToRestore = -1;
+		} else if (list.getSelected() != null) {
+			// The path vanilla builds runs through the selected row; with none it would pick the
+			// first row and so change the selection, which focusing must not do.
+			setInitialFocus(list);
+		}
+	}
+
 	/** Shortcuts only make sense when not typing a search query. */
 	private boolean shortcutsApply() {
 		return !searchBar.isFocused() && selected != null;
@@ -784,35 +843,31 @@ public class GuiScreenShotManager extends Screen {
 			return;
 		}
 
-		// The list row already carries the capture time, so this line stays short
-		// enough not to be trimmed: the filename (which the row may show as a
-		// friendly time instead) plus the facts the row has no space for.
-		StringBuilder details = new StringBuilder();
-		// First, ahead of even the name: an animation previews as its first frame, so this is the
-		// one fact about it the image above cannot show, and the line is trimmed from the end.
-		int animationFrames = ScreenshotMetadata.animationFrames(selected);
-		if (animationFrames > 0) {
-			details.append(Component.translatable("voxelcam.animation.details", animationFrames).getString()).append("  ·  ");
-		}
-		details.append(selected.getName());
-		ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(selected);
-		if (size != null) {
-			details.append("  ·  ").append(size.width()).append('×').append(size.height());
-		}
-		details.append("  ·  ").append(ScreenshotMetadata.fileSize(selected));
-		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
-		if (captureContext != null) {
-			details.append("  ·  ").append(captureContext.describeLocation());
-		}
-		// Last, and only for the handful of screenshots that have one: an automatic capture is the
-		// only kind whose existence needs explaining after the fact.
-		MomentTag moment = ScreenshotMetadata.moment(selected);
-		if (moment != null) {
-			details.append("  ·  ").append(moment.describe().getString());
-		}
-		context.centeredText(font,
-				Component.literal(font.plainSubstrByWidth(details.toString(), previewWidth)).withStyle(ChatFormatting.GRAY),
+		context.centeredText(font, Component.literal(detailsLine(selected)).withStyle(ChatFormatting.GRAY),
 				previewX + previewWidth / 2, previewY + previewHeight + 4, 0xFFA0A0A0);
+	}
+
+	/**
+	 * The line under the preview, as wide as the preview, fitted by {@link CaptionFit#details}:
+	 * at the default window it has room for an advancement's title and little else, and the
+	 * title is the one fact that says why a file nobody asked for exists. Public so the client
+	 * game test can read what the line says rather than only photograph it.
+	 */
+	public String detailsLine(File selected) {
+		int animationFrames = ScreenshotMetadata.animationFrames(selected);
+		ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(selected);
+		CaptureContext captureContext = ScreenshotMetadata.captureContext(selected);
+		MomentTag moment = ScreenshotMetadata.moment(selected);
+		return CaptionFit.fit(CaptionFit.details(
+						animationFrames > 0
+								? Component.translatable("voxelcam.animation.details", animationFrames).getString()
+								: null,
+						moment == null ? null : moment.describe().getString(),
+						captureContext == null ? null : captureContext.describeLocation(),
+						size == null ? null : size.width() + "×" + size.height(),
+						ScreenshotMetadata.fileSize(selected),
+						selected.getName()),
+				CaptionFit.DETAILS_SEPARATOR, previewWidth, font::width);
 	}
 
 	/**

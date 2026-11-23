@@ -31,6 +31,8 @@ public final class PngTextChunk {
 	private static final String IEND = "IEND";
 	private static final String IHDR = "IHDR";
 	private static final int IHDR_DATA_LENGTH = 13;
+	/** Bytes from the start of the file through the end of a well-formed {@code IHDR}. */
+	static final int HEADER_LENGTH = SIGNATURE.length + 4 + 4 + IHDR_DATA_LENGTH + 4;
 
 	private PngTextChunk() {
 	}
@@ -164,16 +166,23 @@ public final class PngTextChunk {
 		return length < 0 || dataEnd + 4 > png.length;
 	}
 
-	/** Everything {@link #ihdrEnd} takes on trust: the signature, and a first chunk that is a
-	 * 13-byte {@code IHDR} with its CRC inside the array. */
 	private static void requireIhdrFirst(byte[] png) throws IOException {
-		int ihdrChunkLength = 4 + 4 + IHDR_DATA_LENGTH + 4;
-		if (png.length < SIGNATURE.length + ihdrChunkLength
-				|| !Arrays.equals(png, 0, SIGNATURE.length, SIGNATURE, 0, SIGNATURE.length)
-				|| readInt(png, SIGNATURE.length) != IHDR_DATA_LENGTH
-				|| !IHDR.equals(new String(png, SIGNATURE.length + 4, 4, StandardCharsets.US_ASCII))) {
+		if (!startsWithIhdr(png)) {
 			throw new IOException("Not a PNG with a complete IHDR, so there is nowhere to write a tag");
 		}
+	}
+
+	/**
+	 * Everything {@link #ihdrEnd} takes on trust, and everything {@link PngDimensions} needs
+	 * before bytes 16–23 mean width and height: the signature, and a first chunk that is a
+	 * 13-byte {@code IHDR} with its CRC inside the array. One check for both, because the
+	 * manager lists anything named {@code .png} and each reader once took the header on trust.
+	 */
+	static boolean startsWithIhdr(byte[] png) {
+		return png.length >= HEADER_LENGTH
+				&& Arrays.equals(png, 0, SIGNATURE.length, SIGNATURE, 0, SIGNATURE.length)
+				&& readInt(png, SIGNATURE.length) == IHDR_DATA_LENGTH
+				&& IHDR.equals(new String(png, SIGNATURE.length + 4, 4, StandardCharsets.US_ASCII));
 	}
 
 	/** The first chunk after the signature must be IHDR; this is where new chunks are inserted. */

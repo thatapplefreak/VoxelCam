@@ -53,7 +53,6 @@ public final class CaptureStatusHud {
 
 	private static final String BUSY_KEY = "voxelcam.hud.saving";
 	private static final String RECORDING_KEY = "voxelcam.hud.recording";
-	private static final String BUSY_REFUSAL_KEY = "voxelcam.savingpleasewait";
 
 	private CaptureStatusHud() {
 	}
@@ -81,8 +80,9 @@ public final class CaptureStatusHud {
 
 		List<CaptureStatus.Notice> notices = CaptureStatus.visibleAt(now);
 		for (CaptureStatus.Notice notice : notices) {
-			// The busy line already says it; a "please wait" under "Saving…" says it twice.
-			if (busy && notice.kind() == CaptureStatus.Kind.BUSY && BUSY_REFUSAL_KEY.equals(notice.key())) {
+			// The busy line or the recording cue already says it; a "still saving" under "Saving…"
+			// says it twice.
+			if (busy && notice.kind() == CaptureStatus.Kind.BUSY) {
 				continue;
 			}
 			extractRow(graphics, client, y, notice.text(), accentFor(notice.kind()),
