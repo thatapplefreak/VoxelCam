@@ -187,6 +187,41 @@ class AutoCaptureTest {
 				AutoCapture.gateFor(MomentTrigger.NEW_DIMENSION, true, true, false, AutoCapture.ScreenKind.LEVEL_LOADING));
 	}
 
+	/**
+	 * The first frame after the loading screen closes is fog, or the portal overlay, because vanilla
+	 * only waits for the player's own section. That clears on its own too, so whatever trigger was
+	 * armed for the arrival waits: the advancement for entering a dimension arrives with it and
+	 * usually wins the cooldown, and is as much a picture of the arrival as the new-dimension moment.
+	 */
+	@Test
+	void aWorldStillComingIntoViewIsWaitedOutByEveryTrigger() {
+		for (MomentTrigger trigger : MomentTrigger.values()) {
+			assertEquals(AutoCapture.Gate.WAIT,
+					AutoCapture.gateFor(trigger, true, true, false, AutoCapture.ScreenKind.ARRIVING),
+					trigger + " must not shoot an arrival before the world is drawn");
+		}
+	}
+
+	/** Scoped to the arrival: a moment armed outside one, or once it is in view, sees the open
+	 * frame it always did. Joining a world is not an arrival either, which is the caller's side. */
+	@Test
+	void onlyAMomentArmedForAnArrivalWaitsForIt() {
+		assertEquals(AutoCapture.ScreenKind.ARRIVING,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, true, true));
+		assertEquals(AutoCapture.ScreenKind.NONE,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, false, true),
+				"a moment armed after the arrival came into view, or outside one, is taken as before");
+		assertEquals(AutoCapture.ScreenKind.NONE,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, true, false),
+				"once the arrival is in view, its moment is taken");
+		for (AutoCapture.ScreenKind screen : AutoCapture.ScreenKind.values()) {
+			if (screen != AutoCapture.ScreenKind.NONE) {
+				assertEquals(screen, AutoCapture.arrivingKind(screen, true, true),
+						"a screen still decides for itself: " + screen);
+			}
+		}
+	}
+
 	@Test
 	void nothingSurvivesLosingTheWorldOrThePlayer() {
 		assertEquals(AutoCapture.Gate.DROP,
@@ -209,6 +244,18 @@ class AutoCaptureTest {
 		for (int frame = 0; frame < AutoCapture.PENDING_TIMEOUT_FRAMES * 3; frame++) {
 			assertFalse(AutoCapture.advancePending(AutoCapture.ScreenKind.LEVEL_LOADING),
 					"a slow chunk load must not time the capture out at frame " + frame);
+		}
+	}
+
+	/** An arrival has its own bound, counted in ticks by ArrivalWatch; the frame countdown must not
+	 * cut it short. */
+	@Test
+	void theCountdownDoesNotRunWhileAnArrivalComesIntoView() {
+		AutoCapture.arm(MomentTrigger.NEW_DIMENSION, "minecraft:the_nether", 0L);
+
+		for (int frame = 0; frame < AutoCapture.PENDING_TIMEOUT_FRAMES * 3; frame++) {
+			assertFalse(AutoCapture.advancePending(AutoCapture.ScreenKind.ARRIVING),
+					"a slow arrival must not drop the capture at frame " + frame);
 		}
 	}
 

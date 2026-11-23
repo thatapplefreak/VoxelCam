@@ -74,6 +74,10 @@ public final class AutoCapture {
 	enum ScreenKind {
 		NONE,
 		LEVEL_LOADING,
+		/** No screen, but the moment was armed for an arrival in a dimension that is not in view
+		 * yet: the terrain around the player is still being drawn, or the portal overlay is still
+		 * fading. See {@link ArrivalWatch}. */
+		ARRIVING,
 		DEATH,
 		OTHER
 	}
@@ -105,6 +109,20 @@ public final class AutoCapture {
 
 	private static final BossBarTracker BOSS_BARS = new BossBarTracker();
 
+	/** The dimension the last tick was in, to notice the player changing it. Null at the start of
+	 * a session, so joining a world is not an arrival. */
+	private static String lastDimension;
+	/** The arrival being followed, from a change of dimension until it is in view or over; null
+	 * the rest of the time. */
+	private static ArrivalWatch arrival;
+	private static int arrivalTicks;
+	/** Whether the pending capture belongs to the arrival: armed during it, or already pending when
+	 * the dimension changed. Only such a capture waits for the view. */
+	private static boolean pendingForArrival;
+
+	/** What {@link #beforeFrame()} decided: whether this frame's blit takes the pending capture. */
+	private static boolean capturesThisFrame;
+
 	private AutoCapture() {
 	}
 
@@ -117,12 +135,6 @@ public final class AutoCapture {
 	 * capture the player did not ask for, and one that explains at length why it declined to happen
 	 * is worse company than one that simply does not.
 	 */
-	/** Armed and waiting for a frame its gate accepts; any frame while this holds may be the one
-	 * read back. */
-	static boolean isPending() {
-		return state == State.PENDING;
-	}
-
 	public static void fire(MomentTrigger trigger, String subject) {
 		long now = Util.getMillis();
 		if (!shouldArm(trigger, now)) {
@@ -138,12 +150,14 @@ public final class AutoCapture {
 	 * {@link #gateFor} drops the moment for it.
 	 */
 	public static void beforeBlit() {
+		boolean announced = capturesThisFrame;
+		capturesThisFrame = false;
 		if (state != State.PENDING) {
 			return;
 		}
 
 		Minecraft client = Minecraft.getInstance();
-		ScreenKind screen = screenKind(client.gui.screen());
+		ScreenKind screen = viewKind(client);
 		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
 				screen)) {
 			case DROP -> dropPending();
@@ -152,8 +166,35 @@ public final class AutoCapture {
 					dropPending();
 				}
 			}
-			case CAPTURE -> capture(client);
+			case CAPTURE -> {
+				// The HUD was extracted on the strength of beforeFrame's answer. A frame it was not
+				// blanked for would carry the notices into the PNG, so the capture waits a frame.
+				if (announced) {
+					capture(client);
+				}
+			}
 		}
+	}
+
+	/**
+	 * Head of the frame, before {@code CaptureStatus.beforeFrame}: settles whether this frame is the
+	 * one the pending capture is taken from, so the HUD is blank for that frame only and not for
+	 * the whole of a wait that can run to seconds.
+	 */
+	public static void beforeFrame() {
+		capturesThisFrame = false;
+		if (state != State.PENDING) {
+			return;
+		}
+		Minecraft client = Minecraft.getInstance();
+		capturesThisFrame = gateFor(pendingTrigger, client.level != null, client.player != null,
+				CaptureMenu.isArmed(), viewKind(client)) == Gate.CAPTURE;
+	}
+
+	/** Whether this frame's blit takes the pending capture. Valid after {@link #beforeFrame()}; what
+	 * {@code CaptureStatus} hides the HUD for. */
+	static boolean capturesThisFrame() {
+		return capturesThisFrame;
 	}
 
 	/** The two triggers that need no mixin, plus nothing else: the pending countdown runs per frame,
@@ -167,6 +208,8 @@ public final class AutoCapture {
 			return;
 		}
 		watchDeath(player);
+		// Before watchDimension, so the new-dimension moment it arms is armed into the arrival.
+		watchArrival(client, player);
 		watchDimension(client);
 	}
 
@@ -182,6 +225,11 @@ public final class AutoCapture {
 		visitedDimensions.clear();
 		wasAlive = false;
 		BOSS_BARS.reset();
+		lastDimension = null;
+		arrival = null;
+		arrivalTicks = 0;
+		pendingForArrival = false;
+		capturesThisFrame = false;
 	}
 
 	// --- the watches ------------------------------------------------------------------------
@@ -208,6 +256,45 @@ public final class AutoCapture {
 		String dimension = level.dimension().identifier().toString();
 		if (markVisited(dimension)) {
 			fire(MomentTrigger.NEW_DIMENSION, dimension);
+		}
+	}
+
+	/**
+	 * Follows an arrival in a new dimension until it is in view or over; see {@link ArrivalWatch}.
+	 * Only a change of dimension is an arrival. Joining a world is not, so an advancement earned a
+	 * moment after logging in is taken as it always was.
+	 */
+	private static void watchArrival(Minecraft client, LocalPlayer player) {
+		ClientLevel level = client.level;
+		if (level == null) {
+			return;
+		}
+		String dimension = level.dimension().identifier().toString();
+		if (lastDimension != null && !dimension.equals(lastDimension)) {
+			arrival = new ArrivalWatch();
+			arrivalTicks = 0;
+			// Armed before the change and held under the loading screen, or armed on this very
+			// tick from a packet handled before it: an advancement for entering the dimension
+			// arrives that way. Either way its moment is on this side of the screen.
+			if (state == State.PENDING) {
+				pendingForArrival = true;
+			}
+		}
+		lastDimension = dimension;
+		if (arrival == null) {
+			return;
+		}
+		if (!(client.gui.screen() instanceof LevelLoadingScreen)) {
+			arrivalTicks++;
+		}
+		ArrivalWatch.Progress progress = arrival.observe(arrivalTicks, client.levelRenderer.visibleSections().size(),
+				Math.max(player.portalEffectIntensity, player.oPortalEffectIntensity), player.getX(), player.getZ());
+		if (progress == ArrivalWatch.Progress.ARRIVING) {
+			return;
+		}
+		arrival = null;
+		if (progress == ArrivalWatch.Progress.LOST && state == State.PENDING && pendingForArrival) {
+			dropPending();
 		}
 	}
 
@@ -263,6 +350,7 @@ public final class AutoCapture {
 		pendingSubject = subject;
 		pendingFrames = 0;
 		lastArmMillis = nowMillis;
+		pendingForArrival = arrival != null;
 	}
 
 	/**
@@ -282,6 +370,7 @@ public final class AutoCapture {
 		pendingTrigger = null;
 		pendingSubject = null;
 		pendingFrames = 0;
+		pendingForArrival = false;
 	}
 
 	/**
@@ -292,7 +381,8 @@ public final class AutoCapture {
 	 * never finishes ends in a disconnect, which {@link #forgetSession()} handles.
 	 */
 	static boolean advancePending(ScreenKind screen) {
-		if (screen == ScreenKind.LEVEL_LOADING) {
+		// An arrival has its own bound, ArrivalWatch.TIMEOUT_TICKS, counted in ticks.
+		if (screen == ScreenKind.LEVEL_LOADING || screen == ScreenKind.ARRIVING) {
 			return false;
 		}
 		int budget = pendingTrigger == MomentTrigger.DEATH
@@ -330,7 +420,7 @@ public final class AutoCapture {
 			return Gate.DROP;
 		}
 		return switch (screen) {
-			case LEVEL_LOADING -> Gate.WAIT;
+			case LEVEL_LOADING, ARRIVING -> Gate.WAIT;
 			case DEATH -> trigger == MomentTrigger.DEATH ? Gate.CAPTURE : Gate.DROP;
 			case NONE -> trigger == MomentTrigger.DEATH ? Gate.WAIT : Gate.CAPTURE;
 			// The player opened this one, and did so after the moment. Held rather than dropped, it
@@ -345,6 +435,21 @@ public final class AutoCapture {
 	}
 
 	// --- client-facing helpers ----------------------------------------------------------------
+
+	/** What is on screen for the pending capture: {@link #screenKind}, except that an open view
+	 * reads as {@link ScreenKind#ARRIVING} while a capture armed for an arrival waits for it. */
+	private static ScreenKind viewKind(Minecraft client) {
+		ScreenKind screen = screenKind(client.gui.screen());
+		return arrivingKind(screen, pendingForArrival, arrival != null);
+	}
+
+	/**
+	 * Only a capture armed for the arrival waits for it: anything armed once the view is in, or
+	 * outside an arrival altogether, sees the open frame it always did.
+	 */
+	static ScreenKind arrivingKind(ScreenKind screen, boolean armedForArrival, boolean stillArriving) {
+		return screen == ScreenKind.NONE && armedForArrival && stillArriving ? ScreenKind.ARRIVING : screen;
+	}
 
 	static ScreenKind screenKind(Screen screen) {
 		if (screen == null) {
