@@ -153,12 +153,9 @@ public class GuiScreenShotManager extends Screen {
 
 		int searchWidth = listWidth - SORT_BUTTON_WIDTH - GAP - FILTER_BUTTON_SIZE - GAP;
 		searchBar = new EditBox(font, MARGIN, 26, searchWidth, 18, Component.translatable("voxelcam.search"));
-		// A hint is cut at the box's edge rather than scrolled the way a button's label is.
-		Component searchHint = Component.translatable("voxelcam.search");
-		if (!LabelFit.fitsEditBox(font.width(searchHint), searchWidth)) {
-			searchHint = Component.translatable("voxelcam.search.short");
-		}
-		searchBar.setHint(searchHint.copy().withStyle(ChatFormatting.DARK_GRAY));
+		// The hint runs on past the box and is cut only by the favorites star painted over it.
+		searchBar.setHint(Component.translatable(fittingKey("voxelcam.search", LabelFit.hintRoom(searchWidth, GAP)))
+				.withStyle(ChatFormatting.DARK_GRAY));
 		searchBar.setValue(searchText);
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
@@ -210,8 +207,8 @@ public class GuiScreenShotManager extends Screen {
 		int deleteX = actionsX + actionWidth + GAP;
 		int postX = actionsX + (actionWidth + GAP) * 2;
 
-		renameButton = addRenderableWidget(button(fittingKey("voxelcam.rename", actionWidth),
-				"voxelcam.tooltip.rename",
+		renameButton = addRenderableWidget(button(
+				fittingKey("voxelcam.rename", LabelFit.buttonRoom(actionWidth)), "voxelcam.tooltip.rename",
 				b -> renameSelected(), actionsX, actionsY, actionWidth));
 		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
 				b -> minecraft.setScreenAndShow(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
@@ -229,7 +226,8 @@ public class GuiScreenShotManager extends Screen {
 		int burstActionWidth = FilmstripLayout.actionWidth(previewWidth);
 		int actionX = previewX + previewWidth - burstActionWidth;
 		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
-		setAsKeyButton = addRenderableWidget(button(fittingKey("voxelcam.burst.setaskey", burstActionWidth),
+		setAsKeyButton = addRenderableWidget(button(
+				fittingKey("voxelcam.burst.setaskey", LabelFit.buttonRoom(burstActionWidth)),
 				"voxelcam.tooltip.setaskey",
 				b -> setSelectedFrameAsKey(), actionX, actionTop, burstActionWidth));
 		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
@@ -237,7 +235,8 @@ public class GuiScreenShotManager extends Screen {
 		// changed with the burst would be one a test (and clickScreenButton) could never find by
 		// its translation.
 		exportAnimationButton = addRenderableWidget(button(
-				fittingKey("voxelcam.burst.exportanimation", burstActionWidth), "voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
+				fittingKey("voxelcam.burst.exportanimation", LabelFit.buttonRoom(burstActionWidth)),
+				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
 				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, burstActionWidth));
 		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
 		filmstripScrollLeftButton = addRenderableWidget(button("voxelcam.burst.scrollleft",
@@ -263,14 +262,16 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	/**
-	 * {@code key}, or its {@code .short} wording where the full label would scroll inside a
-	 * button {@code buttonWidth} wide. Only Rename and the filmstrip's column have one: at the
-	 * narrowest window Re-christen and Export Animation scroll by nearly half their width, so
-	 * what shows at any moment is a fragment. Delete and Share overflow by a few pixels there and
-	 * are left to vanilla's scrolling, which still shows most of the word at every moment.
+	 * {@code key}, or its {@code .short} wording where the full label does not fit in
+	 * {@code room} pixels ({@link LabelFit#keyFor}). Only Rename, the filmstrip's column and the
+	 * search hint have one: at the narrowest window Re-christen and Export Animation scroll by
+	 * nearly half their width, so what shows at any moment is a fragment. Delete and Share
+	 * overflow by a few pixels there and are left to vanilla's scrolling, which still shows most
+	 * of the word at every moment.
 	 */
-	private String fittingKey(String key, int buttonWidth) {
-		return LabelFit.fitsButton(font.width(Component.translatable(key)), buttonWidth) ? key : key + ".short";
+	private String fittingKey(String key, int room) {
+		return LabelFit.keyFor(key, room, font.width(Component.translatable(key)),
+				font.width(Component.translatable(key + ".short")));
 	}
 
 	private Button button(String labelKey, String tooltipKey, Button.OnPress action,

@@ -717,8 +717,9 @@ Below ~362px the filmstrip's Set as key / Export animation column narrows too
 (`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons, and its
 two buttons take their `.short` labels where the full ones no longer fit. A button label that does not fit is not clipped:
 vanilla scrolls it inside the button. So only a label that would scroll by a large part of itself
-has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is cut
-rather than scrolled), picked in `init()` when `LabelFit` says the full one does not fit;
+has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is
+neither scrolled nor clipped but runs on until the favorites star covers it), picked in `init()`
+by `LabelFit.keyFor` where the full one does not fit and the short one is shorter;
 Delete and Share overflow by a few pixels at 320 and are left to scroll. The cells
 are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
 count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
