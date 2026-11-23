@@ -27,18 +27,15 @@ import java.util.List;
  */
 public final class CaptureMenuHud {
 
-	private static final int RADIUS = 58;
+	static final int RADIUS = 58;
 	/** Grid step. Larger reads chunkier; the dial is quantised to this in both axes. */
 	private static final int CELL = 3;
 	private static final int RING_THICKNESS = 4;
-	private static final int LABEL_GAP = 12;
-	/** Vanilla's font is 9px tall; kept as a constant so the plate does not depend on a field. */
-	private static final int LINE_HEIGHT = 9;
+	static final int LABEL_GAP = 12;
 
 	/** Thinner than the main dial's ring: the outer ring is a second, lesser signal, not
 	 * another thing competing for the eye with the mode the player already committed to. */
 	private static final int OPTION_RING_THICKNESS = 3;
-	private static final int OPTION_LABEL_GAP = 14;
 
 	private static final int TRANSPARENT = 0;
 	private static final int SECTOR = 0x88101010;
@@ -65,9 +62,17 @@ public final class CaptureMenuHud {
 		// Scaled positions, so the aim offset lands in the same space the wedges are laid out in.
 		double mouseX = client.mouseHandler.getScaledXPos(client.getWindow());
 		double mouseY = client.mouseHandler.getScaledYPos(client.getWindow());
-		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY);
-
 		CaptureMenu.Mode[] modes = CaptureMenu.Mode.values();
+		// Laid out before the aim is read, from the same widths and screen the labels below are
+		// placed with, so the ring a release commits is the ring that is drawn.
+		int[][] optionRadii = new int[modes.length][];
+		for (CaptureMenu.Mode mode : modes) {
+			int[] widths = optionLabelsFor(mode).stream().mapToInt(client.font::width).toArray();
+			optionRadii[mode.ordinal()] = CaptureMenuLabels.optionRadii(modes.length, mode.ordinal(), widths,
+					graphics.guiWidth(), graphics.guiHeight());
+		}
+		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY, optionRadii);
+
 		CaptureMenu.Mode aimedMode = CaptureMenu.aimedMode();
 		int aimed = aimedMode.ordinal();
 
@@ -75,16 +80,17 @@ public final class CaptureMenuHud {
 
 		double wedge = Math.PI * 2 / modes.length;
 		for (int i = 0; i < modes.length; i++) {
-			extractLabel(graphics, client, centerX, centerY, i * wedge,
+			extractLabel(graphics, client, i * wedge,
 					Component.translatable(labelKey(modes[i])), i == aimed, RADIUS + LABEL_GAP);
 		}
 
-		// Only drawn once the cursor has actually reached CaptureMenu.OPTION_RADIUS — aimedOption
+		// Only drawn once the cursor has actually reached the aimed option's radius — aimedOption
 		// returns -1 both short of that and for a mode with no options, so this single check
 		// covers both without the HUD needing to know which one applies.
 		int aimedOption = CaptureMenu.aimedOption();
 		if (aimedOption >= 0) {
-			extractOptionRing(graphics, client, centerX, centerY, aimedMode, aimedOption);
+			extractOptionRing(graphics, client, centerX, centerY, aimedMode, aimedOption,
+					optionRadii[aimedMode.ordinal()]);
 		}
 	}
 
@@ -147,12 +153,13 @@ public final class CaptureMenuHud {
 	 * #extractDial} is — but only that one wedge's slice of the ring, not the full circle:
 	 * showing options at this radius for every mode at once would read as though all three had
 	 * them, when only {@code BIG_SCREENSHOT} and {@code BURST} do. Bounded to {@link
-	 * CaptureMenu#OPTION_RADIUS} rather than the dial's own {@code RADIUS}, so this is a second,
+	 * CaptureMenu#OPTION_RADIUS}, the largest any option's {@code radii} entry can be, rather than
+	 * the dial's own {@code RADIUS}, so this is a second,
 	 * separate scan rather than widening the main dial's — paid only while actually aimed past
 	 * it, not on every open-menu frame.
 	 */
 	private static void extractOptionRing(GuiGraphicsExtractor graphics, Minecraft client,
-			int centerX, int centerY, CaptureMenu.Mode aimedMode, int aimedOption) {
+			int centerX, int centerY, CaptureMenu.Mode aimedMode, int aimedOption, int[] radii) {
 		List<String> options = optionLabelsFor(aimedMode);
 		if (options.isEmpty()) {
 			return;
@@ -166,7 +173,7 @@ public final class CaptureMenuHud {
 			int runColor = TRANSPARENT;
 			for (int left = -radius; left <= radius; left += CELL) {
 				int color = optionCellColor(left + CELL / 2.0, top + CELL / 2.0,
-						wedgeCount, wedgeIndex, options.size(), aimedOption);
+						wedgeCount, wedgeIndex, radii, aimedOption);
 				if (color != runColor) {
 					emitRun(graphics, centerX, centerY, runStart, left, top, runColor);
 					runStart = left;
@@ -176,28 +183,28 @@ public final class CaptureMenuHud {
 			emitRun(graphics, centerX, centerY, runStart, radius + CELL, top, runColor);
 		}
 
-		double wedgeWidth = Math.PI * 2 / wedgeCount;
-		double wedgeCenter = wedgeIndex * wedgeWidth;
-		double optionWidth = wedgeWidth / options.size();
 		for (int i = 0; i < options.size(); i++) {
-			double optionAngle = wedgeCenter - wedgeWidth / 2 + optionWidth * (i + 0.5);
-			extractLabel(graphics, client, centerX, centerY, optionAngle,
-					Component.literal(options.get(i)), i == aimedOption, radius + OPTION_LABEL_GAP);
+			extractLabel(graphics, client, CaptureMenuLabels.optionAngle(wedgeCount, wedgeIndex, options.size(), i),
+					Component.literal(options.get(i)), i == aimedOption, CaptureMenuLabels.OPTION_LABEL_RADIUS);
 		}
 	}
 
 	private static int optionCellColor(double dx, double dy, int wedgeCount, int wedgeIndex,
-			int optionCount, int aimedOption) {
-		double distance = Math.sqrt(dx * dx + dy * dy);
-		int radius = CaptureMenu.OPTION_RADIUS;
-		if (distance > radius || distance < radius - OPTION_RING_THICKNESS) {
-			return TRANSPARENT;
-		}
-
+			int[] radii, int aimedOption) {
 		double angle = Math.atan2(dx, -dy);
 		if (CaptureMenu.wedgeForAngle(angle, wedgeCount) != wedgeIndex) {
 			// Only the aimed wedge's own arc is drawn; elsewhere at this radius stays blank
 			// rather than implying every mode has options here.
+			return TRANSPARENT;
+		}
+
+		// Each option's segment sits at that option's own radius, the one CaptureMenu selects it
+		// from: OPTION_RADIUS, or closer in where its label had to be pulled off the hotbar.
+		int optionCount = radii.length;
+		int option = CaptureMenu.subOptionForAngle(angle, wedgeCount, wedgeIndex, optionCount);
+		double distance = Math.sqrt(dx * dx + dy * dy);
+		int radius = radii[option];
+		if (distance > radius || distance < radius - OPTION_RING_THICKNESS) {
 			return TRANSPARENT;
 		}
 
@@ -212,7 +219,6 @@ public final class CaptureMenuHud {
 			}
 		}
 
-		int option = CaptureMenu.subOptionForAngle(angle, wedgeCount, wedgeIndex, optionCount);
 		return option == aimedOption ? SECTOR_AIMED : SECTOR;
 	}
 
@@ -239,22 +245,17 @@ public final class CaptureMenuHud {
 	/**
 	 * Labels float outside the ring on their wedge's mid-angle, on a plate cut to the text rather
 	 * than to a fixed box — a box sized in advance is what let longer names spill past their own
-	 * edges. The plate is clamped to the screen so a wedge pointing sideways cannot push its label
-	 * off it. {@code radius} is the mode dial's own {@code RADIUS + LABEL_GAP} for a mode label,
-	 * or the option ring's for one of its sub-option labels.
+	 * edges. {@link CaptureMenuLabels#plate} decides where, including keeping it on screen and off
+	 * vanilla's hotbar. {@code radius} is the mode dial's own {@code RADIUS + LABEL_GAP} for a mode
+	 * label, or {@link CaptureMenuLabels#OPTION_LABEL_RADIUS} for one of the ring's.
 	 */
-	private static void extractLabel(GuiGraphicsExtractor graphics, Minecraft client,
-			int centerX, int centerY, double angle, Component label, boolean aimed, int radius) {
-		int x = centerX + (int) Math.round(Math.sin(angle) * radius);
-		int y = centerY - (int) Math.round(Math.cos(angle) * radius) - LINE_HEIGHT / 2;
-
-		int half = client.font.width(label) / 2 + 4;
-		x = Math.max(half + 2, Math.min(graphics.guiWidth() - half - 2, x));
-		y = Math.max(2, Math.min(graphics.guiHeight() - LINE_HEIGHT - 4, y));
-
-		graphics.fill(x - half, y - 3, x + half, y + LINE_HEIGHT + 1,
-				aimed ? LABEL_PLATE_AIMED : LABEL_PLATE);
-		graphics.centeredText(client.font, label, x, y, aimed ? LABEL_TEXT_AIMED : LABEL_TEXT);
+	private static void extractLabel(GuiGraphicsExtractor graphics, Minecraft client, double angle,
+			Component label, boolean aimed, int radius) {
+		int[] plate = CaptureMenuLabels.plate(angle, radius, client.font.width(label),
+				graphics.guiWidth(), graphics.guiHeight());
+		graphics.fill(plate[0], plate[1], plate[2], plate[3], aimed ? LABEL_PLATE_AIMED : LABEL_PLATE);
+		graphics.centeredText(client.font, label, (plate[0] + plate[2]) / 2, plate[1] + 3,
+				aimed ? LABEL_TEXT_AIMED : LABEL_TEXT);
 	}
 
 	private static String labelKey(CaptureMenu.Mode mode) {

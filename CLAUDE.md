@@ -316,7 +316,13 @@ Five things here each cost a playtest to find:
 
 The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
 `BigScreenshotSize.DIAL_OPTIONS`: four burst lengths (2–5 s, all of them) and five sizes, because
-eight would put labels 15° apart and colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. In a game test,
+eight would put labels 15° apart and colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. Below about 290 GUI pixels of height
+(854x480 is 240) the lowest labels reach vanilla's hotbar and the hearts/food row, so
+`CaptureMenuLabels.plate` pulls such a label in along its own ray until it clears them. A pulled
+label lands inside `OPTION_RADIUS`, so that option alone starts being selected where its label
+begins (`CaptureMenuLabels.optionRadii`, which the HUD hands `setAimOffset` each frame and draws
+that arc segment at). Moving only the label left steering onto "8k" or "2s" releasing with the old
+size; the radius only ever comes down, so every aim that picked an option still picks it. In a game test,
 `moveCursor` moves the raw cursor while aim is GUI-scaled, so a vector that clears the dead zone
 may not clear the ring.
 
