@@ -148,21 +148,29 @@ class AutoCaptureTest {
 
 	/**
 	 * Under {@code immediate_respawn} vanilla answers the kill packet by respawning instead of
-	 * opening {@code DeathScreen}, and the player is at their spawn point within a tick. Waiting
-	 * would hold the only pending slot for a screen that is never coming, refusing any moment in
-	 * those seconds; capturing would shoot the respawn. Neither is the death, so it is dropped on
-	 * the first frame — including under the respawn's level-loading screen and an arrival still
+	 * opening {@code DeathScreen}. Waiting would hold the only pending slot for a screen that is
+	 * never coming, refusing any moment in those seconds. The first frame shows the dying player
+	 * without a death screen, and is deliberately not taken (see {@code gateFor}), so it is dropped
+	 * on that frame — including under the respawn's level-loading screen and an arrival still
 	 * coming into view, which are otherwise waited out.
 	 */
 	@Test
 	void aDeathWithNoDeathScreenComingIsDroppedAtOnce() {
 		for (AutoCapture.ScreenKind screen : new AutoCapture.ScreenKind[] {
 				AutoCapture.ScreenKind.NONE, AutoCapture.ScreenKind.LEVEL_LOADING,
-				AutoCapture.ScreenKind.ARRIVING}) {
+				AutoCapture.ScreenKind.ARRIVING, AutoCapture.ScreenKind.OTHER}) {
 			assertEquals(AutoCapture.Gate.DROP,
 					AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, false, screen),
 					"a death under immediate respawn must not wait for a death screen (" + screen + ")");
 		}
+	}
+
+	/** The flag says no screen is coming, but one is already up: the gamerule was switched on after
+	 * the death screen opened. That screen is the death, so it is still taken. */
+	@Test
+	void aDeathScreenAlreadyUpIsCapturedWhateverTheFlagSays() {
+		assertEquals(AutoCapture.Gate.CAPTURE,
+				AutoCapture.gateFor(MomentTrigger.DEATH, true, true, false, false, AutoCapture.ScreenKind.DEATH));
 	}
 
 	/** The flag only answers whether a death screen is coming; the other triggers are not waiting

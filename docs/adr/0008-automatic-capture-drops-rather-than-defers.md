@@ -21,9 +21,12 @@ Three exceptions, each because the obstruction is not the player's doing:
 - **Death** inverts the rule. It waits for the death screen and captures under it, since that
   screen arrives on a server packet after a variable delay. Racing it would give either a clean
   frame or the red-overlay frame for the same trigger. Under the `immediate_respawn` gamerule no
-  death screen comes, and the player is at their spawn point within a tick, so there is no frame
-  of the death left to take. Such a death is dropped at once and never captured. Waiting out the
-  timeout instead would hold the one pending slot and refuse any moment that followed.
+  death screen comes, and such a death is dropped at once and never captured. One frame of it
+  exists: the first the gate sees shows the dying player where they died, with the hurt tilt
+  but no red tint and no "You Died". It is not taken, by choice. It is not the death-screen shot
+  every other death gets, and the respawn is already on its way, so whether the death arms at
+  all depends on latency. Waiting out the timeout instead would hold the one pending slot and
+  refuse any moment that followed.
 
 A dropped capture hands its cooldown window back, so a moment that never became a screenshot does
 not suppress the next one.

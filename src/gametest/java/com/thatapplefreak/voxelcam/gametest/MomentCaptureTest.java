@@ -28,6 +28,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ParticleStatus;
 
@@ -45,8 +46,8 @@ import net.minecraft.server.level.ParticleStatus;
  * The exceptions are a boss, a portal and a death, because what the capture looks like there
  * depends on what the client is doing around it. The integrated server takes commands, so a
  * Wither is summoned and killed for real, a Nether portal is built and walked into, and the
- * player is killed under {@code immediate_respawn}, and none of those comes from anything here
- * calling {@code fire}.
+ * player is killed with and without {@code immediate_respawn}, and none of those captures comes
+ * from anything here calling {@code fire}.
  */
 public class MomentCaptureTest implements FabricClientGameTest {
 
@@ -68,6 +69,7 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
 			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
 			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
+			assertAnOrdinaryDeathIsCapturedUnderTheDeathScreen(context, singleplayer.getServer(), dir);
 			assertADeathUnderImmediateRespawnIsNotCapturedAndBlocksNothing(context, singleplayer.getServer(), dir);
 			assertArrivalsAreCapturedWithTheWorldInView(context, singleplayer.getServer(), dir);
 		}
@@ -299,10 +301,42 @@ public class MomentCaptureTest implements FabricClientGameTest {
 	}
 
 	/**
+	 * The death the gate waits for: {@code /kill} with the gamerule at its default, so the client
+	 * opens {@code DeathScreen} and the moment arrives through the {@code watchDeath} tick watch.
+	 * The file has to be written while the screen is still up, before Respawn is pressed, which is
+	 * what says it was taken under the death screen and not of the respawn after it.
+	 */
+	private static void assertAnOrdinaryDeathIsCapturedUnderTheDeathScreen(ClientGameTestContext context,
+			TestServerContext server, File dir) {
+		resetAutoCapture(context);
+		Set<String> before = listing(dir);
+
+		server.runCommand("kill @a");
+		context.waitForScreen(DeathScreen.class);
+		// The readback, the encode on the IO pool and the tags; Respawn is also held off for its
+		// first twenty ticks.
+		context.waitTicks(40);
+		File written = theOnlyNewFile(dir, before, "an ordinary death");
+		boolean stillDead = context.computeOnClient(client -> client.gui.screen() instanceof DeathScreen);
+		if (!stillDead) {
+			throw new AssertionError("the death screen closed before the capture was checked");
+		}
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(written));
+		if (tag == null || tag.trigger() != MomentTrigger.DEATH) {
+			throw new AssertionError("expected the death moment, got " + tag);
+		}
+
+		context.clickScreenButton("deathScreen.respawn");
+		context.waitForScreen(null);
+		context.waitTicks(10);
+		theOnlyNewFile(dir, before, "an ordinary death, once respawned");
+	}
+
+	/**
 	 * A real death, staged with {@code /kill} so it arrives through the {@code watchDeath} tick watch,
 	 * under {@code immediate_respawn}. Vanilla answers the kill packet by respawning instead of
-	 * opening {@code DeathScreen}, so there is no frame of the death to take: the only shots left
-	 * are of the respawn point, and the death is dropped rather than captured.
+	 * opening {@code DeathScreen}. Its one frame of the dying player, with no death screen, is
+	 * deliberately not taken, so the death is dropped rather than captured.
 	 *
 	 * <p>What this guards is how soon. An advancement a few ticks after the respawn must be taken:
 	 * a death left waiting for a screen that is never coming holds the one pending slot for seconds

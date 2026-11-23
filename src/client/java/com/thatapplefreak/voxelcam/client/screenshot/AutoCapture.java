@@ -419,10 +419,13 @@ public final class AutoCapture {
 	 * from the {@code immediate_respawn} gamerule (at login, on the {@code IMMEDIATE_RESPAWN} game
 	 * event, and copied across a respawn) and reads in {@code handlePlayerCombatKill} to choose
 	 * between opening {@code DeathScreen} and respawning on the spot. When it is false a death is
-	 * dropped at once: the kill packet precedes the zero-health update that arms the moment, so by
-	 * the first frame the respawn is already requested, and any frame shot from then on is a race
-	 * between the dying view and the spawn point — the latency-dependent shot waiting for the
-	 * screen exists to avoid. A death under that gamerule is therefore never captured, by design.
+	 * dropped at once, and a death under that gamerule is never captured. That is a choice, not a
+	 * necessity. The kill packet precedes the zero-health update that arms the moment, and {@code
+	 * runTick} renders straight after the tick that arms it, so the first frame the gate sees always
+	 * still shows the dying player where they died: empty hearts and the hurt tilt, but no red tint
+	 * and no "You Died". It is not taken because it is not the death shot every other death gets,
+	 * and because the respawn is already requested: whether the death arms at all, and every frame
+	 * after the first, depend on latency, so taking it would make the trigger intermittent.
 	 */
 	static Gate gateFor(MomentTrigger trigger, boolean hasLevel, boolean hasPlayer, boolean captureMenuArmed,
 			boolean deathScreenComing, ScreenKind screen) {
@@ -437,9 +440,9 @@ public final class AutoCapture {
 		if (captureMenuArmed) {
 			return Gate.DROP;
 		}
-		// immediate_respawn: the kill packet respawned the player instead of opening the screen, and
-		// they are standing at their spawn point a tick later. There is nothing left to wait for,
-		// and no frame left that is the death.
+		// immediate_respawn: the kill packet respawned the player instead of opening the screen.
+		// There is nothing to wait for, and this frame of the dying player is deliberately not
+		// taken; the Javadoc says why.
 		if (trigger == MomentTrigger.DEATH && !deathScreenComing && screen != ScreenKind.DEATH) {
 			return Gate.DROP;
 		}
