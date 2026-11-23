@@ -239,7 +239,8 @@ public final class CaptureStatus {
 	 *       press that bypassed the menu is queued the same way, so it is covered here too;</li>
 	 *   <li>a burst frame this frame's head settled on — only those, so the recording cue can
 	 *       show on every frame in between;</li>
-	 *   <li>an automatic moment, armed and waiting for the frame its gate accepts.</li>
+	 *   <li>an automatic moment whose gate takes this frame — only that frame, since a moment can
+	 *       wait seconds for an arrival to come into view.</li>
 	 * </ul>
 	 * Over-hiding costs a frame of a notice; under-hiding puts it in a PNG. So each term errs wide.
 	 */
@@ -255,7 +256,7 @@ public final class CaptureStatus {
 	 */
 	public static void beforeFrame() {
 		frameIsCaptured = capturesFrame(BigScreenshot.isCapturing(), CaptureMenu.capturesThisFrame(),
-				Burst.capturesThisFrame(), AutoCapture.isPending());
+				Burst.capturesThisFrame(), AutoCapture.capturesThisFrame());
 
 		long now = Util.getMillis();
 		boolean nowBusy = busyAt(ScreenshotHandler.savesInFlight(), BigScreenshot.isBusy(), Burst.isBusy());

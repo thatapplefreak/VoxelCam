@@ -11,6 +11,7 @@ import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
 import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -143,6 +145,19 @@ class ScreenshotMetadataTest {
 		assertNull(ScreenshotMetadata.dimensions(dir.resolve("bogus.png").toFile()));
 		assertNull(ScreenshotMetadata.dimensions(dir.resolve("absent.png").toFile()));
 		assertNull(ScreenshotMetadata.dimensions(null));
+	}
+
+	/**
+	 * A JPEG renamed to {@code .png} is long enough to have bytes where IHDR's width and height
+	 * would be, and its list row and details line showed them as 65536×-2424765. It has to be
+	 * the absent answer the rows already leave the dimensions out for.
+	 */
+	@Test
+	void aJpegNamedPngHasNoDimensions() throws IOException {
+		File jpeg = dir.resolve("fake jpeg.png").toFile();
+		ImageIO.write(new BufferedImage(64, 36, BufferedImage.TYPE_INT_RGB), "jpg", jpeg);
+
+		assertNull(ScreenshotMetadata.dimensions(jpeg));
 	}
 
 	/**

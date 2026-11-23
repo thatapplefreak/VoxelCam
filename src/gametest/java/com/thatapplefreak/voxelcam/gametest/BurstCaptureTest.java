@@ -292,8 +292,11 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	 * in the listing, so this is the burst's own key whatever the clock says.
 	 */
 	private static void openManagerOn(ClientGameTestContext context, File dir, File key) {
+		// Selected after the manager is built, since building one is an opening and forgets the
+		// selection; its init() then finds this one listed and keeps it.
+		GuiScreenShotManager manager = context.computeOnClient(client -> new GuiScreenShotManager(dir));
 		context.runOnClient(client -> VoxelCamIO.selectPhoto(key));
-		context.setScreen(() -> new GuiScreenShotManager(dir));
+		context.setScreen(() -> manager);
 		context.waitForScreen(GuiScreenShotManager.class);
 	}
 
