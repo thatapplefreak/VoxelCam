@@ -545,8 +545,12 @@ Five invariants that are easy to break:
 - **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
   manager overrides `repositionElements()` to `rebuildWidgets()` so it rebuilds — that is what picks
   up files renamed or deleted while a popup was open, not just resize handling. The rebuild also
-  runs the no-arg `setInitialFocus()`, which the manager overrides to focus the list after a
-  keyboard input: vanilla's default would land on the search field and switch the shortcuts off.
+  runs the no-arg `setInitialFocus()`, and after an arrow key or Tab vanilla's default lands on
+  the search field and switches the shortcuts off. The manager overrides it to focus the
+  highlighted row through `setInitialFocus(list)`, not `setFocused(list)`: a list focused with no
+  focused row is outside the focus path, the next rebuild's `clearFocus()` misses it, and the
+  arrows then move a selection the highlight no longer shows. A search being typed keeps the field
+  and its cursor across a rebuild. `ManagerFocusTest` plays every return with real input.
 - **That rebuild is also why the manager's own `selected` field is not authoritative.** It predates
   whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
   and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the

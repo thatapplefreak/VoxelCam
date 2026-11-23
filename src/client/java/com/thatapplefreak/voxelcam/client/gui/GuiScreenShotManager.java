@@ -80,6 +80,8 @@ public class GuiScreenShotManager extends Screen {
 	private Button filmstripScrollRightButton;
 
 	private String searchText = "";
+	/** The search field's cursor across a rebuild that happened while it had focus; -1 if none. */
+	private int searchCursorToRestore = -1;
 	private boolean favoritesOnly = false;
 	private File selected;
 	/** Which frame of the selected burst the preview is showing — null means the key itself.
@@ -624,16 +626,35 @@ public class GuiScreenShotManager extends Screen {
 	}
 
 	/**
-	 * Vanilla's default, after an arrow key or Tab was the last input, tabs onto the first
-	 * focusable widget — the search field — and this runs on every rebuild, so each return from a
-	 * popup switched the shortcuts off for exactly the player using them. The list is where a
-	 * keyboard player was: arrows keep moving through it, and Tab or a click still reaches the
-	 * search field. With the mouse last, vanilla focuses nothing, and neither does this.
+	 * Remembers a search being typed, so {@link #setInitialFocus()} can put it back: the rebuild
+	 * replaces the field, and the export finishing or a resize can land mid-word.
+	 */
+	@Override
+	protected void rebuildWidgets() {
+		searchCursorToRestore = searchBar != null && searchBar.isFocused() ? searchBar.getCursorPosition() : -1;
+		// Vanilla's clearFocus() walks the focus path, and a list focused with no focused row has
+		// none, so without this the screen could keep the old list after the rebuild.
+		setFocused(null);
+		super.rebuildWidgets();
+	}
+
+	/**
+	 * Vanilla's default, after an arrow key or Tab, tabs onto the first focusable widget — the
+	 * search field — which switched the shortcuts off on every return from a popup. Instead the
+	 * focus goes to the highlighted row, whatever the last input was: the first arrow press then
+	 * moves the selection, the row shows as focused, and the next rebuild can clear it. A search
+	 * being typed when the rebuild came keeps the field, with its cursor where it was.
 	 */
 	@Override
 	protected void setInitialFocus() {
-		if (minecraft.getLastInputType().isKeyboard()) {
-			setFocused(list);
+		if (searchCursorToRestore >= 0) {
+			setInitialFocus(searchBar);
+			searchBar.moveCursorTo(searchCursorToRestore, false);
+			searchCursorToRestore = -1;
+		} else if (list.getSelected() != null) {
+			// The path vanilla builds runs through the selected row; with none it would pick the
+			// first row and so change the selection, which focusing must not do.
+			setInitialFocus(list);
 		}
 	}
 
