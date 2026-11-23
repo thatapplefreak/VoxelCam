@@ -54,7 +54,7 @@ class BigScreenshotSizeTest {
 	}
 
 	/**
-	 * WxH is matched before Nx on purpose, so "2x2" is two pixels square rather than
+	 * WxH is matched before Nx on purpose, so "20x20" is twenty pixels square rather than
 	 * a mangled multiple. Getting this backwards would silently turn a tiny request
 	 * into a screen-multiple one.
 	 */

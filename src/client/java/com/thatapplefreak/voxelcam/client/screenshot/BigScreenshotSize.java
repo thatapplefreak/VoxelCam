@@ -92,7 +92,7 @@ public final class BigScreenshotSize {
 			return preset;
 		}
 
-		// WxH before Nx, so "2x2" is two pixels square rather than a mangled multiple.
+		// WxH before Nx, so "20x20" is twenty pixels square rather than a mangled multiple.
 		Matcher absolute = ABSOLUTE.matcher(token);
 		if (absolute.matches()) {
 			int width = Integer.parseInt(absolute.group(1));
