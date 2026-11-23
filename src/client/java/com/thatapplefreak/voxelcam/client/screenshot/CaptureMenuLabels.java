@@ -1,8 +1,11 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import java.util.Arrays;
+
 /**
- * Where {@link CaptureMenuHud} puts a label's plate. Renderer-free so the placement can be
- * checked without a client; the HUD measures the text and draws, this only does the arithmetic.
+ * Where {@link CaptureMenuHud} puts a label's plate, and how far out each outer-ring option starts
+ * being selected as a result. Renderer-free so both can be checked without a client; the HUD
+ * measures the text and draws, this only does the arithmetic.
  */
 final class CaptureMenuLabels {
 
@@ -32,8 +35,9 @@ final class CaptureMenuLabels {
 	 * in along its own ray until it clears them. Below about 290 GUI pixels of height the outer
 	 * ring's lowest labels reach that band, and 854x480 at its automatic scale is 240. Along the
 	 * ray rather than straight up or sideways, so the label still points at the middle of its own
-	 * arc segment; only the label moves, so what an aim selects is untouched. The armour row above
-	 * the hearts is not kept clear: at 240 high a label pulled that far would sit on the dial.
+	 * arc segment. A pulled ring label lands inside {@link CaptureMenu#OPTION_RADIUS}, so its
+	 * option's radius comes down to meet it ({@link #optionRadii}). The armour row above the
+	 * hearts is not kept clear: at 240 high a label pulled that far would sit on the dial.
 	 */
 	static int[] plate(double angle, int radius, int textWidth, int guiWidth, int guiHeight) {
 		int[] plate = placeOnRay(angle, radius, textWidth, guiWidth, guiHeight);
@@ -41,6 +45,38 @@ final class CaptureMenuLabels {
 			plate = placeOnRay(angle, pulled, textWidth, guiWidth, guiHeight);
 		}
 		return plate;
+	}
+
+	/**
+	 * Where each of wedge {@code wedgeIndex}'s options starts being selected, given its labels'
+	 * {@code textWidths}: {@link CaptureMenu#OPTION_RADIUS}, or for an option whose label
+	 * {@link #plate} pulled in, the distance from the dial's centre to the nearest point of that
+	 * label's plate. So the whole label selects its option, and the option engages from the label
+	 * outward with no gap below the old radius for the ring to flicker off in. The radius only
+	 * ever comes down, and only for a pulled label: anything that selected an option before still
+	 * selects the same one. {@code CaptureMenuHud} draws each option's arc segment at its radius.
+	 */
+	static int[] optionRadii(int wedgeCount, int wedgeIndex, int[] textWidths, int guiWidth, int guiHeight) {
+		int[] radii = new int[textWidths.length];
+		for (int i = 0; i < textWidths.length; i++) {
+			double angle = optionAngle(wedgeCount, wedgeIndex, textWidths.length, i);
+			int[] plate = plate(angle, OPTION_LABEL_RADIUS, textWidths[i], guiWidth, guiHeight);
+			boolean pulled = !Arrays.equals(plate,
+					placeOnRay(angle, OPTION_LABEL_RADIUS, textWidths[i], guiWidth, guiHeight));
+			radii[i] = pulled
+					? Math.min(CaptureMenu.OPTION_RADIUS, (int) Math.floor(nearestDistance(plate, guiWidth, guiHeight)))
+					: CaptureMenu.OPTION_RADIUS;
+		}
+		return radii;
+	}
+
+	/** From the dial's centre, the aim offset's origin, to the closest point of {@code plate}. */
+	static double nearestDistance(int[] plate, int guiWidth, int guiHeight) {
+		double centreX = guiWidth / 2;
+		double centreY = guiHeight / 2;
+		double x = Math.max(plate[0], Math.min(plate[2], centreX));
+		double y = Math.max(plate[1], Math.min(plate[3], centreY));
+		return Math.hypot(x - centreX, y - centreY);
 	}
 
 	private static int[] placeOnRay(double angle, int radius, int textWidth, int guiWidth, int guiHeight) {

@@ -76,6 +76,9 @@ public final class CaptureMenu {
 	// to reset on open.
 	private static double aimDx;
 	private static double aimDy;
+	// Where each option starts being selected, per mode ordinal, as the HUD laid it out this
+	// frame; null means OPTION_RADIUS for every option. See optionForOffset(dx, dy, radii).
+	private static int[][] optionRadii;
 
 	private static boolean cursorWasGrabbed;
 
@@ -107,24 +110,28 @@ public final class CaptureMenu {
 	/**
 	 * Valid only while {@link #isOpen()}. The 0-based index into the aimed mode's own option
 	 * list (see {@code Burst.DIAL_OPTIONS} / {@code BigScreenshotSize.DIAL_OPTIONS}), or -1 if
-	 * the cursor has not reached {@link #OPTION_RADIUS} yet, or the aimed mode has no options
+	 * the cursor has not reached that option's radius yet ({@link #OPTION_RADIUS}, or closer in
+	 * where the HUD pulled its label off the hotbar), or the aimed mode has no options
 	 * ({@code SCREENSHOT}). {@code CaptureMenuHud} only draws the outer ring once this is
 	 * non-negative, so the ring and what a release actually commits can never disagree.
 	 */
 	public static int aimedOption() {
-		return optionForOffset(aimDx, aimDy);
+		return optionForOffset(aimDx, aimDy, optionRadii);
 	}
 
 	/**
-	 * Feeds the live cursor offset from the menu's anchor while the menu is open; a no-op
-	 * otherwise, so a caller does not need to guard every frame itself.
+	 * Feeds the live cursor offset from the menu's anchor while the menu is open, with the
+	 * per-option activation radii the HUD drew the outer ring at this frame (see {@link
+	 * #optionForOffset(double, double, int[][])}); a no-op otherwise, so a caller does not need
+	 * to guard every frame itself.
 	 */
-	public static void setAimOffset(double dx, double dy) {
+	public static void setAimOffset(double dx, double dy, int[][] radii) {
 		if (state != State.OPEN) {
 			return;
 		}
 		aimDx = dx;
 		aimDy = dy;
+		optionRadii = radii;
 	}
 
 	/** Called once when the capture-menu key transitions from up to down. */
@@ -146,6 +153,7 @@ public final class CaptureMenu {
 		ticksHeld = 0;
 		aimDx = 0;
 		aimDy = 0;
+		optionRadii = null;
 	}
 
 	/** Called every tick while {@link #isArmed()}, from the same end-tick hook that edge-detects the key. */
@@ -304,7 +312,7 @@ public final class CaptureMenu {
 	 * inside the ordinary dial leaves the session length/size exactly as it already was.
 	 */
 	private static void applyAimedOption(Mode mode) {
-		int option = optionForOffset(aimDx, aimDy);
+		int option = optionForOffset(aimDx, aimDy, optionRadii);
 		if (option < 0) {
 			return;
 		}
@@ -428,9 +436,18 @@ public final class CaptureMenu {
 	 * the same {@code (dx, dy)} and so can never disagree about which wedge that is.
 	 */
 	static int optionForOffset(double dx, double dy) {
-		if (dx * dx + dy * dy < (double) OPTION_RADIUS * OPTION_RADIUS) {
-			return -1;
-		}
+		return optionForOffset(dx, dy, null);
+	}
+
+	/**
+	 * {@link #optionForOffset(double, double)} where each option may start being selected closer
+	 * in than {@link #OPTION_RADIUS}: {@code radii[mode ordinal][option]}, or {@code null} for
+	 * {@code OPTION_RADIUS} throughout. On a short GUI {@code CaptureMenuLabels} pulls the lowest
+	 * labels in off vanilla's hotbar, and lowers those options' radii to where their labels
+	 * begin, so a player who steers onto the label they can read gets that option. The angle
+	 * still decides which option it is; only how far out it engages changes.
+	 */
+	static int optionForOffset(double dx, double dy, int[][] radii) {
 		Mode[] modes = Mode.values();
 		double angle = Math.atan2(dx, -dy);
 		int wedgeIndex = wedgeForAngle(angle, modes.length);
@@ -438,6 +455,11 @@ public final class CaptureMenu {
 		if (optionCount == 0) {
 			return -1;
 		}
-		return subOptionForAngle(angle, modes.length, wedgeIndex, optionCount);
+		int option = subOptionForAngle(angle, modes.length, wedgeIndex, optionCount);
+		int radius = radii == null ? OPTION_RADIUS : radii[wedgeIndex][option];
+		if (dx * dx + dy * dy < (double) radius * radius) {
+			return -1;
+		}
+		return option;
 	}
 }

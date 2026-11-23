@@ -62,9 +62,17 @@ public final class CaptureMenuHud {
 		// Scaled positions, so the aim offset lands in the same space the wedges are laid out in.
 		double mouseX = client.mouseHandler.getScaledXPos(client.getWindow());
 		double mouseY = client.mouseHandler.getScaledYPos(client.getWindow());
-		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY);
-
 		CaptureMenu.Mode[] modes = CaptureMenu.Mode.values();
+		// Laid out before the aim is read, from the same widths and screen the labels below are
+		// placed with, so the ring a release commits is the ring that is drawn.
+		int[][] optionRadii = new int[modes.length][];
+		for (CaptureMenu.Mode mode : modes) {
+			int[] widths = optionLabelsFor(mode).stream().mapToInt(client.font::width).toArray();
+			optionRadii[mode.ordinal()] = CaptureMenuLabels.optionRadii(modes.length, mode.ordinal(), widths,
+					graphics.guiWidth(), graphics.guiHeight());
+		}
+		CaptureMenu.setAimOffset(mouseX - centerX, mouseY - centerY, optionRadii);
+
 		CaptureMenu.Mode aimedMode = CaptureMenu.aimedMode();
 		int aimed = aimedMode.ordinal();
 
@@ -76,12 +84,13 @@ public final class CaptureMenuHud {
 					Component.translatable(labelKey(modes[i])), i == aimed, RADIUS + LABEL_GAP);
 		}
 
-		// Only drawn once the cursor has actually reached CaptureMenu.OPTION_RADIUS — aimedOption
+		// Only drawn once the cursor has actually reached the aimed option's radius — aimedOption
 		// returns -1 both short of that and for a mode with no options, so this single check
 		// covers both without the HUD needing to know which one applies.
 		int aimedOption = CaptureMenu.aimedOption();
 		if (aimedOption >= 0) {
-			extractOptionRing(graphics, client, centerX, centerY, aimedMode, aimedOption);
+			extractOptionRing(graphics, client, centerX, centerY, aimedMode, aimedOption,
+					optionRadii[aimedMode.ordinal()]);
 		}
 	}
 
@@ -144,12 +153,13 @@ public final class CaptureMenuHud {
 	 * #extractDial} is — but only that one wedge's slice of the ring, not the full circle:
 	 * showing options at this radius for every mode at once would read as though all three had
 	 * them, when only {@code BIG_SCREENSHOT} and {@code BURST} do. Bounded to {@link
-	 * CaptureMenu#OPTION_RADIUS} rather than the dial's own {@code RADIUS}, so this is a second,
+	 * CaptureMenu#OPTION_RADIUS}, the largest any option's {@code radii} entry can be, rather than
+	 * the dial's own {@code RADIUS}, so this is a second,
 	 * separate scan rather than widening the main dial's — paid only while actually aimed past
 	 * it, not on every open-menu frame.
 	 */
 	private static void extractOptionRing(GuiGraphicsExtractor graphics, Minecraft client,
-			int centerX, int centerY, CaptureMenu.Mode aimedMode, int aimedOption) {
+			int centerX, int centerY, CaptureMenu.Mode aimedMode, int aimedOption, int[] radii) {
 		List<String> options = optionLabelsFor(aimedMode);
 		if (options.isEmpty()) {
 			return;
@@ -163,7 +173,7 @@ public final class CaptureMenuHud {
 			int runColor = TRANSPARENT;
 			for (int left = -radius; left <= radius; left += CELL) {
 				int color = optionCellColor(left + CELL / 2.0, top + CELL / 2.0,
-						wedgeCount, wedgeIndex, options.size(), aimedOption);
+						wedgeCount, wedgeIndex, radii, aimedOption);
 				if (color != runColor) {
 					emitRun(graphics, centerX, centerY, runStart, left, top, runColor);
 					runStart = left;
@@ -180,17 +190,21 @@ public final class CaptureMenuHud {
 	}
 
 	private static int optionCellColor(double dx, double dy, int wedgeCount, int wedgeIndex,
-			int optionCount, int aimedOption) {
-		double distance = Math.sqrt(dx * dx + dy * dy);
-		int radius = CaptureMenu.OPTION_RADIUS;
-		if (distance > radius || distance < radius - OPTION_RING_THICKNESS) {
-			return TRANSPARENT;
-		}
-
+			int[] radii, int aimedOption) {
 		double angle = Math.atan2(dx, -dy);
 		if (CaptureMenu.wedgeForAngle(angle, wedgeCount) != wedgeIndex) {
 			// Only the aimed wedge's own arc is drawn; elsewhere at this radius stays blank
 			// rather than implying every mode has options here.
+			return TRANSPARENT;
+		}
+
+		// Each option's segment sits at that option's own radius, the one CaptureMenu selects it
+		// from: OPTION_RADIUS, or closer in where its label had to be pulled off the hotbar.
+		int optionCount = radii.length;
+		int option = CaptureMenu.subOptionForAngle(angle, wedgeCount, wedgeIndex, optionCount);
+		double distance = Math.sqrt(dx * dx + dy * dy);
+		int radius = radii[option];
+		if (distance > radius || distance < radius - OPTION_RING_THICKNESS) {
 			return TRANSPARENT;
 		}
 
@@ -205,7 +219,6 @@ public final class CaptureMenuHud {
 			}
 		}
 
-		int option = CaptureMenu.subOptionForAngle(angle, wedgeCount, wedgeIndex, optionCount);
 		return option == aimedOption ? SECTOR_AIMED : SECTOR;
 	}
 
