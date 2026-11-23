@@ -8,7 +8,6 @@ import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.util.Util;
 
 import java.util.HashSet;
@@ -75,9 +74,9 @@ public final class AutoCapture {
 	enum ScreenKind {
 		NONE,
 		LEVEL_LOADING,
-		/** No screen, but the level was loaded moments ago and is not in view yet: the terrain
-		 * around the player is still being drawn, or the portal overlay is still fading. See {@link
-		 * #viewSettled}. */
+		/** No screen, but the moment was armed for an arrival in a dimension that is not in view
+		 * yet: the terrain around the player is still being drawn, or the portal overlay is still
+		 * fading. See {@link ArrivalWatch}. */
 		ARRIVING,
 		DEATH,
 		OTHER
@@ -110,20 +109,19 @@ public final class AutoCapture {
 
 	private static final BossBarTracker BOSS_BARS = new BossBarTracker();
 
-	/**
-	 * Ticks a newly loaded level is given to come into view before a capture held for it is taken
-	 * anyway. Reached only when the view never settles by {@link #viewSettled}'s measure, as when
-	 * the player runs straight out of the portal and the chunk loads never stop; what is on screen
-	 * by then is mostly drawn, and the arrival is still the moment.
-	 */
-	static final int ARRIVAL_TIMEOUT_TICKS = 100;
-
-	/** The level whose arrival {@link #watchArrival} is following, held only to notice the next
-	 * one: a dimension change builds a new {@code ClientLevel}. Cleared on disconnect, so it never
-	 * outlives the connection it belongs to. */
-	private static ClientLevel arrivalLevel;
+	/** The dimension the last tick was in, to notice the player changing it. Null at the start of
+	 * a session, so joining a world is not an arrival. */
+	private static String lastDimension;
+	/** The arrival being followed, from a change of dimension until it is in view or over; null
+	 * the rest of the time. */
+	private static ArrivalWatch arrival;
 	private static int arrivalTicks;
-	private static boolean arrivalInView = true;
+	/** Whether the pending capture belongs to the arrival: armed during it, or already pending when
+	 * the dimension changed. Only such a capture waits for the view. */
+	private static boolean pendingForArrival;
+
+	/** What {@link #beforeFrame()} decided: whether this frame's blit takes the pending capture. */
+	private static boolean capturesThisFrame;
 
 	private AutoCapture() {
 	}
@@ -137,12 +135,6 @@ public final class AutoCapture {
 	 * capture the player did not ask for, and one that explains at length why it declined to happen
 	 * is worse company than one that simply does not.
 	 */
-	/** Armed and waiting for a frame its gate accepts; any frame while this holds may be the one
-	 * read back. */
-	static boolean isPending() {
-		return state == State.PENDING;
-	}
-
 	public static void fire(MomentTrigger trigger, String subject) {
 		long now = Util.getMillis();
 		if (!shouldArm(trigger, now)) {
@@ -158,15 +150,14 @@ public final class AutoCapture {
 	 * {@link #gateFor} drops the moment for it.
 	 */
 	public static void beforeBlit() {
+		boolean announced = capturesThisFrame;
+		capturesThisFrame = false;
 		if (state != State.PENDING) {
 			return;
 		}
 
 		Minecraft client = Minecraft.getInstance();
-		ScreenKind screen = screenKind(client.gui.screen());
-		if (screen == ScreenKind.NONE && !arrivalInView) {
-			screen = ScreenKind.ARRIVING;
-		}
+		ScreenKind screen = viewKind(client);
 		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
 				screen)) {
 			case DROP -> dropPending();
@@ -175,8 +166,35 @@ public final class AutoCapture {
 					dropPending();
 				}
 			}
-			case CAPTURE -> capture(client);
+			case CAPTURE -> {
+				// The HUD was extracted on the strength of beforeFrame's answer. A frame it was not
+				// blanked for would carry the notices into the PNG, so the capture waits a frame.
+				if (announced) {
+					capture(client);
+				}
+			}
 		}
+	}
+
+	/**
+	 * Head of the frame, before {@code CaptureStatus.beforeFrame}: settles whether this frame is the
+	 * one the pending capture is taken from, so the HUD is blank for that frame only and not for
+	 * the whole of a wait that can run to seconds.
+	 */
+	public static void beforeFrame() {
+		capturesThisFrame = false;
+		if (state != State.PENDING) {
+			return;
+		}
+		Minecraft client = Minecraft.getInstance();
+		capturesThisFrame = gateFor(pendingTrigger, client.level != null, client.player != null,
+				CaptureMenu.isArmed(), viewKind(client)) == Gate.CAPTURE;
+	}
+
+	/** Whether this frame's blit takes the pending capture. Valid after {@link #beforeFrame()}; what
+	 * {@code CaptureStatus} hides the HUD for. */
+	static boolean capturesThisFrame() {
+		return capturesThisFrame;
 	}
 
 	/** The two triggers that need no mixin, plus nothing else: the pending countdown runs per frame,
@@ -190,8 +208,9 @@ public final class AutoCapture {
 			return;
 		}
 		watchDeath(player);
-		watchDimension(client);
+		// Before watchDimension, so the new-dimension moment it arms is armed into the arrival.
 		watchArrival(client, player);
+		watchDimension(client);
 	}
 
 	/** From {@code ClientPlayConnectionEvents.DISCONNECT}: everything here is scoped to one
@@ -206,9 +225,11 @@ public final class AutoCapture {
 		visitedDimensions.clear();
 		wasAlive = false;
 		BOSS_BARS.reset();
-		arrivalLevel = null;
+		lastDimension = null;
+		arrival = null;
 		arrivalTicks = 0;
-		arrivalInView = true;
+		pendingForArrival = false;
+		capturesThisFrame = false;
 	}
 
 	// --- the watches ------------------------------------------------------------------------
@@ -239,58 +260,45 @@ public final class AutoCapture {
 	}
 
 	/**
-	 * Vanilla closes the loading screen once the player's own section is ready, not the world
-	 * around it, and a portal's overlay is still fading out then. A capture taken on that first
-	 * frame is fog or purple. Followed per level rather than per trigger, so an advancement granted
-	 * on arrival waits for the view as well; once a level has settled, nothing here holds a
-	 * capture again until the next one loads.
+	 * Follows an arrival in a new dimension until it is in view or over; see {@link ArrivalWatch}.
+	 * Only a change of dimension is an arrival. Joining a world is not, so an advancement earned a
+	 * moment after logging in is taken as it always was.
 	 */
 	private static void watchArrival(Minecraft client, LocalPlayer player) {
 		ClientLevel level = client.level;
 		if (level == null) {
 			return;
 		}
-		if (level != arrivalLevel) {
-			arrivalLevel = level;
+		String dimension = level.dimension().identifier().toString();
+		if (lastDimension != null && !dimension.equals(lastDimension)) {
+			arrival = new ArrivalWatch();
 			arrivalTicks = 0;
-			arrivalInView = false;
+			// Armed before the change and held under the loading screen, or armed on this very
+			// tick from a packet handled before it: an advancement for entering the dimension
+			// arrives that way. Either way its moment is on this side of the screen.
+			if (state == State.PENDING) {
+				pendingForArrival = true;
+			}
 		}
-		if (arrivalInView) {
+		lastDimension = dimension;
+		if (arrival == null) {
 			return;
 		}
-		// Not counted under the loading screen, which is bounded by its own completion; the
-		// arrival starts when the world is first on screen.
 		if (!(client.gui.screen() instanceof LevelLoadingScreen)) {
 			arrivalTicks++;
 		}
-		LevelRenderer renderer = client.levelRenderer;
-		arrivalInView = viewSettled(arrivalTicks, renderer.visibleSections().size(),
-				!renderer.hasRenderedAllSections() || !renderer.expectedChunks().isEmpty(),
-				Math.max(player.portalEffectIntensity, player.oPortalEffectIntensity));
+		ArrivalWatch.Progress progress = arrival.observe(arrivalTicks, client.levelRenderer.visibleSections().size(),
+				Math.max(player.portalEffectIntensity, player.oPortalEffectIntensity), player.getX(), player.getZ());
+		if (progress == ArrivalWatch.Progress.ARRIVING) {
+			return;
+		}
+		arrival = null;
+		if (progress == ArrivalWatch.Progress.LOST && state == State.PENDING && pendingForArrival) {
+			dropPending();
+		}
 	}
 
 	// --- pure seams, unit-testable with no client --------------------------------------------
-
-	/**
-	 * Whether a newly loaded level is in view enough to be a picture of where the player arrived.
-	 * All three are things the client already knows for free: the sections the renderer is drawing,
-	 * whether any are still waiting to be built or waiting on a chunk the server has not sent, and
-	 * the portal overlay's strength, which vanilla fades out on its own once the player has
-	 * arrived. Waiting on them is the same policy as waiting out a loading screen: the obstruction
-	 * clears by itself and is not the player's doing.
-	 *
-	 * <p>Bounded by {@link #ARRIVAL_TIMEOUT_TICKS}, after which the view counts as settled and a
-	 * held capture is taken rather than dropped. Dropping would lose the arrival silently on a slow
-	 * machine, the failure the loading-screen rule exists to avoid; a mostly drawn arrival is
-	 * still the moment.
-	 */
-	static boolean viewSettled(int ticksSinceArrival, int visibleSections, boolean sectionsPending,
-			float portalOverlay) {
-		if (ticksSinceArrival >= ARRIVAL_TIMEOUT_TICKS) {
-			return true;
-		}
-		return visibleSections > 0 && !sectionsPending && portalOverlay <= 0.0F;
-	}
 
 	/**
 	 * @return whether arriving in {@code dimension} is a moment. The first dimension of a session is
@@ -342,6 +350,7 @@ public final class AutoCapture {
 		pendingSubject = subject;
 		pendingFrames = 0;
 		lastArmMillis = nowMillis;
+		pendingForArrival = arrival != null;
 	}
 
 	/**
@@ -361,6 +370,7 @@ public final class AutoCapture {
 		pendingTrigger = null;
 		pendingSubject = null;
 		pendingFrames = 0;
+		pendingForArrival = false;
 	}
 
 	/**
@@ -371,7 +381,7 @@ public final class AutoCapture {
 	 * never finishes ends in a disconnect, which {@link #forgetSession()} handles.
 	 */
 	static boolean advancePending(ScreenKind screen) {
-		// An arrival has its own bound, after which it captures rather than gives up.
+		// An arrival has its own bound, ArrivalWatch.TIMEOUT_TICKS, counted in ticks.
 		if (screen == ScreenKind.LEVEL_LOADING || screen == ScreenKind.ARRIVING) {
 			return false;
 		}
@@ -425,6 +435,21 @@ public final class AutoCapture {
 	}
 
 	// --- client-facing helpers ----------------------------------------------------------------
+
+	/** What is on screen for the pending capture: {@link #screenKind}, except that an open view
+	 * reads as {@link ScreenKind#ARRIVING} while a capture armed for an arrival waits for it. */
+	private static ScreenKind viewKind(Minecraft client) {
+		ScreenKind screen = screenKind(client.gui.screen());
+		return arrivingKind(screen, pendingForArrival, arrival != null);
+	}
+
+	/**
+	 * Only a capture armed for the arrival waits for it: anything armed once the view is in, or
+	 * outside an arrival altogether, sees the open frame it always did.
+	 */
+	static ScreenKind arrivingKind(ScreenKind screen, boolean armedForArrival, boolean stillArriving) {
+		return screen == ScreenKind.NONE && armedForArrival && stillArriving ? ScreenKind.ARRIVING : screen;
+	}
 
 	static ScreenKind screenKind(Screen screen) {
 		if (screen == null) {

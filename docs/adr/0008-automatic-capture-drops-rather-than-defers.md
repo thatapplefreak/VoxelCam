@@ -12,10 +12,12 @@ Three exceptions, each because the obstruction is not the player's doing:
 - **A level-loading screen** holds the capture rather than dropping it. That screen clears by
   itself, and the frame countdown is paused under it so a slow chunk load cannot silently lose a
   portal arrival.
-- **A level that has just loaded** holds the capture too, until its terrain is drawn and the
-  portal overlay has faded, since vanilla closes the loading screen before either. That wait is
-  bounded, and running out of it captures rather than drops: what is on screen by then is mostly
-  the place the player arrived, and dropping would lose the arrival silently on a slow machine.
+- **An arrival in a new dimension** holds a moment armed for it until the view has filled in,
+  meaning the renderer's visible sections have stopped changing, and the portal overlay has
+  faded. Vanilla closes the loading screen before either. Moments armed outside an arrival, or
+  after it is in view, do not wait. The wait ends in a drop, not a late capture, when the
+  player walks away from where they arrived or the view never holds still: a frame of
+  somewhere they went afterwards is not the arrival.
 - **Death** inverts the rule. It waits for the death screen and captures under it, since that
   screen arrives on a server packet after a variable delay. Racing it would give either a clean
   frame or the red-overlay frame for the same trigger.

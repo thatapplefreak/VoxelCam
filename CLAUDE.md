@@ -63,7 +63,7 @@ class wraps something untestable, the pattern has been to extract a package-priv
 (`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`/`openFolderCommand`,
 `ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
 `ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`,
-`AutoCapture.gateFor`/`shouldArm`/`markVisited`, `VoxelCamConfig.snapshot`) rather
+`AutoCapture.gateFor`/`shouldArm`/`markVisited`/`arrivingKind`, `ArrivalWatch`, `VoxelCamConfig.snapshot`) rather
 than mock the world. The last two pairs live on `VoxelCamIO` rather than in the popup that uses them
 for exactly this reason.
 
@@ -96,9 +96,11 @@ has never executed under test, even though the injectors themselves are proven t
 (`defaultRequire: 1` fails the launch otherwise). The exceptions are a Wither and a portal: the
 integrated server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest`
 summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and its search for a
-dying owner. It also builds a Nether portal and walks it twice in survival, and compares each
-arrival's capture with the same view 200 ticks later. The first trip grants an advancement under
-the loading screen, so whichever moment arms first is taken; the second is `watchDimension`'s. The
+dying owner. It also stages three arrivals and compares each capture with the same view 200
+ticks later: a Nether portal walked in survival, where the advancement it grants may win; a
+teleport into the Nether, `watchDimension`'s alone with no overlay; and an end portal. It stages
+them twice, at the framework's render distance of 5 and at vanilla's 12. At 5 the view fills
+in a few ticks, which is how the first fix for this passed there and failed at 12. The
 Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
@@ -452,7 +454,7 @@ Five things here are load-bearing:
   worse than one that never fires — a shot of the inventory screen the player opened ten seconds
   later is not the moment, and a feature producing those is one nobody leaves switched on. So a
   pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`,
-  or a level just loaded that is not in view yet) and dropped when it is the player's own doing
+  or an arrival not yet in view) and dropped when it is the player's own doing
   (any other screen), or when the level or player is gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
   A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
@@ -463,17 +465,22 @@ Five things here are load-bearing:
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing
   said about why. A load that never finishes ends in a disconnect, which `forgetSession()` handles.
-- **An arrival waits for the world to be drawn, whatever armed it.** Vanilla closes the loading
-  screen once the player's own section is ready, so the first frame after it is fog, or the
-  portal overlay at nearly full strength. `watchArrival` follows each new `ClientLevel` until
-  `viewSettled`: sections visible, none waiting to be built or on a chunk
-  (`hasRenderedAllSections`, `expectedChunks`), and `portalEffectIntensity` back at zero. Until
-  then an open frame reads as `ScreenKind.ARRIVING`, which every trigger waits out, because the
-  advancement a first trip grants arms under the loading screen and wins the cooldown. It is
-  bounded by `ARRIVAL_TIMEOUT_TICKS`, counted from the screen closing, and the bound captures
-  rather than drops: a player who runs straight out keeps chunks loading, and a mostly drawn
-  arrival is still the moment. The frame countdown does not run under it, for the same reason
-  as under the loading screen.
+- **A moment armed for an arrival waits for the arrival to come into view.** Vanilla closes the
+  loading screen once the player's own section is ready, so the first frame after it is fog, the
+  End's empty sky, or the portal overlay at nearly full strength. An arrival is a change of
+  dimension (joining a world is not one), and the moment armed for it is the new-dimension one,
+  or the advancement for entering the dimension, which arrives with it and usually wins the
+  cooldown. Anything armed before the view settles counts; anything armed later does not wait.
+  `ArrivalWatch` decides, from the renderer's visible-section count holding unchanged for
+  `STEADY_TICKS` (10) and the portal overlay back at zero. Until then the open frame reads as
+  `ScreenKind.ARRIVING`, which waits. The count climbs in bursts as chunks arrive and stops when
+  the view is in. The readings that look like better signals are not: `expectedChunks()` never
+  empties at render distance 5, and empties with a third of the view drawn at 16, and
+  `hasRenderedAllSections()` is true with nothing on screen. Nothing read on the first tick after
+  the screen closes counts, because the renderer can still describe the level just left. A
+  player who walks more than `WANDER_BLOCKS` (8) away first has made the moment their own doing,
+  and it is dropped. So is one whose view has not held still after `TIMEOUT_TICKS` (600), a
+  backstop well past the slowest arrival measured.
 - **`DEATH` waits for `DeathScreen` rather than racing it.** `AutoCapture.tick` runs at
   `END_CLIENT_TICK`, but the screen is opened from `handlePlayerCombatKill`, a server-driven packet
   a variable number of ticks later. Shooting on the first open frame would give a clean shot or the
@@ -514,7 +521,8 @@ Two things are load-bearing:
   frame it says will be read back.** Extraction precedes the blit every capture reads from, so
   anything drawn on a captured frame is in the PNG. Each path contributes its own condition:
   `BigScreenshot.isCapturing()`, `CaptureMenu.capturesThisFrame()`, `Burst.isBusy()` and
-  `AutoCapture.isPending()`. A new capture path has to add its own, or its frames carry
+  `AutoCapture.capturesThisFrame()`. That last one is the frame the moment's gate takes, not every
+  frame it is pending, which during an arrival can be seconds. A new capture path has to add its own, or its frames carry
   whatever notice is up. `CaptureStatusHudTest` checks pixels for this: it asserts the accent
   bar is in the presented frame, then asserts it is absent from a menu tap, every burst frame
   and a big screenshot.

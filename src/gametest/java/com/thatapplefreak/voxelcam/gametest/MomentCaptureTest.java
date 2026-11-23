@@ -13,8 +13,12 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -24,6 +28,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.server.level.ParticleStatus;
 
 /**
  * The automatic capture path end to end: {@code AutoCapture.fire} through the blit, the write on
@@ -62,72 +67,138 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			assertAScreenThePlayerOpenedDropsThePendingCapture(context, dir);
 			assertAMomentUnderAHeldCaptureMenuIsDropped(context, dir);
 			assertAWitherKilledAtFullHealthIsCaptured(context, singleplayer.getServer(), dir);
-			assertAPortalArrivalIsCapturedWithTheWorldInView(context, singleplayer.getServer(), dir);
+			assertArrivalsAreCapturedWithTheWorldInView(context, singleplayer.getServer(), dir);
+		}
+
+		// Again at vanilla's default render distance. The framework's 5 hides both ways the first
+		// attempt at this failed: the view fills in a few ticks, and a teleport out of a quiet
+		// overworld leaves the renderer reading that overworld on the first tick in the new level.
+		int frameworkRenderDistance = context.computeOnClient(client -> client.options.renderDistance().get());
+		context.runOnClient(client -> client.options.renderDistance().set(VANILLA_RENDER_DISTANCE));
+		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
+			context.waitTicks(20);
+			assertArrivalsAreCapturedWithTheWorldInView(context, singleplayer.getServer(), dir);
+		} finally {
+			context.runOnClient(client -> client.options.renderDistance().set(frameworkRenderDistance));
 		}
 	}
 
+	private static final int VANILLA_RENDER_DISTANCE = 12;
+
 	/**
-	 * A real portal, walked in survival so its overlay builds to full strength, both ways a player
-	 * meets it. The first trip is a fresh world's first Nether visit, which also grants "We Need to
-	 * Go Deeper" under the loading screen, so whichever of the two moments arms first is the one
-	 * taken. The second, after the session's dimensions are forgotten, is the new-dimension moment
-	 * on its own, the shape every later session's first trip takes.
+	 * The three ways a player arrives somewhere, each compared with the same view once everything
+	 * has settled: the moment is the place, not the fog or the portal overlay it was drawn out of.
+	 * Vanilla closes the loading screen once the player's own section is ready, not the world
+	 * around it.
 	 *
-	 * <p>Vanilla closes the loading screen once the player's own section is ready, not the world
-	 * around it, and the overlay is still fading out then. What a player expects is a picture of
-	 * where they arrived, so each capture is compared with the same view once everything has
-	 * settled: the moment is the place, not the fog it was drawn out of.
+	 * <ul>
+	 *   <li>A real Nether portal, walked in survival so its overlay is at full strength. A fresh
+	 *       world's first visit also grants "We Need to Go Deeper" as the player arrives, so
+	 *       whichever of the two moments arms first is the one taken.</li>
+	 *   <li>A teleport into the Nether in a later session, which is the new-dimension moment on its
+	 *       own with no overlay to wait out.</li>
+	 *   <li>An end portal, the End's own arrival, where the first frames draw nothing at all.</li>
+	 * </ul>
+	 *
+	 * <p>Then the other side of the wait: a player who moves off before the view is in has left
+	 * the arrival behind, and its moment is dropped rather than taken somewhere else.
 	 */
-	private static void assertAPortalArrivalIsCapturedWithTheWorldInView(ClientGameTestContext context,
+	private static void assertArrivalsAreCapturedWithTheWorldInView(ClientGameTestContext context,
 			TestServerContext server, File dir) {
-		server.runCommand("gamemode survival @a");
 		server.runCommand("difficulty peaceful");
+		server.runCommand("time set noon");
 		server.runCommand("execute at @p run fill ~-1 ~-1 ~3 ~2 ~3 ~3 minecraft:obsidian");
 		server.runCommand("execute at @p run fill ~ ~ ~3 ~1 ~2 ~3 minecraft:nether_portal[axis=x]");
 		int[] home = context.computeOnClient(client -> new int[] {
 				client.player.getBlockX(), client.player.getBlockY(), client.player.getBlockZ()});
-		String inFrontOfThePortal = (home[0] + 0.5) + " " + home[1] + " " + (home[2] + 0.5);
+		String atHome = (home[0] + 0.5) + " " + home[1] + " " + (home[2] + 0.5) + " 0 0";
 		String intoThePortal = (home[0] + 0.5) + " " + home[1] + " " + (home[2] + 3.5);
+		// A portal sheds particles across the view, enough on their own to move the comparison by
+		// about 10. They are not what is being measured.
+		ParticleStatus particles = context.computeOnClient(client -> client.options.particles().get());
+		context.runOnClient(client -> client.options.particles().set(ParticleStatus.MINIMAL));
 		context.waitTicks(5);
+		try {
+			stageArrivals(context, server, dir, home, atHome, intoThePortal);
+		} finally {
+			context.runOnClient(client -> client.options.particles().set(particles));
+		}
+	}
 
+	private static void stageArrivals(ClientGameTestContext context, TestServerContext server, File dir, int[] home,
+			String atHome, String intoThePortal) {
+
+		server.runCommand("gamemode survival @p");
 		resetAutoCapture(context);
 		Set<String> before = listing(dir);
 		server.runCommand("tp @p " + intoThePortal);
-		File first = awaitArrival(context, dir, before, "the first trip to the Nether");
-		assertLooksLikeTheSettledView(context, first, "the first trip to the Nether");
+		File walked = awaitArrival(context, dir, before, "a walked portal into the Nether");
+		assertLooksLikeTheSettledView(context, walked, "a walked portal into the Nether");
 
-		// Back beside the portal rather than into it: a dimension change puts the player on portal
-		// cooldown, and standing in a portal keeps renewing it.
-		server.runCommand("execute in minecraft:overworld run tp @p " + inFrontOfThePortal);
-		context.waitFor(client -> client.level != null && client.gui.screen() == null
-				&& client.level.dimension().identifier().getPath().equals("overworld"), 600);
-		context.waitTicks(40);
-		// Forgotten from the overworld, so that is the session's login dimension and the Nether is
-		// new again, with its advancement already earned.
-		resetAutoCapture(context);
+		// Where the portal left the player, with its portal taken away, so the teleport back here
+		// lands on solid ground with no overlay.
+		String inTheNether = context.computeOnClient(client -> String.format(Locale.ROOT, "%.2f %.2f %.2f %.1f %.1f",
+				client.player.getX(), client.player.getY(), client.player.getZ(),
+				client.player.getYRot(), client.player.getXRot()));
+		server.runCommand("gamemode creative @p");
+		server.runCommand("execute at @p run fill ~-3 ~-1 ~-3 ~3 ~4 ~3 minecraft:air replace minecraft:nether_portal");
+		goHome(context, server, atHome);
 		before = listing(dir);
-		server.runCommand("tp @p " + intoThePortal);
-		File second = awaitArrival(context, dir, before, "a later session's first trip to the Nether");
-		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(second));
+		server.runCommand("execute in minecraft:the_nether run tp @p " + inTheNether);
+		File teleported = awaitArrival(context, dir, before, "a teleport into the Nether");
+		MomentTag tag = MomentTag.fromTags(PngTextChunk.read(teleported));
 		if (tag == null || tag.trigger() != MomentTrigger.NEW_DIMENSION
 				|| !"minecraft:the_nether".equals(tag.subject())) {
 			throw new AssertionError("expected the new-dimension moment for the Nether, got " + tag);
 		}
-		assertLooksLikeTheSettledView(context, second, "a later session's first trip to the Nether");
+		assertLooksLikeTheSettledView(context, teleported, "a teleport into the Nether");
+
+		goHome(context, server, atHome);
+		server.runCommand(String.format(Locale.ROOT, "setblock %d %d %d minecraft:end_portal", home[0] + 2, home[1], home[2]));
+		context.waitTicks(5);
+		before = listing(dir);
+		server.runCommand("tp @p " + (home[0] + 2.5) + " " + home[1] + " " + (home[2] + 0.5));
+		File end = awaitArrival(context, dir, before, "an end portal into the End");
+		assertLooksLikeTheSettledView(context, end, "an end portal into the End");
+
+		// Moved off by command, since a test cannot steer a walk through terrain it has not seen;
+		// the watch only sees where the player is. A few ticks in, nothing is in view yet.
+		goHome(context, server, atHome);
+		before = listing(dir);
+		server.runCommand("execute in minecraft:the_nether run tp @p " + inTheNether);
+		context.waitFor(client -> client.level != null && client.gui.screen() == null
+				&& client.level.dimension().identifier().getPath().equals("the_nether"), 600);
+		context.waitTicks(2);
+		server.runCommand("execute as @p at @p run tp @p ~12 ~ ~");
+		context.waitTicks(300);
+		assertNothingNew(dir, before, "an arrival the player moved away from before it was in view");
+		goHome(context, server, atHome);
 	}
 
-	/** Eighty ticks in the portal in survival, the load, and then however long the view takes to
-	 * come in, with room for the encode and the tags after. */
+	/** Back to the overworld, and the session forgotten there: the overworld becomes the login
+	 * dimension, and everywhere else is new again. */
+	private static void goHome(ClientGameTestContext context, TestServerContext server, String atHome) {
+		server.runCommand("execute in minecraft:overworld run tp @p " + atHome);
+		context.waitFor(client -> client.level != null && client.gui.screen() == null
+				&& client.level.dimension().identifier().getPath().equals("overworld"), 600);
+		context.waitTicks(40);
+		resetAutoCapture(context);
+	}
+
+	/** Eighty ticks in a portal in survival, the load, and then however long the view takes to come
+	 * in, with room for the encode and the tags after. */
 	private static File awaitArrival(ClientGameTestContext context, File dir, Set<String> before, String what) {
-		context.waitFor(client -> !newNames(dir, before).isEmpty(), 900);
+		context.waitFor(client -> !newNames(dir, before).isEmpty(), 1200);
 		context.waitTicks(40);
 		return theOnlyNewFile(dir, before, what);
 	}
 
 	/**
-	 * Measured against the empty first frame vanilla hands over, which differed from the settled
-	 * view by 96 per channel through the portal overlay; a capture of the drawn world differs only
-	 * by the portal particles drifting through it.
+	 * The first frame vanilla hands over differs from the settled view by 80 to 100 per channel
+	 * through a portal's overlay, and by about 37 in the End, where it is empty. A frame of the
+	 * drawn world differed by 0.4 to 5 across render distances 5, 12 and 16, and by 10.8 once with
+	 * a portal's particles across it. Overworld arrivals are left out, because drifting clouds
+	 * alone move it by about 10.
 	 */
 	private static final double SETTLED_VIEW_TOLERANCE = 10.0;
 
@@ -145,8 +216,12 @@ public class MomentCaptureTest implements FabricClientGameTest {
 		settled.delete();
 	}
 
-	/** Mean absolute difference per channel over the middle of the frame, clear of the HUD: notices
-	 * and toasts along the top, and the chat, hotbar and hand along the bottom. */
+	/**
+	 * Mean absolute difference per channel over the middle of the frame, clear of the HUD: notices
+	 * and toasts along the top, and the chat, hotbar and hand along the bottom. The worst tenth of
+	 * pixels is left out, which is what a stray particle or a mob that moved can account for; an
+	 * empty frame differs everywhere.
+	 */
 	private static double meanDifference(File a, File b) {
 		try {
 			BufferedImage left = ImageIO.read(a);
@@ -154,23 +229,30 @@ public class MomentCaptureTest implements FabricClientGameTest {
 			if (left.getWidth() != right.getWidth() || left.getHeight() != right.getHeight()) {
 				throw new AssertionError(a.getName() + " and " + b.getName() + " differ in size");
 			}
-			long total = 0;
-			long samples = 0;
+			List<Integer> differences = new ArrayList<>();
 			for (int y = left.getHeight() / 6; y < left.getHeight() * 3 / 4; y++) {
 				for (int x = left.getWidth() / 4; x < left.getWidth() * 3 / 4; x++) {
 					int p = left.getRGB(x, y);
 					int q = right.getRGB(x, y);
+					int difference = 0;
 					for (int shift = 0; shift <= 16; shift += 8) {
-						total += Math.abs(((p >> shift) & 0xFF) - ((q >> shift) & 0xFF));
-						samples++;
+						difference += Math.abs(((p >> shift) & 0xFF) - ((q >> shift) & 0xFF));
 					}
+					differences.add(difference);
 				}
 			}
-			return (double) total / samples;
+			Collections.sort(differences);
+			int kept = differences.size() * 9 / 10;
+			long total = 0;
+			for (int i = 0; i < kept; i++) {
+				total += differences.get(i);
+			}
+			return (double) total / (kept * 3L);
 		} catch (IOException e) {
 			throw new AssertionError("could not read " + a + " or " + b, e);
 		}
 	}
+
 
 	/**
 	 * The one trigger hook that can be staged: the integrated server takes commands, and a Wither

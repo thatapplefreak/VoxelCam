@@ -189,9 +189,9 @@ class AutoCaptureTest {
 
 	/**
 	 * The first frame after the loading screen closes is fog, or the portal overlay, because vanilla
-	 * only waits for the player's own section. That clears on its own too, so every trigger held
-	 * across it waits: an advancement granted on arrival is as much a picture of the arrival as
-	 * the new-dimension moment.
+	 * only waits for the player's own section. That clears on its own too, so whatever trigger was
+	 * armed for the arrival waits: the advancement for entering a dimension arrives with it and
+	 * usually wins the cooldown, and is as much a picture of the arrival as the new-dimension moment.
 	 */
 	@Test
 	void aWorldStillComingIntoViewIsWaitedOutByEveryTrigger() {
@@ -202,24 +202,24 @@ class AutoCaptureTest {
 		}
 	}
 
+	/** Scoped to the arrival: a moment armed outside one, or once it is in view, sees the open
+	 * frame it always did. Joining a world is not an arrival either, which is the caller's side. */
 	@Test
-	void anArrivalIsNotInViewUntilTheTerrainIsDrawnAndTheOverlayHasFaded() {
-		assertFalse(AutoCapture.viewSettled(1, 0, false, 0.0F),
-				"nothing drawn yet: the frame vanilla hands over first in the End");
-		assertFalse(AutoCapture.viewSettled(1, 16, true, 0.0F),
-				"sections still being built or waiting on chunks: the Nether's first frame");
-		assertFalse(AutoCapture.viewSettled(1, 115, false, 0.4F),
-				"the portal overlay is still fading out over the drawn world");
-		assertTrue(AutoCapture.viewSettled(1, 115, false, 0.0F));
-	}
-
-	/** Bounded, and the bound captures: dropping would lose the arrival silently on a slow machine,
-	 * and by then what is on screen is mostly drawn. */
-	@Test
-	void anArrivalThatNeverSettlesIsTakenAfterItsBound() {
-		assertFalse(AutoCapture.viewSettled(AutoCapture.ARRIVAL_TIMEOUT_TICKS - 1, 40, true, 0.0F));
-		assertTrue(AutoCapture.viewSettled(AutoCapture.ARRIVAL_TIMEOUT_TICKS, 40, true, 0.0F),
-				"a player who ran straight out of the portal keeps chunks loading indefinitely");
+	void onlyAMomentArmedForAnArrivalWaitsForIt() {
+		assertEquals(AutoCapture.ScreenKind.ARRIVING,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, true, true));
+		assertEquals(AutoCapture.ScreenKind.NONE,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, false, true),
+				"a moment armed after the arrival came into view, or outside one, is taken as before");
+		assertEquals(AutoCapture.ScreenKind.NONE,
+				AutoCapture.arrivingKind(AutoCapture.ScreenKind.NONE, true, false),
+				"once the arrival is in view, its moment is taken");
+		for (AutoCapture.ScreenKind screen : AutoCapture.ScreenKind.values()) {
+			if (screen != AutoCapture.ScreenKind.NONE) {
+				assertEquals(screen, AutoCapture.arrivingKind(screen, true, true),
+						"a screen still decides for itself: " + screen);
+			}
+		}
 	}
 
 	@Test
@@ -247,8 +247,8 @@ class AutoCaptureTest {
 		}
 	}
 
-	/** An arrival's own bound ends in a capture, so the frame countdown must not end it in a drop
-	 * first. */
+	/** An arrival has its own bound, counted in ticks by ArrivalWatch; the frame countdown must not
+	 * cut it short. */
 	@Test
 	void theCountdownDoesNotRunWhileAnArrivalComesIntoView() {
 		AutoCapture.arm(MomentTrigger.NEW_DIMENSION, "minecraft:the_nether", 0L);
