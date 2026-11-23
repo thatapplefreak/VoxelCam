@@ -159,7 +159,9 @@ public class GuiScreenShotManager extends Screen {
 
 		int searchWidth = listWidth - SORT_BUTTON_WIDTH - GAP - FILTER_BUTTON_SIZE - GAP;
 		searchBar = new EditBox(font, MARGIN, 26, searchWidth, 18, Component.translatable("voxelcam.search"));
-		searchBar.setHint(Component.translatable("voxelcam.search").withStyle(ChatFormatting.DARK_GRAY));
+		// The hint runs on past the box and is cut only by the favorites star painted over it.
+		searchBar.setHint(Component.translatable(fittingKey("voxelcam.search", LabelFit.hintRoom(searchWidth, GAP)))
+				.withStyle(ChatFormatting.DARK_GRAY));
 		searchBar.setValue(searchText);
 		searchBar.setResponder(this::onSearchChanged);
 		addRenderableWidget(searchBar);
@@ -211,7 +213,8 @@ public class GuiScreenShotManager extends Screen {
 		int deleteX = actionsX + actionWidth + GAP;
 		int postX = actionsX + (actionWidth + GAP) * 2;
 
-		renameButton = addRenderableWidget(button("voxelcam.rename", "voxelcam.tooltip.rename",
+		renameButton = addRenderableWidget(button(
+				fittingKey("voxelcam.rename", LabelFit.buttonRoom(actionWidth)), "voxelcam.tooltip.rename",
 				b -> renameSelected(), actionsX, actionsY, actionWidth));
 		deleteButton = addRenderableWidget(button("voxelcam.delete", "voxelcam.tooltip.delete",
 				b -> minecraft.setScreenAndShow(DeletePopup.create(this)), deleteX, actionsY, actionWidth));
@@ -229,12 +232,16 @@ public class GuiScreenShotManager extends Screen {
 		int burstActionWidth = FilmstripLayout.actionWidth(previewWidth);
 		int actionX = previewX + previewWidth - burstActionWidth;
 		int actionTop = filmstripTop + (FILMSTRIP_HEIGHT - FILMSTRIP_ACTION_HEIGHT * 2 - FILMSTRIP_ACTION_GAP) / 2;
-		setAsKeyButton = addRenderableWidget(button("voxelcam.burst.setaskey", "voxelcam.tooltip.setaskey",
+		setAsKeyButton = addRenderableWidget(button(
+				fittingKey("voxelcam.burst.setaskey", LabelFit.buttonRoom(burstActionWidth)),
+				"voxelcam.tooltip.setaskey",
 				b -> setSelectedFrameAsKey(), actionX, actionTop, burstActionWidth));
 		setAsKeyButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
-		// A fixed label, with the frame count in the tooltip: a label that changed with the burst
-		// would be one a test (and clickScreenButton) could never find by its translation.
-		exportAnimationButton = addRenderableWidget(button("voxelcam.burst.exportanimation",
+		// A fixed label for a given width, with the frame count in the tooltip: a label that
+		// changed with the burst would be one a test (and clickScreenButton) could never find by
+		// its translation.
+		exportAnimationButton = addRenderableWidget(button(
+				fittingKey("voxelcam.burst.exportanimation", LabelFit.buttonRoom(burstActionWidth)),
 				"voxelcam.tooltip.exportanimation", b -> exportSelectedAnimation(),
 				actionX, actionTop + FILMSTRIP_ACTION_HEIGHT + FILMSTRIP_ACTION_GAP, burstActionWidth));
 		exportAnimationButton.setHeight(FILMSTRIP_ACTION_HEIGHT);
@@ -258,6 +265,19 @@ public class GuiScreenShotManager extends Screen {
 		visibleFiles = files;
 		list.setScreenshots(files, selected);
 		updateButtonStates();
+	}
+
+	/**
+	 * {@code key}, or its {@code .short} wording where the full label does not fit in
+	 * {@code room} pixels ({@link LabelFit#keyFor}). Only Rename, the filmstrip's column and the
+	 * search hint have one: at the narrowest window Re-christen and Export Animation scroll by
+	 * nearly half their width, so what shows at any moment is a fragment. Delete and Share
+	 * overflow by a few pixels there and are left to vanilla's scrolling, which still shows most
+	 * of the word at every moment.
+	 */
+	private String fittingKey(String key, int room) {
+		return LabelFit.keyFor(key, room, font.width(Component.translatable(key)),
+				font.width(Component.translatable(key + ".short")));
 	}
 
 	private Button button(String labelKey, String tooltipKey, Button.OnPress action,

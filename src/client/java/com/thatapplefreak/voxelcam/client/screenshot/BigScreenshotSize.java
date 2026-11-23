@@ -76,7 +76,12 @@ public final class BigScreenshotSize {
 		return new BigScreenshotSize(token, 0, width, height);
 	}
 
-	/** @return the parsed size, or null if the token is not a preset, a multiple or WxH. */
+	/**
+	 * @return the parsed size, or null if the token is not a preset, a multiple or WxH, or is a
+	 *         WxH with an edge below {@link #MIN_EDGE}. A too-small size is refused rather than
+	 *         raised, so the command never reports a size the player did not ask for and a
+	 *         hand-edited config holding one falls back to the default like any other bad token.
+	 */
 	public static BigScreenshotSize parse(String input) {
 		// ROOT, not the default locale: the preset keys are ASCII literals, and under tr/az
 		// 'I' folds to a dotless one, so "IMAX" would stop being a preset on a Turkish system.
@@ -87,10 +92,12 @@ public final class BigScreenshotSize {
 			return preset;
 		}
 
-		// WxH before Nx, so "2x2" is two pixels square rather than a mangled multiple.
+		// WxH before Nx, so "20x20" is twenty pixels square rather than a mangled multiple.
 		Matcher absolute = ABSOLUTE.matcher(token);
 		if (absolute.matches()) {
-			return ofPixels(Integer.parseInt(absolute.group(1)), Integer.parseInt(absolute.group(2)));
+			int width = Integer.parseInt(absolute.group(1));
+			int height = Integer.parseInt(absolute.group(2));
+			return width >= MIN_EDGE && height >= MIN_EDGE ? ofPixels(width, height) : null;
 		}
 
 		Matcher multiple = MULTIPLE.matcher(token);
@@ -121,7 +128,11 @@ public final class BigScreenshotSize {
 		int wanted = multiple > 0 ? window.getWidth() * multiple : width;
 		int wantedHeight = multiple > 0 ? window.getHeight() * multiple : height;
 
-		int max = RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize();
+		return resolve(wanted, wantedHeight, RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize());
+	}
+
+	/** The fitting behind {@link #resolve(Window)}, apart from the GPU query so it can be tested. */
+	static Resolved resolve(int wanted, int wantedHeight, int max) {
 		// Both axes shrink by the same factor. Clamping them independently would turn a 16:9
 		// request into a square whenever only one axis overflowed, re-framing the shot — the
 		// exact thing asking for a multiple of the window is meant to avoid.
@@ -129,10 +140,12 @@ public final class BigScreenshotSize {
 		int clampedWidth = Math.clamp(Math.round(wanted * scale), MIN_EDGE, max);
 		int clampedHeight = Math.clamp(Math.round(wantedHeight * scale), MIN_EDGE, max);
 
-		return new Resolved(clampedWidth, clampedHeight,
-				clampedWidth != wanted || clampedHeight != wantedHeight, max);
+		// Only the maximum counts as clamping, since that is what the command reports. Raising to
+		// the floor (a multiple of a tiny window, or the short side of a very long shot) is not.
+		return new Resolved(clampedWidth, clampedHeight, scale < 1.0, max);
 	}
 
+	/** {@code clamped} means the GPU's maximum texture size shrank the request. */
 	public record Resolved(int width, int height, boolean clamped, int maxTextureSize) {
 	}
 }

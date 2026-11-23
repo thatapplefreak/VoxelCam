@@ -88,15 +88,17 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are the automatic triggers' own hooks, all but two.** `MomentCaptureTest` calls
-`AutoCapture.fire` directly, because earning an advancement and dying are server-driven events a
-client game test does not stage — staging them would be testing Minecraft. So `ToastManagerMixin`'s
-`instanceof AdvancementToast` branch has never been asserted on and the `watchDeath` tick watch
-has never executed under test, even though the injectors themselves are proven to resolve
-(`defaultRequire: 1` fails the launch otherwise). The exceptions are a Wither and a portal: the
-integrated server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest`
-summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and its search for a
-dying owner. It also stages three arrivals and compares each capture with the same view 200
+**So is one of the automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
+directly for an advancement, because earning one is a server-driven event a client game test does
+not stage — staging it would be testing Minecraft. So `ToastManagerMixin`'s
+`instanceof AdvancementToast` branch has never been asserted on, even though the injector itself
+is proven to resolve (`defaultRequire: 1` fails the launch otherwise). The others are staged,
+because the integrated server takes commands (`singleplayer.getServer().runCommand`).
+`MomentCaptureTest` summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and
+its search for a dying owner. It kills the player with `/kill` twice: once ordinarily, asserting a
+DEATH capture taken under `DeathScreen` before Respawn is pressed, and once under
+`immediate_respawn`, asserting nothing is written and the next moment is not blocked. It also
+stages three arrivals and compares each capture with the same view 200
 ticks later: a Nether portal walked in survival, where the advancement it grants may win; a
 teleport into the Nether, `watchDimension`'s alone with no overlay; and an end portal. It stages
 them twice, at the framework's render distance of 5 and at vanilla's 12. At 5 the view fills
@@ -332,7 +334,10 @@ playback true to time. Frames are numbered by issue order, so names stay contigu
 Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
 reserved for it, so no generation tag is needed. The end-of-burst notice waits in
 `frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
-mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
+mid-burst, since completions race across the IO pool. A burst the gate or a failed readback stops
+(`abort`) while a later slot was still to come says it was cut short in that same notice
+(`completionNotice`), naming no cause the gate does not know (a death, a portal and a menu all fail
+it alike), and kept short enough to fit the default window with its file name; a skipped slot is not an early end and keeps the plain wording. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
 The collapse is one level deep, so rename refuses any name that would fold the renamed file under
@@ -487,7 +492,15 @@ Five things here are load-bearing:
   red-overlay shot depending on latency — the same trigger, two different screenshots. So `DEATH`
   alone inverts two rows of the gate: no screen means WAIT, `DeathScreen` means CAPTURE.
   `DeathScreen` draws the world behind itself rather than replacing it, so the moment is still in
-  the shot.
+  the shot. **So a death under the `immediate_respawn` gamerule is never captured, by design.**
+  `handlePlayerCombatKill` respawns instead of opening the screen when
+  `LocalPlayer.shouldShowDeathScreen()` is false, and `gateFor` drops such a death on its first
+  frame (`deathScreenComing`) rather than holding the one pending slot for a screen that is never
+  coming. That first frame does show the dying player at the death spot (empty hearts, the hurt
+  tilt, no red tint, no "You Died"): `runTick` renders straight after the tick that arms the
+  death. It is deliberately not taken. It is not the death-screen shot every other death gets,
+  and the kill packet has already requested the respawn, so whether the death arms at all and
+  every later frame depend on latency. Capturing it would make the trigger intermittent.
 - **The cooldown is global, charged at arm time, and handed back on a drop.** One automatic capture
   per window whatever caused it: first trigger in a window wins, the rest are dropped silently,
   because a cascade of advancements a second apart is one moment to the player and not five files.
@@ -496,7 +509,7 @@ Five things here are load-bearing:
   trusted from the file — a hand-edited zero would turn a cascade into a screenshot per toast.
 
 `ScreenshotHandler.captureMoment` refuses **silently** rather than reusing `captureNow`, whose
-refusal path posts a `voxelcam.savingpleasewait` notice: nobody asked for this screenshot, so nobody
+refusal path posts a busy notice: nobody asked for this screenshot, so nobody
 wants to be told at length why it did not happen. `MomentTag` threads through
 `saveCapturedImage`/`write`/`embedMetadata` as a fourth nullable parameter, kept separate from
 `BurstFrame` rather than bagged with it because `burst` carries *behaviour* (completion accounting,
@@ -751,7 +764,13 @@ where they were, and only free text (a name, an advancement title) is ever cut i
 live in its three builders — a capture's time to the second outranks its day, dimensions outrank
 size, and the details line runs animation, moment, location, dimensions, size, file name.
 Below ~362px the filmstrip's Set as key / Export animation column narrows too
-(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons. The cells
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons, and its
+two buttons take their `.short` labels where the full ones no longer fit. A button label that does not fit is not clipped:
+vanilla scrolls it inside the button. So only a label that would scroll by a large part of itself
+has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is
+neither scrolled nor clipped but runs on until the favorites star covers it), picked in `init()`
+by `LabelFit.keyFor` where the full one does not fit and the short one is shorter;
+Delete and Share overflow by a few pixels at 320 and are left to scroll. The cells
 are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
 count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
 free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`

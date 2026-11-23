@@ -142,7 +142,7 @@ public final class ScreenshotHandler {
 	/** Takes a plain screenshot of the given frame, refusing while another save is in flight. */
 	static void captureNow(RenderTarget framebuffer) {
 		if (BigScreenshot.isBusy() || Burst.isBusy() || !beginSave(1)) {
-			CaptureStatus.post(CaptureStatus.Kind.BUSY, "voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 		capture(framebuffer);
@@ -152,7 +152,7 @@ public final class ScreenshotHandler {
 	 * Takes the single frame an {@link AutoCapture} moment armed, tagged with what armed it.
 	 *
 	 * <p>Deliberately not {@link #captureNow(RenderTarget)}: that path answers a refusal with
-	 * a {@code voxelcam.savingpleasewait} notice, which is right for a keypress and wrong here.
+	 * a busy notice, which is right for a keypress and wrong here.
 	 * Nobody asked for this screenshot, so nobody wants to be told at length why it did not happen
 	 * — the caller gets a {@code false} and drops it.
 	 *
@@ -199,7 +199,7 @@ public final class ScreenshotHandler {
 			// in the completed count too, or the group's end-of-burst announcement waits
 			// forever for a frame that will never report in on its own.
 			Burst.frameCompleted(false);
-			Burst.abort("a readback failed");
+			Burst.abort("a readback failed", Burst.CUT_SHORT_BY_FAILURE);
 		}
 	}
 
