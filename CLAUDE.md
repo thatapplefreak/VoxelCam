@@ -88,15 +88,17 @@ loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor
 that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
 and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
 
-**So are the automatic triggers' own hooks, all but two.** `MomentCaptureTest` calls
-`AutoCapture.fire` directly, because earning an advancement and dying are server-driven events a
-client game test does not stage — staging them would be testing Minecraft. So `ToastManagerMixin`'s
-`instanceof AdvancementToast` branch has never been asserted on and the `watchDeath` tick watch
-has never executed under test, even though the injectors themselves are proven to resolve
-(`defaultRequire: 1` fails the launch otherwise). The exceptions are a Wither and a portal: the
-integrated server takes commands (`singleplayer.getServer().runCommand`), so `MomentCaptureTest`
-summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and its search for a
-dying owner. It also stages three arrivals and compares each capture with the same view 200
+**So is one of the automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
+directly for an advancement, because earning one is a server-driven event a client game test does
+not stage — staging it would be testing Minecraft. So `ToastManagerMixin`'s
+`instanceof AdvancementToast` branch has never been asserted on, even though the injector itself
+is proven to resolve (`defaultRequire: 1` fails the launch otherwise). The others are staged,
+because the integrated server takes commands (`singleplayer.getServer().runCommand`).
+`MomentCaptureTest` summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and
+its search for a dying owner. It kills the player with `/kill` twice: once ordinarily, asserting a
+DEATH capture taken under `DeathScreen` before Respawn is pressed, and once under
+`immediate_respawn`, asserting nothing is written and the next moment is not blocked. It also
+stages three arrivals and compares each capture with the same view 200
 ticks later: a Nether portal walked in survival, where the advancement it grants may win; a
 teleport into the Nether, `watchDimension`'s alone with no overlay; and an end portal. It stages
 them twice, at the framework's render distance of 5 and at vanilla's 12. At 5 the view fills
@@ -487,7 +489,15 @@ Five things here are load-bearing:
   red-overlay shot depending on latency — the same trigger, two different screenshots. So `DEATH`
   alone inverts two rows of the gate: no screen means WAIT, `DeathScreen` means CAPTURE.
   `DeathScreen` draws the world behind itself rather than replacing it, so the moment is still in
-  the shot.
+  the shot. **So a death under the `immediate_respawn` gamerule is never captured, by design.**
+  `handlePlayerCombatKill` respawns instead of opening the screen when
+  `LocalPlayer.shouldShowDeathScreen()` is false, and `gateFor` drops such a death on its first
+  frame (`deathScreenComing`) rather than holding the one pending slot for a screen that is never
+  coming. That first frame does show the dying player at the death spot (empty hearts, the hurt
+  tilt, no red tint, no "You Died"): `runTick` renders straight after the tick that arms the
+  death. It is deliberately not taken. It is not the death-screen shot every other death gets,
+  and the kill packet has already requested the respawn, so whether the death arms at all and
+  every later frame depend on latency. Capturing it would make the trigger intermittent.
 - **The cooldown is global, charged at arm time, and handed back on a drop.** One automatic capture
   per window whatever caused it: first trigger in a window wins, the rest are dropped silently,
   because a cascade of advancements a second apart is one moment to the player and not five files.

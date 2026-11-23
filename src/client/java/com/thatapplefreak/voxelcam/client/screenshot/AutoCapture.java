@@ -158,8 +158,7 @@ public final class AutoCapture {
 
 		Minecraft client = Minecraft.getInstance();
 		ScreenKind screen = viewKind(client);
-		switch (gateFor(pendingTrigger, client.level != null, client.player != null, CaptureMenu.isArmed(),
-				screen)) {
+		switch (gateNow(client, screen)) {
 			case DROP -> dropPending();
 			case WAIT -> {
 				if (advancePending(screen)) {
@@ -187,8 +186,18 @@ public final class AutoCapture {
 			return;
 		}
 		Minecraft client = Minecraft.getInstance();
-		capturesThisFrame = gateFor(pendingTrigger, client.level != null, client.player != null,
-				CaptureMenu.isArmed(), viewKind(client)) == Gate.CAPTURE;
+		capturesThisFrame = gateNow(client, viewKind(client)) == Gate.CAPTURE;
+	}
+
+	/**
+	 * The gate as both ends of the frame ask it. One call, so that {@link #beforeFrame()}'s decision
+	 * to blank the HUD and {@link #beforeBlit()}'s decision to capture are made from the same
+	 * inputs: two that drifted would put the notices into a PNG, or blank a frame never taken.
+	 */
+	private static Gate gateNow(Minecraft client, ScreenKind screen) {
+		LocalPlayer player = client.player;
+		return gateFor(pendingTrigger, client.level != null, player != null, CaptureMenu.isArmed(),
+				player != null && player.shouldShowDeathScreen(), screen);
 	}
 
 	/** Whether this frame's blit takes the pending capture. Valid after {@link #beforeFrame()}; what
@@ -405,9 +414,21 @@ public final class AutoCapture {
 	 * different screenshots. Waiting <em>for</em> the death screen instead gives one consistent
 	 * result every time, and {@code DeathScreen} draws the world behind itself rather than replacing
 	 * it, so the moment is still in the shot.
+	 *
+	 * <p>{@code deathScreenComing} is {@code LocalPlayer.shouldShowDeathScreen()}, which vanilla sets
+	 * from the {@code immediate_respawn} gamerule (at login, on the {@code IMMEDIATE_RESPAWN} game
+	 * event, and copied across a respawn) and reads in {@code handlePlayerCombatKill} to choose
+	 * between opening {@code DeathScreen} and respawning on the spot. When it is false a death is
+	 * dropped at once, and a death under that gamerule is never captured. That is a choice, not a
+	 * necessity. The kill packet precedes the zero-health update that arms the moment, and {@code
+	 * runTick} renders straight after the tick that arms it, so the first frame the gate sees always
+	 * still shows the dying player where they died: empty hearts and the hurt tilt, but no red tint
+	 * and no "You Died". It is not taken because it is not the death shot every other death gets,
+	 * and because the respawn is already requested: whether the death arms at all, and every frame
+	 * after the first, depend on latency, so taking it would make the trigger intermittent.
 	 */
 	static Gate gateFor(MomentTrigger trigger, boolean hasLevel, boolean hasPlayer, boolean captureMenuArmed,
-			ScreenKind screen) {
+			boolean deathScreenComing, ScreenKind screen) {
 		if (!hasLevel || !hasPlayer) {
 			return Gate.DROP;
 		}
@@ -417,6 +438,12 @@ public final class AutoCapture {
 		// the menu that came up after the moment armed: one waiting out a level load, or a death
 		// waiting for its screen.
 		if (captureMenuArmed) {
+			return Gate.DROP;
+		}
+		// immediate_respawn: the kill packet respawned the player instead of opening the screen.
+		// There is nothing to wait for, and this frame of the dying player is deliberately not
+		// taken; the Javadoc says why.
+		if (trigger == MomentTrigger.DEATH && !deathScreenComing && screen != ScreenKind.DEATH) {
 			return Gate.DROP;
 		}
 		return switch (screen) {
