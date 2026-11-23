@@ -30,9 +30,9 @@ final class FilmstripLayout {
 	 * How wide the Set as key / Export animation column is: {@link #MAX_ACTION_WIDTH} wherever
 	 * a cell still fits beside it, and less where one would not. Below a scaled width of about
 	 * 362 the full column leaves no room between the scroll buttons, and at 320, the narrowest
-	 * vanilla produces, it leaves minus eight pixels. The column is what gives way because a
-	 * label that does not fit its button scrolls, while a strip with no cell leaves no frame to
-	 * pick and so nothing for Set as key to act on.
+	 * vanilla produces, it leaves minus eight pixels. The column is what gives way because its
+	 * buttons can take a shorter wording ({@link LabelFit}), while a strip with no cell leaves no
+	 * frame to pick and so nothing for Set as key to act on.
 	 */
 	static int actionWidth(int previewWidth) {
 		int scrollButtons = (SCROLL_BUTTON_WIDTH + ROW_GAP) * 2;

@@ -12,6 +12,7 @@
 
 	"voxelcam.screenshots": "Treasure Maps",
 	"voxelcam.search": "Search th' Chest",
+	"voxelcam.search.short": "Seek a Map",
 
 	"voxelcam.sort.date.desc": "Day ↓",
 	"voxelcam.sort.date.asc": "Day ↑",
@@ -24,6 +25,7 @@
 
 	"voxelcam.done": "Aye",
 	"voxelcam.rename": "Re-christen",
+	"voxelcam.rename.short": "Dub",
 	"voxelcam.delete": "Scuttle",
 	"voxelcam.openscreenshotsfolder.short": "Chest",
 	"voxelcam.share": "Trade…",
@@ -108,8 +110,10 @@
 	"voxelcam.burst.unavailable": "A flurry needs a world open and no menu on screen, arr",
 	"voxelcam.burst.failed": "Flurry chartin' failed, check th' log fer details",
 	"voxelcam.burst.setaskey": "Make th' Key",
+	"voxelcam.burst.setaskey.short": "Make Key",
 	"voxelcam.burst.setaskey.failed": "Couldn't make this map th' key",
 	"voxelcam.burst.exportanimation": "Make 'Em Dance",
+	"voxelcam.burst.exportanimation.short": "Dance!",
 	"voxelcam.burst.exportanimation.failed": "Th' maps wouldn't dance, see th' log fer why",
 	"voxelcam.burst.exporting": "Teachin' th' maps t' dance…",
 	"voxelcam.animation.loading": "Unrollin’ th’ picture…",
