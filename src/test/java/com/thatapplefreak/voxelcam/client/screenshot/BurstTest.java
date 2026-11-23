@@ -5,10 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.ToIntFunction;
 
 /**
  * The capture itself needs a live client — {@code beforeBlit()} reads {@code
@@ -301,5 +309,41 @@ class BurstTest {
 		Burst.abortAt("a screen opened", Burst.CUT_SHORT_BY_GATE, 0L);
 
 		assertNull(Burst.completionNotice("key.png", 0L));
+	}
+
+	/** The default font's advance per character, from vanilla's {@code ascii.png}: most glyphs are
+	 * 5 pixels and a gap. The same table {@code CaptionFitTest} measures with. */
+	private static final ToIntFunction<String> FONT = text -> text.codePoints().map(c -> switch (c) {
+		case ' ', 't', 'I', '(', ')', '[', ']' -> 4;
+		case 'l', '`' -> 3;
+		case ':', '.', ',', 'i', '!', '|', '\'', ';' -> 2;
+		case 'k', 'f', '<', '>' -> 5;
+		default -> 6;
+	}).sum();
+
+	/**
+	 * The default 854x480 window at GUI scale 2 is 427 wide: a notice's text starts at x=11 and its
+	 * plate may reach x=423. The file name is the end of the line and the one part a player reads
+	 * the notice for, so a line the window cuts loses exactly that.
+	 */
+	private static final int NOTICE_TEXT_WIDTH = 423 - 11;
+
+	@Test
+	void everyEndOfBurstNoticeFitsTheDefaultWindowWithItsFileName() throws IOException {
+		for (String lang : List.of("en_us", "en_pt")) {
+			JsonObject strings = lang(lang);
+			for (String key : List.of("voxelcam.burst.saved", Burst.CUT_SHORT_BY_GATE, Burst.CUT_SHORT_BY_FAILURE)) {
+				String line = String.format(Locale.ROOT, strings.get(key).getAsString(),
+						99, "2026-11-23_09.02.57_1.png");
+				assertTrue(FONT.applyAsInt(line) <= NOTICE_TEXT_WIDTH,
+						lang + " " + key + " is " + FONT.applyAsInt(line) + " wide: " + line);
+			}
+		}
+	}
+
+	private static JsonObject lang(String name) throws IOException {
+		try (InputStream in = BurstTest.class.getResourceAsStream("/assets/voxelcam/lang/" + name + ".json")) {
+			return JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
+		}
 	}
 }

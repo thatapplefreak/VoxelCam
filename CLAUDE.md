@@ -328,8 +328,9 @@ Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file
 reserved for it, so no generation tag is needed. The end-of-burst notice waits in
 `frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
 mid-burst, since completions race across the IO pool. A burst the gate or a failed readback stops
-(`abort`) while a later slot was still to come says it was cut short, and why, in that same notice
-(`completionNotice`); a skipped slot is not an early end and keeps the plain wording. `VoxelCamIO` collapses groups by filename so
+(`abort`) while a later slot was still to come says it was cut short in that same notice
+(`completionNotice`), naming no cause the gate does not know (a death, a portal and a menu all fail
+it alike), and kept short enough to fit the default window with its file name; a skipped slot is not an early end and keeps the plain wording. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
 The collapse is one level deep, so rename refuses any name that would fold the renamed file under
