@@ -76,6 +76,11 @@ public class BurstCaptureTest implements FabricClientGameTest {
 		context.waitFor(client -> !CaptureMenu.isCapturePending() && !Burst.isBusy(), 600);
 		// PNG encoding runs on the IO worker, and a burst has several frames queued on it.
 		context.waitTicks(60);
+		// A fixed wait is not enough on a runner that has fallen behind. A frame's file exists from
+		// the moment its encode starts and is empty until it ends, so reading its header then fails
+		// with an EOFException that says nothing about the burst — which is how this test failed in
+		// CI once. So wait for the files themselves.
+		context.waitFor(client -> everyNewFrameIsFinished(dir, before), 1200);
 
 		Set<String> written = theNewFiles(dir, before, planned, "a held, aimed release at the burst wedge");
 		File key = theKeyAmong(written, dir);
@@ -400,6 +405,23 @@ public class BurstCaptureTest implements FabricClientGameTest {
 	private static Set<String> listing(File dir) {
 		String[] names = dir.list();
 		return names == null ? new HashSet<>() : new HashSet<>(Arrays.asList(names));
+	}
+
+	/**
+	 * Whether every PNG the burst has written so far is finished. The burst tags are what say so:
+	 * they are spliced in after the encode, through a temp file moved into place, so a file that
+	 * carries them was whole before they went in and is whole now. One still being encoded has none.
+	 */
+	private static boolean everyNewFrameIsFinished(File dir, Set<String> before) {
+		Set<String> names = listing(dir);
+		names.removeAll(before);
+		names.removeIf(name -> !name.endsWith(".png"));
+		for (String name : names) {
+			if (BurstFrame.fromTags(PngTextChunk.read(new File(dir, name))) == null) {
+				return false;
+			}
+		}
+		return !names.isEmpty();
 	}
 
 	/** Up to {@code planned} frames, and at least half: a slot can be skipped while every
