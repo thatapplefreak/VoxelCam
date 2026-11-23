@@ -1,16 +1,24 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
+import com.thatapplefreak.voxelcam.client.screenshot.AnimationPreview;
+import com.thatapplefreak.voxelcam.client.screenshot.SmallerShareCopy;
 import com.thatapplefreak.voxelcam.client.share.NativeShare;
 import com.thatapplefreak.voxelcam.client.upload.CatboxUploader;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 
 /**
  * Share targets for one screenshot. Replaces the old "Post to..." dialog, which
@@ -28,7 +36,31 @@ public class SharePopup extends Screen {
 	private static final int GAP = 4;
 
 	private final GuiScreenShotManager parent;
+	/** What every button acts on: the screenshot itself, or for an exported animation its WebP
+	 * copy — Discord plays an animated WebP but shows an APNG as a still, and a link pasted
+	 * there is where most of these end up. */
 	private final File screenshot;
+	/** The file the popup was opened on: the APNG itself, for an animation. */
+	private final File source;
+	/** A smaller WebP made for Discord this session, reused for a second send, or null. */
+	private File smallCopy;
+	/*
+	 * What is still running. Kept here rather than read off the buttons: init() rebuilds every
+	 * button on the way back from the size prompt, which would forget a save dialog or upload that
+	 * is still in flight and offer to start a second one.
+	 */
+	private boolean shrinking;
+	private boolean saving;
+	private boolean uploading;
+	private boolean revealing;
+	/** Set once the player backs out. Anything that finishes after this must not start something new. */
+	private boolean closed;
+	/** The size prompt this popup has open, or null. Kept so that only its own prompt, and not
+	 * some later popup's, counts as the player still being here. */
+	private ShareSizePopup sizePrompt;
+	/** Set whenever the popup stops being the screen for anything but its own size prompt: Done and
+	 * Escape as well as another screen taking its place. Cleared when it is put back. */
+	private boolean left;
 
 	private Button saveButton;
 	private Button revealButton;
@@ -40,7 +72,9 @@ public class SharePopup extends Screen {
 	public SharePopup(GuiScreenShotManager parent, File screenshot) {
 		super(Component.translatable("voxelcam.share"));
 		this.parent = parent;
-		this.screenshot = screenshot;
+		this.source = screenshot;
+		File webp = AnimatedPng.sharingCopyOf(screenshot);
+		this.screenshot = webp != null ? webp : screenshot;
 	}
 
 	@Override
@@ -58,6 +92,75 @@ public class SharePopup extends Screen {
 		y += BUTTON_HEIGHT + GAP * 2;
 		addRenderableWidget(Button.builder(Component.translatable("voxelcam.done"), b -> onClose())
 				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
+		// init() runs again on the way back from the size prompt, with fresh buttons.
+		refreshButtons();
+	}
+
+	private void refreshButtons() {
+		saveButton.active = !shrinking && !saving;
+		linkButton.active = !shrinking && !uploading;
+		revealButton.active = !revealing;
+	}
+
+	/**
+	 * Runs {@code action} on the file to send — asking first, when the sharing copy is over
+	 * Discord's free limit, whether to send a smaller copy instead. Only the two actions that send
+	 * a file somewhere ask; Reveal and Copy path point at what is on disk.
+	 */
+	private void withSizeChoice(Consumer<File> action) {
+		if (screenshot.equals(source) || !SmallerShareCopy.tooBigForDiscord(screenshot)) {
+			action.accept(screenshot);
+			return;
+		}
+		sizePrompt = new ShareSizePopup(this, screenshot.length(), smaller -> {
+			minecraft.setScreenAndShow(this);
+			if (smaller) {
+				withSmallerCopy(action);
+			} else {
+				action.accept(screenshot);
+			}
+		});
+		minecraft.setScreenAndShow(sizePrompt);
+	}
+
+	/** Makes the smaller copy off the render thread — it decodes and re-encodes every frame, at
+	 * least once — then runs {@code action} on it. Made once per popup and reused. */
+	private void withSmallerCopy(Consumer<File> action) {
+		if (smallCopy != null) {
+			action.accept(smallCopy);
+			return;
+		}
+		shrinking = true;
+		refreshButtons();
+		setStatus("voxelcam.share.shrinking", false);
+		long fullSize = screenshot.length();
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return SmallerShareCopy.make(source, fullSize, SmallerShareCopy.DISCORD_LIMIT_BYTES,
+						AnimationPreview::argbOf);
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}, Util.ioPool()).whenComplete((made, error) -> minecraft.execute(() -> {
+			shrinking = false;
+			if (!stillOpen()) {
+				// Backing out while the copy was being made is backing out of the send: nothing is
+				// uploaded and no Save dialog opens over the game. Being replaced counts the same.
+				// A death screen or a disconnect takes the popup away through removed(), never
+				// onClose(), so the closed flag alone would leave this send armed.
+				SmallerShareCopy.discard(made);
+				return;
+			}
+			refreshButtons();
+			if (error != null) {
+				VoxelCamClient.LOGGER.warn("Making a smaller copy of {} failed", source, error);
+				setStatus("voxelcam.share.shrinkfailed", true);
+				return;
+			}
+			smallCopy = made;
+			status = null;
+			action.accept(made);
+		}));
 	}
 
 	private Button addButton(String labelKey, String tooltipKey, int x, int y, Runnable action) {
@@ -68,17 +171,27 @@ public class SharePopup extends Screen {
 	}
 
 	private void saveCopy() {
-		// The native dialog runs off-thread; keep the button from being pressed
-		// again while one is already open.
-		saveButton.active = false;
+		withSizeChoice(this::saveCopyOf);
+	}
+
+	private void saveCopyOf(File file) {
+		// The native dialog answers asynchronously (ADR-0012); keep the button from being
+		// pressed again while one is already open.
+		saving = true;
+		refreshButtons();
 		setStatus("voxelcam.share.choosing", false);
-		NativeShare.saveCopy(screenshot,
+		// A smaller copy lives in a temp folder; the dialog opens beside the animation instead.
+		File suggested = file.equals(smallCopy) ? new File(source.getAbsoluteFile().getParentFile(), file.getName()) : file;
+		NativeShare.saveCopy(file, suggested,
 						Component.translatable("voxelcam.share.savecopy.title").getString(),
-						Component.translatable("voxelcam.share.png").getString())
+						Component.translatable("webp".equals(NativeShare.extensionOf(file))
+								? "voxelcam.share.webp" : "voxelcam.share.png").getString())
 				.whenComplete((saved, error) -> minecraft.execute(() -> {
-					saveButton.active = true;
+					saving = false;
+					refreshButtons();
+					discardSmallCopyIfDone();
 					if (error != null) {
-						VoxelCamClient.LOGGER.warn("Saving a copy of {} failed", screenshot, error);
+						VoxelCamClient.LOGGER.warn("Saving a copy of {} failed", file, error);
 						setStatus("voxelcam.share.savefailed", true);
 					} else if (saved == null) {
 						// Cancelled: clear the "choose a location" prompt, say nothing.
@@ -92,9 +205,11 @@ public class SharePopup extends Screen {
 	private void reveal() {
 		// The command is waited on off-thread, so the outcome arrives later; keep the
 		// button from queueing a second file manager window in the meantime.
-		revealButton.active = false;
+		revealing = true;
+		refreshButtons();
 		NativeShare.revealInFileManager(screenshot).whenComplete((outcome, error) -> minecraft.execute(() -> {
-			revealButton.active = true;
+			revealing = false;
+			refreshButtons();
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Revealing {} failed", screenshot, error);
 				setStatus("voxelcam.share.revealfailed", true);
@@ -118,13 +233,36 @@ public class SharePopup extends Screen {
 	 * that produces a link without the player configuring anything first.
 	 */
 	private void uploadToCatbox() {
-		linkButton.active = false;
+		withSizeChoice(this::uploadToCatbox);
+	}
+
+	private void uploadToCatbox(File file) {
+		uploading = true;
+		refreshButtons();
 		setStatus("voxelcam.share.uploading.link", false);
-		CatboxUploader.upload(screenshot).whenComplete((link, error) -> minecraft.execute(() -> {
-			linkButton.active = true;
+		int upload = LateShare.beginUpload();
+		CatboxUploader.upload(file).whenComplete((link, error) -> minecraft.execute(() -> {
+			uploading = false;
+			refreshButtons();
+			discardSmallCopyIfDone();
+			if (error instanceof CatboxUploader.TooLargeException tooLarge) {
+				// The one failure trying again cannot fix, so it says what is wrong with the file.
+				setStatus(Component.translatable("voxelcam.share.linktoobig",
+						SmallerShareCopy.megabytes(tooLarge.bytes()),
+						CatboxUploader.MAX_UPLOAD_BYTES / 1_000_000), true);
+				return;
+			}
 			if (error != null) {
 				VoxelCamClient.LOGGER.warn("Catbox upload failed", error);
 				setStatus("voxelcam.share.linkfailed", true);
+				return;
+			}
+			if (!LateShare.mayCopyLink(upload, stillOpen())) {
+				// An upload already under way when the player backed out still finishes, but its
+				// link must not replace the one a later popup said it copied, or whatever they
+				// have copied since. Logged, so the upload is not lost.
+				VoxelCamClient.LOGGER.info("Share link for {} arrived after its popup was left; not copied: {}",
+						file.getName(), link);
 				return;
 			}
 			NativeShare.copyText(link);
@@ -162,8 +300,62 @@ public class SharePopup extends Screen {
 		}
 	}
 
+	/**
+	 * Whether the player is still in this popup: not backed out of it, and it has not been replaced
+	 * by some other screen. Its own size prompt counts as still being here, since the player comes
+	 * back from that to this popup's status line. The decision is {@link LateShare#popupStillOpen},
+	 * where a test can reach it.
+	 */
+	private boolean stillOpen() {
+		return LateShare.popupStillOpen(closed, minecraft.gui.screen(), this, sizePrompt);
+	}
+
 	@Override
 	public void onClose() {
+		closed = true;
+		discardSmallCopyIfDone();
 		minecraft.setScreenAndShow(parent);
+	}
+
+	/**
+	 * The popup is on screen: for the first time, back from its own size prompt, or put back by
+	 * whatever had covered it. Either way the size prompt is done with and the player is here.
+	 */
+	@Override
+	public void added() {
+		super.added();
+		sizePrompt = null;
+		left = false;
+	}
+
+	/**
+	 * Vanilla calls this whenever the popup stops being the screen, and for a screen that takes its
+	 * place (a death, a disconnect) it is the only call: {@code onClose()} is for Done and Escape.
+	 * So this is where the smaller copy is cleaned up for a popup that was replaced.
+	 *
+	 * <p>Opening its own size prompt is the one departure that is not leaving. The prompt is
+	 * assigned before the switch, which is how it is told apart here. If that prompt is itself
+	 * replaced by another screen, nothing tells this popup, and a copy it had already made stays
+	 * until the game exits, when {@code deleteOnExit} takes it.
+	 */
+	@Override
+	public void removed() {
+		super.removed();
+		if (sizePrompt == null) {
+			left = true;
+			discardSmallCopyIfDone();
+		}
+	}
+
+	/**
+	 * Deletes the smaller copy once the player has left the popup and nothing is still reading it.
+	 * A save dialog or an upload that was already under way when they left still finishes; the
+	 * copy goes when the last of them does, rather than out from under it.
+	 */
+	private void discardSmallCopyIfDone() {
+		if ((closed || left) && !saving && !uploading && smallCopy != null) {
+			SmallerShareCopy.discard(smallCopy);
+			smallCopy = null;
+		}
 	}
 }

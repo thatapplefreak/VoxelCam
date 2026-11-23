@@ -4,16 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+import net.minecraft.util.Util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * What's reachable here without a live client is the pure wedge/mode geometry, and the corners of
  * the state machine that never touch {@code Minecraft}: arming from idle, a duplicate key-down not
- * resetting an already-armed hold, and a sub-threshold tick never opening the menu. The busy-guard
- * refusal (it sends a chat message), crossing into {@code OPEN} (which checks the current screen
- * and grabs the cursor), and firing either mode (which resolves a render target or touches the
- * window) all need a real client — that's the gametest suite's job, the same split
+ * resetting an already-armed hold, a sub-threshold tick never opening the menu, and the busy-guard
+ * refusal, which only posts a notice. Crossing into {@code OPEN} (which checks the current screen
+ * and grabs the cursor) and firing either mode (which resolves a render target or touches the
+ * window) both need a real client — that's the gametest suite's job, the same split
  * {@code BigScreenshotTest} draws around {@code request()}/{@code beginCapture()}/{@code finish()}.
  */
 class CaptureMenuTest {
@@ -23,6 +25,9 @@ class CaptureMenuTest {
 	void settle() {
 		CaptureMenu.abort();
 		CaptureMenu.discardPendingCapture();
+		Burst.forgetBurst();
+		ScreenshotHandler.forgetSavesInFlight();
+		CaptureStatus.forgetAll();
 	}
 
 	// --- wedgeForAngle -------------------------------------------------------------------------
@@ -153,9 +158,38 @@ class CaptureMenuTest {
 		assertFalse(CaptureMenu.isOpen(), "arming alone must not open the menu yet");
 	}
 
-	// keyDown's busy-guard (BigScreenshot.isBusy() / ScreenshotHandler.isSaving()) sends a chat
-	// message on refusal, which touches Minecraft.getInstance() — untestable here for the same
-	// reason BigScreenshotTest never calls request() itself; covered by the gametest instead.
+	// --- the busy refusal -------------------------------------------------------------------------
+
+	/** A burst that is still recording is not saving anything the player would recognise as a
+	 * save, and the recording cue is what is on screen, so the refusal has to say recording. */
+	@Test
+	void aPressWhileABurstIsRecordingIsRefusedAsRecording() {
+		Burst.beginBurst(30, Util.getMillis());
+
+		CaptureMenu.onKeyDown();
+
+		assertFalse(CaptureMenu.isArmed(), "a burst is still running");
+		assertEquals("voxelcam.recordingpleasewait", onlyNotice().key());
+	}
+
+	/** Once the burst has stopped recording, its last frames are ordinary saves still encoding —
+	 * the same as a plain screenshot that has not finished, and under the same "Saving…" line. */
+	@Test
+	void aPressWhileFramesAreStillEncodingIsRefusedAsSaving() {
+		assertTrue(ScreenshotHandler.beginSave(1));
+
+		CaptureMenu.onKeyDown();
+
+		assertFalse(CaptureMenu.isArmed(), "a save is still in flight");
+		assertEquals("voxelcam.savingpleasewait", onlyNotice().key());
+	}
+
+	private static CaptureStatus.Notice onlyNotice() {
+		List<CaptureStatus.Notice> notices = CaptureStatus.visibleAt(Util.getMillis());
+		assertEquals(1, notices.size(), "the refusal should say why nothing happened");
+		assertEquals(CaptureStatus.Kind.BUSY, notices.get(0).kind());
+		return notices.get(0);
+	}
 
 	@Test
 	void aDuplicateKeyDownWhileAlreadyArmedIsANoOp() {
@@ -205,6 +239,22 @@ class CaptureMenuTest {
 
 		assertTrue(CaptureMenu.isCapturePending(),
 				"the blit of the frame the menu was drawn on must not be the one captured");
+	}
+
+	/**
+	 * A screenshot-key press the menu never saw is queued the same way. The frame on screen when it
+	 * arrives has the capture status HUD in it, so it waits for a frame that has begun — the one
+	 * {@code CaptureStatus.beforeFrame} hides the HUD for, because this reports it is captured.
+	 */
+	@Test
+	void aKeyPressOutsideTheMenuWaitsForAFrameThatHidesTheHud() {
+		CaptureMenu.queueScreenshot();
+
+		CaptureMenu.beforeBlit();
+		assertTrue(CaptureMenu.isCapturePending(), "the frame already on screen must not be the one captured");
+
+		CaptureMenu.beforeFrame();
+		assertTrue(CaptureMenu.capturesThisFrame(), "the next frame should be marked as read back");
 	}
 
 	@Test

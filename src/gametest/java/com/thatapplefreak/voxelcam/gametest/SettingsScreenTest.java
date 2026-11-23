@@ -2,23 +2,27 @@ package com.thatapplefreak.voxelcam.gametest;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
 import com.thatapplefreak.voxelcam.client.gui.GuiAutoCaptureSettings;
 import com.thatapplefreak.voxelcam.client.gui.GuiScreenShotManager;
 import com.thatapplefreak.voxelcam.client.gui.GuiSettings;
 import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
 import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTrigger;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
+
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The settings screen reached from the manager's gear button, and the config file both it and
@@ -43,6 +47,8 @@ public class SettingsScreenTest implements FabricClientGameTest {
 		assertBurstLengthStepsAndPersists(context);
 		assertBigScreenshotSizeButtonReflectsState(context);
 		assertAutoCaptureTogglesAndPersists(context);
+		assertCaptureStatusTogglesAndPersists(context);
+		assertEveryRowFitsTheSmallestWindow(context);
 		assertDoneReturnsToTheManager(context);
 
 		context.setScreen(TitleScreen::new);
@@ -62,12 +68,12 @@ public class SettingsScreenTest implements FabricClientGameTest {
 	 * their own, since they never touch {@code FabricLoader.getConfigDir()} itself.
 	 */
 	private static void assertBurstLengthStepsAndPersists(ClientGameTestContext context) {
-		int before = context.computeOnClient(client -> Burst.getLength());
+		int before = context.computeOnClient(client -> Burst.getSeconds());
 
 		context.clickScreenButton("voxelcam.settings.burstlengthplus");
 		context.waitTicks(2);
 
-		int after = context.computeOnClient(client -> Burst.getLength());
+		int after = context.computeOnClient(client -> Burst.getSeconds());
 		if (after != before + 1) {
 			throw new AssertionError("burst length should have gone from " + before
 					+ " to " + (before + 1) + ", was " + after);
@@ -84,7 +90,7 @@ public class SettingsScreenTest implements FabricClientGameTest {
 			try {
 				String json = Files.readString(configFile.toPath());
 				JsonObject parsed = JsonParser.parseString(json).getAsJsonObject();
-				return parsed.get("burstLength").getAsInt();
+				return parsed.get("burstSeconds").getAsInt();
 			} catch (IOException e) {
 				throw new AssertionError("could not read voxelcam.json", e);
 			}
@@ -148,6 +154,67 @@ public class SettingsScreenTest implements FabricClientGameTest {
 
 		context.clickScreenButton("voxelcam.done");
 		context.waitForScreen(GuiSettings.class);
+	}
+
+	/** No session static mirrors this one either, so it is the same snapshot() check again. */
+	private static void assertCaptureStatusTogglesAndPersists(ClientGameTestContext context) {
+		context.clickScreenButton("voxelcam.settings.capturehud");
+		context.waitTicks(20);
+		if (context.computeOnClient(client -> VoxelCamConfig.current().captureStatusHud)) {
+			throw new AssertionError("clicking the capture status toggle should have switched the HUD off");
+		}
+		if (writtenBoolean(context, "captureStatusHud")) {
+			throw new AssertionError("voxelcam.json should record the capture status HUD as off");
+		}
+
+		context.clickScreenButton("voxelcam.settings.capturehud");
+		context.waitTicks(20);
+		if (!writtenBoolean(context, "captureStatusHud")) {
+			throw new AssertionError("switching the capture status HUD back on should have been written too");
+		}
+	}
+
+	/**
+	 * {@code clickScreenButton} presses a widget without a hit test, so Done rendered below the
+	 * bottom of the screen would still pass every assertion above. At 320x240 the GUI scale is 1,
+	 * vanilla's smallest scaled height, which is where a hand-laid-out screen runs out of room.
+	 */
+	private static void assertEveryRowFitsTheSmallestWindow(ClientGameTestContext context) {
+		int[] original = context.computeOnClient(client ->
+				new int[] { client.getWindow().getScreenWidth(), client.getWindow().getScreenHeight() });
+		context.getInput().resizeWindow(320, 240);
+		try {
+			context.waitTicks(5);
+			String offScreen = context.computeOnClient(client -> {
+				Screen screen = client.gui.screen();
+				StringBuilder bad = new StringBuilder();
+				for (AbstractWidget widget : Screens.getWidgets(screen)) {
+					if (widget.getY() < 0 || widget.getY() + widget.getHeight() > screen.height
+							|| widget.getX() < 0 || widget.getX() + widget.getWidth() > screen.width) {
+						bad.append(widget.getMessage().getString()).append(" at y=").append(widget.getY()).append("; ");
+					}
+				}
+				return bad.toString();
+			});
+			if (!offScreen.isEmpty()) {
+				throw new AssertionError("settings widgets fall outside a 320x240 window: " + offScreen);
+			}
+		} finally {
+			context.getInput().resizeWindow(original[0], original[1]);
+			context.waitTicks(5);
+		}
+	}
+
+	private static boolean writtenBoolean(ClientGameTestContext context, String field) {
+		return context.computeOnClient(client -> {
+			File configFile = FabricLoader.getInstance().getConfigDir().resolve("voxelcam.json").toFile();
+			try {
+				JsonObject parsed = JsonParser.parseString(Files.readString(configFile.toPath())).getAsJsonObject();
+				return parsed.get(field).getAsBoolean();
+			} catch (IOException e) {
+				throw new AssertionError("could not read voxelcam.json", e);
+			}
+		});
 	}
 
 	private static boolean writtenDeathTrigger(ClientGameTestContext context) {

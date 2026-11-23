@@ -3,7 +3,7 @@ package com.thatapplefreak.voxelcam.client.mixin;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureMenu;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,7 +24,7 @@ public class KeyboardHandlerMixin {
 
 	@Inject(method = "keyPress(JILnet/minecraft/client/input/KeyEvent;)V", at = @At("HEAD"), cancellable = true)
 	private void voxelcam$cancelCaptureMenuOnEscape(long window, int action, KeyEvent event, CallbackInfo ci) {
-		if (action != GLFW.GLFW_RELEASE && event.key() == GLFW.GLFW_KEY_ESCAPE && CaptureMenu.isOpen()) {
+		if (action != InputConstants.RELEASE && event.key() == InputConstants.KEY_ESCAPE && CaptureMenu.isOpen()) {
 			CaptureMenu.abort();
 			ci.cancel();
 		}

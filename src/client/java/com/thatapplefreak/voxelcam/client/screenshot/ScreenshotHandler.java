@@ -3,14 +3,15 @@ package com.thatapplefreak.voxelcam.client.screenshot;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thatapplefreak.voxelcam.client.VoxelCamClient;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,10 +49,11 @@ public final class ScreenshotHandler {
 	 * involved the decision belongs to {@link CaptureMenu}, which makes it on release — capturing
 	 * here as well would take a second, unwanted screenshot on every hold.
 	 *
-	 * <p>Everything else still captures on the spot. {@code Screenshot.grab} is public API that
-	 * other mods and code paths call, and a press brief enough that the tick-based edge detector
-	 * never sees the key down never reaches {@link CaptureMenu} at all — swallowing those would
-	 * lose screenshots VoxelCam used to take.
+	 * <p>Everything else still captures. {@code Screenshot.grab} is public API that other mods and
+	 * code paths call, and a press brief enough that the tick-based edge detector never sees the
+	 * key down never reaches {@link CaptureMenu} at all — swallowing those would lose screenshots
+	 * VoxelCam used to take. They are taken from the next frame rather than on the spot, though
+	 * ({@link CaptureMenu#queueScreenshot}): the frame on screen now has the capture status HUD in it.
 	 *
 	 * @return true, always, so vanilla's own save is cancelled.
 	 */
@@ -70,7 +72,13 @@ public final class ScreenshotHandler {
 			return true;
 		}
 
-		captureNow(framebuffer);
+		if (framebuffer != Minecraft.getInstance().gameRenderer.mainRenderTarget()) {
+			// Another mod's own target: the HUD was never drawn into it, and the next frame's
+			// blit would read the main target instead of the one it asked for.
+			captureNow(framebuffer);
+			return true;
+		}
+		CaptureMenu.queueScreenshot();
 		return true;
 	}
 
@@ -134,7 +142,7 @@ public final class ScreenshotHandler {
 	/** Takes a plain screenshot of the given frame, refusing while another save is in flight. */
 	static void captureNow(RenderTarget framebuffer) {
 		if (BigScreenshot.isBusy() || Burst.isBusy() || !beginSave(1)) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 		capture(framebuffer);
@@ -144,7 +152,7 @@ public final class ScreenshotHandler {
 	 * Takes the single frame an {@link AutoCapture} moment armed, tagged with what armed it.
 	 *
 	 * <p>Deliberately not {@link #captureNow(RenderTarget)}: that path answers a refusal with
-	 * {@code voxelcam.savingpleasewait} in chat, which is right for a keypress and wrong here.
+	 * a busy notice, which is right for a keypress and wrong here.
 	 * Nobody asked for this screenshot, so nobody wants to be told at length why it did not happen
 	 * — the caller gets a {@code false} and drops it.
 	 *
@@ -171,7 +179,7 @@ public final class ScreenshotHandler {
 		} catch (Throwable t) {
 			endSave();
 			VoxelCamClient.LOGGER.error("Failed to read back a screenshot", t);
-			ChatMessages.send("voxelcam.savefailed");
+			CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed");
 		}
 	}
 
@@ -191,7 +199,7 @@ public final class ScreenshotHandler {
 			// in the completed count too, or the group's end-of-burst announcement waits
 			// forever for a frame that will never report in on its own.
 			Burst.frameCompleted(false);
-			Burst.abort("a readback failed");
+			Burst.abort("a readback failed", Burst.CUT_SHORT_BY_FAILURE);
 		}
 	}
 
@@ -218,9 +226,9 @@ public final class ScreenshotHandler {
 	 *
 	 * <p>{@code burst} and {@code moment} stay separate parameters rather than one bag of extras
 	 * because they are not the same kind of thing: {@code burst} carries <em>behaviour</em> — the
-	 * completion accounting {@link Burst#frameCompleted} depends on, and the chat suppression that
+	 * completion accounting {@link Burst#frameCompleted} depends on, and the notice suppression that
 	 * keeps a burst from announcing every frame — while {@code moment} carries only tags and a
-	 * different chat key. Both are null for an ordinary keypress, and never both non-null.
+	 * different notice key. Both are null for an ordinary keypress, and never both non-null.
 	 */
 	static void saveCapturedImage(NativeImage image, File target, BurstFrame burst, MomentTag moment) {
 		// Read while still on the render thread: by the time write() runs on the IO pool, the
@@ -256,24 +264,36 @@ public final class ScreenshotHandler {
 		Minecraft client = Minecraft.getInstance();
 		boolean succeeded = false;
 		try (image) {
-			writeOrDiscard(target, image::writeToFile);
+			// A burst writes dozens of frames at a time, so its frames go through VoxelCam's own
+			// encoder, about a third smaller than stb's; a single capture keeps the vanilla path.
+			writeOrDiscard(target, burst != null ? file -> writeCompressed(image, file) : image::writeToFile);
 			succeeded = true;
 			embedMetadata(target, context, burst, moment);
 			if (burst == null) {
 				client.execute(() -> announceSaved(target, moment));
 			}
-		} catch (IOException e) {
+		} catch (IOException | RuntimeException e) {
+			// Unchecked as well: an encoder that throws one has failed the save just the same, and
+			// uncaught it would end this task with no notice at all.
+			//
+			// Known gap: an Error is not caught, so a single screenshot that fails with one (an
+			// OutOfMemoryError, in practice) has its slot released below but posts no notice of
+			// either kind; the pool logs it. If it came from the encode, writeOrDiscard has removed
+			// the file; if it came from embedMetadata, which reads the whole file back to splice
+			// its tags in, the screenshot is on disk untagged and unannounced. Posting a notice
+			// from the finally block would cover both, but that is allocating on the way out of an
+			// out-of-memory failure, ahead of the endSave() that must not be skipped.
 			VoxelCamClient.LOGGER.error("Failed to save screenshot to {}", target, e);
 			if (burst == null) {
-				client.execute(() -> ChatMessages.send("voxelcam.savefailed"));
+				client.execute(() -> CaptureStatus.post(CaptureStatus.Kind.FAILED, "voxelcam.savefailed"));
 			}
 		} finally {
 			// A burst's frames stay quiet individually — one voxelcam.savedscreenshotas per
-			// frame would spam chat for what the player experienced as a single press — and
+			// frame would spam the HUD for what the player experienced as a single press — and
 			// Burst.frameCompleted is what eventually speaks for the whole group, once, only
 			// after every frame it issued has reported in this same way. This runs on
 			// Util.ioPool(), so it reaches Burst's otherwise render-thread-only state through
-			// client.execute the same way the chat messages above do.
+			// client.execute the same way the notices above do.
 			if (burst != null) {
 				boolean frameSucceeded = succeeded;
 				client.execute(() -> Burst.frameCompleted(frameSucceeded));
@@ -284,16 +304,14 @@ public final class ScreenshotHandler {
 
 	/**
 	 * An automatic capture says what caught it, not just where it landed — the file name alone
-	 * would leave the player wondering what they had just been given. Unlike most of VoxelCam's
-	 * feedback this can safely go to chat: {@code ChatMessages} is silent with no player, and every
-	 * moment trigger requires one.
+	 * would leave the player wondering what they had just been given.
 	 */
 	private static void announceSaved(File target, MomentTag moment) {
 		if (moment == null) {
-			ChatMessages.send("voxelcam.savedscreenshotas", target.getName());
+			CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.savedscreenshotas", target.getName());
 			return;
 		}
-		ChatMessages.send(Component.translatable("voxelcam.moment.saved", moment.describe(), target.getName()));
+		CaptureStatus.post(CaptureStatus.Kind.SAVED, "voxelcam.moment.saved", moment.describe(), target.getName());
 	}
 
 	/**
@@ -303,18 +321,30 @@ public final class ScreenshotHandler {
 	 * header every frame it is on screen. A file that was already there is left alone — this
 	 * undoes what the failed write itself created, nothing else.
 	 *
+	 * <p>Whatever the write failed with, which is why this is a flag and a {@code finally} rather
+	 * than a catch: a burst frame's encoder opens the file and then throws unchecked, an {@code
+	 * IllegalArgumentException} for a bad pixel array or an {@code OutOfMemoryError} for the pixels
+	 * themselves, and neither is this method's to catch.
+	 *
 	 * <p>Split out from {@link #write} so it can be tested; encoding a real NativeImage needs a
 	 * GL context.
 	 */
 	static void writeOrDiscard(File target, PngWriter writer) throws IOException {
 		boolean existed = target.exists();
+		boolean written = false;
 		try {
 			writer.writeTo(target);
-		} catch (IOException e) {
-			if (!existed) {
+			written = true;
+		} finally {
+			if (!written && !existed) {
 				target.delete();
 			}
-			throw e;
+		}
+	}
+
+	private static void writeCompressed(NativeImage image, File target) throws IOException {
+		try (OutputStream out = new BufferedOutputStream(new FileOutputStream(target))) {
+			PngEncoder.encode(image.getPixels(), image.getWidth(), image.getHeight(), out);
 		}
 	}
 
@@ -332,23 +362,25 @@ public final class ScreenshotHandler {
 	 * either way, so neither needs a snapshot before the frame moves on.
 	 */
 	private static void embedMetadata(File target, CaptureContext context, BurstFrame burst, MomentTag moment) {
-		Map<String, String> tags = new LinkedHashMap<>();
-		if (context != null) {
-			tags.putAll(context.toTags());
-		}
-		tags.putAll(ModProvenance.capture().toTags());
-		if (burst != null) {
-			tags.putAll(burst.toTags());
-		}
-		if (moment != null) {
-			tags.putAll(moment.toTags());
-		}
-		if (tags.isEmpty()) {
-			return;
-		}
+		// The whole of it, and unchecked failures too: write() reports whatever escapes from here
+		// as a failed save, and this file is saved.
 		try {
+			Map<String, String> tags = new LinkedHashMap<>();
+			if (context != null) {
+				tags.putAll(context.toTags());
+			}
+			tags.putAll(ModProvenance.capture().toTags());
+			if (burst != null) {
+				tags.putAll(burst.toTags());
+			}
+			if (moment != null) {
+				tags.putAll(moment.toTags());
+			}
+			if (tags.isEmpty()) {
+				return;
+			}
 			PngTextChunk.embed(target, tags);
-		} catch (IOException e) {
+		} catch (IOException | RuntimeException e) {
 			VoxelCamClient.LOGGER.error("Failed to embed metadata into {}", target, e);
 		}
 	}

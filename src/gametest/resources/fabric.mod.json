@@ -16,8 +16,12 @@
 			"com.thatapplefreak.voxelcam.gametest.RenamePopupFocusTest",
 			"com.thatapplefreak.voxelcam.gametest.RenamePopupFailureTest",
 			"com.thatapplefreak.voxelcam.gametest.RenameSelectionTest",
+			"com.thatapplefreak.voxelcam.gametest.RenameShortcutTest",
+			"com.thatapplefreak.voxelcam.gametest.FilmstripTest",
 			"com.thatapplefreak.voxelcam.gametest.SettingsScreenTest",
-			"com.thatapplefreak.voxelcam.gametest.MomentCaptureTest"
+			"com.thatapplefreak.voxelcam.gametest.MomentCaptureTest",
+			"com.thatapplefreak.voxelcam.gametest.CaptureStatusHudTest",
+			"com.thatapplefreak.voxelcam.gametest.ManagerFocusTest"
 		]
 	},
 	"depends": {

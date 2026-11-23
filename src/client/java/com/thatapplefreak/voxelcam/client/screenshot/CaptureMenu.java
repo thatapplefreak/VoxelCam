@@ -1,9 +1,8 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
 import com.thatapplefreak.voxelcam.client.VoxelCamConfig;
-import com.thatapplefreak.voxelcam.client.util.ChatMessages;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLMouse;
 
 /**
  * Holding the screenshot key opens a mouse-aimed menu of capture modes instead of firing
@@ -77,6 +76,9 @@ public final class CaptureMenu {
 	// to reset on open.
 	private static double aimDx;
 	private static double aimDy;
+	// Where each option starts being selected, per mode ordinal, as the HUD laid it out this
+	// frame; null means OPTION_RADIUS for every option. See optionForOffset(dx, dy, radii).
+	private static int[][] optionRadii;
 
 	private static boolean cursorWasGrabbed;
 
@@ -108,24 +110,28 @@ public final class CaptureMenu {
 	/**
 	 * Valid only while {@link #isOpen()}. The 0-based index into the aimed mode's own option
 	 * list (see {@code Burst.DIAL_OPTIONS} / {@code BigScreenshotSize.DIAL_OPTIONS}), or -1 if
-	 * the cursor has not reached {@link #OPTION_RADIUS} yet, or the aimed mode has no options
+	 * the cursor has not reached that option's radius yet ({@link #OPTION_RADIUS}, or closer in
+	 * where the HUD pulled its label off the hotbar), or the aimed mode has no options
 	 * ({@code SCREENSHOT}). {@code CaptureMenuHud} only draws the outer ring once this is
 	 * non-negative, so the ring and what a release actually commits can never disagree.
 	 */
 	public static int aimedOption() {
-		return optionForOffset(aimDx, aimDy);
+		return optionForOffset(aimDx, aimDy, optionRadii);
 	}
 
 	/**
-	 * Feeds the live cursor offset from the menu's anchor while the menu is open; a no-op
-	 * otherwise, so a caller does not need to guard every frame itself.
+	 * Feeds the live cursor offset from the menu's anchor while the menu is open, with the
+	 * per-option activation radii the HUD drew the outer ring at this frame (see {@link
+	 * #optionForOffset(double, double, int[][])}); a no-op otherwise, so a caller does not need
+	 * to guard every frame itself.
 	 */
-	public static void setAimOffset(double dx, double dy) {
+	public static void setAimOffset(double dx, double dy, int[][] radii) {
 		if (state != State.OPEN) {
 			return;
 		}
 		aimDx = dx;
 		aimDy = dy;
+		optionRadii = radii;
 	}
 
 	/** Called once when the capture-menu key transitions from up to down. */
@@ -139,7 +145,7 @@ public final class CaptureMenu {
 			return;
 		}
 		if (ScreenshotHandler.isSaving() || BigScreenshot.isBusy() || Burst.isBusy()) {
-			ChatMessages.send("voxelcam.savingpleasewait");
+			CaptureStatus.postBusy();
 			return;
 		}
 
@@ -147,6 +153,7 @@ public final class CaptureMenu {
 		ticksHeld = 0;
 		aimDx = 0;
 		aimDy = 0;
+		optionRadii = null;
 	}
 
 	/** Called every tick while {@link #isArmed()}, from the same end-tick hook that edge-detects the key. */
@@ -204,6 +211,12 @@ public final class CaptureMenu {
 		return pendingCapture != null;
 	}
 
+	/** Whether this frame's blit is the one a released selection fires from — valid once {@link
+	 * #beforeFrame()} has run for the frame. */
+	static boolean capturesThisFrame() {
+		return pendingCapture != null && pendingFrameStarted;
+	}
+
 	/**
 	 * Head of {@code Minecraft.renderFrame}: marks that a frame has begun with the menu already
 	 * closed, so what {@link #beforeBlit()} finds in the framebuffer cannot still have it in it.
@@ -235,6 +248,22 @@ public final class CaptureMenu {
 	private static void queue(Mode mode) {
 		pendingCapture = mode;
 		pendingFrameStarted = false;
+	}
+
+	/**
+	 * Queues an ordinary screenshot for the next frame's blit, the way a released selection is,
+	 * for a press that never went through the menu: F2 over a screen, F2 with the menu bound to
+	 * another key, or another mod calling {@code Screenshot.grab}.
+	 *
+	 * <p>Taking it on the spot instead would read back the frame already on screen, and that frame
+	 * has the capture status HUD in it, even under F1. A queued capture is one {@link
+	 * CaptureStatus#beforeFrame} hides the HUD for. A capture that is already queued is left alone:
+	 * it is about to be taken from the same frame this one would be.
+	 */
+	public static void queueScreenshot() {
+		if (pendingCapture == null) {
+			queue(Mode.SCREENSHOT);
+		}
 	}
 
 	/**
@@ -283,7 +312,7 @@ public final class CaptureMenu {
 	 * inside the ordinary dial leaves the session length/size exactly as it already was.
 	 */
 	private static void applyAimedOption(Mode mode) {
-		int option = optionForOffset(aimDx, aimDy);
+		int option = optionForOffset(aimDx, aimDy, optionRadii);
 		if (option < 0) {
 			return;
 		}
@@ -293,7 +322,7 @@ public final class CaptureMenu {
 				// unreachable — kept only so the switch stays exhaustive without a default.
 			}
 			case BIG_SCREENSHOT -> BigScreenshot.setSize(BigScreenshotSize.DIAL_OPTIONS.get(option));
-			case BURST -> Burst.setLength(Burst.DIAL_OPTIONS[option]);
+			case BURST -> Burst.setSeconds(Burst.DIAL_OPTIONS[option]);
 		}
 		// Unreachable from the unit suite: crossing into OPEN (where this is called from) already
 		// needs a real client, same as the busy-guard refusal and firing either mode do.
@@ -318,17 +347,22 @@ public final class CaptureMenu {
 		// is a second thing to track while aiming something that already shows its own selection.
 		// Hidden, not disabled: disabled would hand the deltas back to mouse-look and turn the
 		// camera under the menu.
-		GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_HIDDEN);
+		SDLMouse.SDL_HideCursor();
 	}
 
 	private static void restoreCursor(Minecraft client) {
+		// Unconditionally, and before the grab: SDL's cursor visibility is a global flag
+		// independent of relative-mouse mode, and nothing in vanilla ever calls
+		// SDL_ShowCursor - grabMouse/releaseMouse only drive
+		// SDL_SetWindowRelativeMouseMode and SDL_WarpMouseInWindow. Under GLFW this was
+		// free, because grabMouse's CURSOR_DISABLED overwrote CURSOR_HIDDEN. On SDL a hide
+		// left standing survives the grab, and the player gets an invisible pointer in the
+		// next inventory screen with nothing to undo it short of a restart.
+		SDLMouse.SDL_ShowCursor();
 		// A screen opening is what aborted the menu in the first place on that path; vanilla
 		// re-grabs when it closes, so grabbing here would capture the cursor out from under it.
 		if (cursorWasGrabbed && client.gui.screen() == null) {
 			client.mouseHandler.grabMouse();
-		} else {
-			// Nothing else is going to undo the hide, and a screen that is up now needs a pointer.
-			GLFW.glfwSetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
 		}
 		cursorWasGrabbed = false;
 	}
@@ -402,9 +436,18 @@ public final class CaptureMenu {
 	 * the same {@code (dx, dy)} and so can never disagree about which wedge that is.
 	 */
 	static int optionForOffset(double dx, double dy) {
-		if (dx * dx + dy * dy < (double) OPTION_RADIUS * OPTION_RADIUS) {
-			return -1;
-		}
+		return optionForOffset(dx, dy, null);
+	}
+
+	/**
+	 * {@link #optionForOffset(double, double)} where each option may start being selected closer
+	 * in than {@link #OPTION_RADIUS}: {@code radii[mode ordinal][option]}, or {@code null} for
+	 * {@code OPTION_RADIUS} throughout. On a short GUI {@code CaptureMenuLabels} pulls the lowest
+	 * labels in off vanilla's hotbar, and lowers those options' radii to where their labels
+	 * begin, so a player who steers onto the label they can read gets that option. The angle
+	 * still decides which option it is; only how far out it engages changes.
+	 */
+	static int optionForOffset(double dx, double dy, int[][] radii) {
 		Mode[] modes = Mode.values();
 		double angle = Math.atan2(dx, -dy);
 		int wedgeIndex = wedgeForAngle(angle, modes.length);
@@ -412,6 +455,11 @@ public final class CaptureMenu {
 		if (optionCount == 0) {
 			return -1;
 		}
-		return subOptionForAngle(angle, modes.length, wedgeIndex, optionCount);
+		int option = subOptionForAngle(angle, modes.length, wedgeIndex, optionCount);
+		int radius = radii == null ? OPTION_RADIUS : radii[wedgeIndex][option];
+		if (dx * dx + dy * dy < (double) radius * radius) {
+			return -1;
+		}
+		return option;
 	}
 }

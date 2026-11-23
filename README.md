@@ -22,14 +22,21 @@ Features
   the menu's outer ring, the settings screen, or `/bigscreenshot` (or `/bs`),
   which takes presets like `4k` and `imax`, a multiple of your window such as
   `4x`, or exact dimensions like `3840x2160`.
-* Capture a burst of consecutive frames in one go. The manager lists a burst as
-  a single entry you can expand, and any frame in it can be promoted to the one
-  that represents the group.
+* Capture a burst: two to five seconds of play at ten frames a second. The
+  manager lists a burst as a single entry you can expand, and any frame in it
+  can be promoted to the one that represents the group. **Export Animation** turns the whole burst into one
+  looping animation, at full quality and at the speed it was captured, that plays
+  right in the manager. Sharing it hands out an animated WebP copy, which plays
+  on Discord, and offers a smaller copy when it is over Discord's 10 MB limit.
 * Let VoxelCam catch the moments you would have missed: it takes a screenshot
-  by itself when you earn an advancement, when a boss bar empties, when you
+  by itself when you earn an advancement, when a boss is defeated, when you
   die, and the first time you arrive in a dimension. All four are on by
   default, each can be switched off, and no more than one is taken every ten
   seconds so a run of advancements is one screenshot rather than five.
+* A small status line in the top corner says what a capture is doing — saving,
+  saved and under what name, or why it could not — instead of chat. It stays
+  visible with the HUD hidden (`F1`), never shows up in the screenshots it is
+  reporting on, and can be switched off in the settings.
 * Every capture records where it came from — dimension and coordinates, the
   world or server name, the mods that were loaded, and the Iris shader pack if
   there is one. It is written into the PNG itself, so it survives copying,
@@ -44,8 +51,8 @@ Features
 Requirements
 ------------
 
-* Minecraft 26.2
-* [Fabric Loader](https://fabricmc.net/) 0.19.3 or newer
+* Minecraft 26.3
+* [Fabric Loader](https://fabricmc.net/) 0.20.1 or newer
 * [Fabric API](https://modrinth.com/mod/fabric-api)
 * Java 25 — the runtime the Minecraft launcher already ships with
 
@@ -55,10 +62,10 @@ Installing
 VoxelCam is client-side only. Install it in your own game; servers do not need
 it, and you can use it on any server, modded or vanilla.
 
-1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.19.3 or newer
-   for Minecraft 26.2.
-2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 26.2.
-3. Download `voxelcam-2.4.0.jar` from the
+1. Install [Fabric Loader](https://fabricmc.net/use/installer) 0.20.1 or newer
+   for Minecraft 26.3.
+2. Download [Fabric API](https://modrinth.com/mod/fabric-api) for 26.3.
+3. Download `voxelcam-2.5.0.jar` from the
    [latest release](https://github.com/thatapplefreak/VoxelCam/releases/latest).
 4. Put both jars in your `mods` folder, creating it if it does not exist:
    * Windows — `%appdata%\.minecraft\mods`
@@ -72,7 +79,7 @@ hold it to pick a big screenshot or a burst from the capture menu, and press
 `Escape` while it is open to back out without taking anything. Both keys can
 be rebound under Controls, in a VoxelCam category.
 
-VoxelCam targets **Java 25**, the runtime Minecraft 26.2 ships with, so the
+VoxelCam targets **Java 25**, the runtime Minecraft 26.3 ships with, so the
 official launcher needs no changes.
 
 Building
@@ -100,6 +107,32 @@ implementation remains in this repository's Git history.
 2.2.0 moved from Minecraft 1.21.11 to 26.2. Nothing changed for players beyond
 the camera button joining the title screen's row of icon buttons; the work was
 following Minecraft's own move to unobfuscated code and a rewritten GUI layer.
+
+2.5.0 moved from 26.2 to 26.3, and this time players get something too. A
+status line in the top corner says what a capture is doing, in place of chat
+messages. A burst can be anywhere from two to five seconds long. **Export
+Animation** turns a burst into one looping animation, and sharing it hands out
+an animated WebP copy that plays on Discord. Underneath, 26.3 moved its GPU
+abstraction into a new package and swapped GLFW for SDL, so the rest of the
+work was following that: the key handling, the pointer in the capture menu, and
+the Save-As dialog, which is SDL's now and opens without a custom caption.
+
+AI disclosure
+-------------
+
+Since 2.0.0, most of VoxelCam's code, tests and documentation have been written
+with Claude Code, an AI coding assistant, under my direction. I decide what the
+mod does and how it behaves, review every change before it is merged, and test
+each release in game. Versions before 2.0.0 (2013–2014) were written by hand.
+
+The in-game English strings, the Modrinth description and the release notes
+were drafted with Claude too, and the 16×16 star icon was drawn by a script
+Claude wrote. The camera icon and the original pirate translation are
+hand-made; strings added to the translation since were drafted with Claude.
+The mod does not use generative AI while you play.
+
+[`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) has the details, and is what the
+disclosure on the [Modrinth page](https://modrinth.com/mod/voxelcam) says.
 
 Licence
 -------

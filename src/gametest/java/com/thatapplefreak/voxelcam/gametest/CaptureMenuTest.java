@@ -22,7 +22,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 
 /**
  * Drives {@link CaptureMenu} the way the physical key would, through its own public methods
- * directly rather than simulated GLFW press/hold/release — no such input-simulation
+ * directly rather than simulated platform press/hold/release — no such input-simulation
  * infrastructure exists in this repo (see {@code CaptureTest}, which takes the same approach for
  * {@link BigScreenshot}). Once {@code onKeyDown()} arms it, {@code VoxelCamClient}'s own end-tick
  * hook keeps calling {@code tick()} forward every real client tick exactly as it would for an
@@ -45,9 +45,75 @@ public class CaptureMenuTest implements FabricClientGameTest {
 			assertARealKeyHoldOpensTheMenu(context, dir);
 			assertAHeldAndAimedReleaseTakesTheAimedMode(context, dir);
 			assertAimingPastTheRingCommitsItsOption(context, dir);
+			assertAnAimedReleaseWithTheHudHiddenTakesTheAimedMode(context, dir);
 			assertTheThreeWedgeDialRendersCorrectly(context);
 			assertEscapeCancelsWithoutCapturingOrPausing(context, dir);
+			assertMouseButtonsAndTheWheelDoNothingWhileTheMenuIsOpen(context, dir);
 			assertOpeningAScreenWhileHeldAbortsWithoutCapturing(context, dir);
+		}
+	}
+
+	/**
+	 * Clicking a wedge is the natural thing to do to a radial menu, and the menu is not a screen,
+	 * so vanilla's mouse handling does not know it is there. With no screen up, a press on a
+	 * released mouse is "click to regain focus": vanilla grabs the mouse again, which turns the
+	 * camera under the dial and moves the tracked cursor back to the centre, and the same press
+	 * then clicks its key mapping, so a right click uses the held item. The wheel moves the hotbar
+	 * whether or not the mouse is grabbed.
+	 *
+	 * <p>The hotbar slot is the assertion that holds on any machine. The grab is only checked where
+	 * the mouse was grabbed to begin with, since a window without focus is never grabbed at all.
+	 */
+	private static void assertMouseButtonsAndTheWheelDoNothingWhileTheMenuIsOpen(
+			ClientGameTestContext context, File dir) {
+		Set<String> before = listing(dir);
+		boolean wasGrabbed = context.computeOnClient(client -> client.mouseHandler.isMouseGrabbed());
+		int slot = context.computeOnClient(client -> client.player.getInventory().getSelectedSlot());
+
+		context.getInput().holdKey(InputConstants.KEY_F2);
+		try {
+			context.waitFor(client -> CaptureMenu.isOpen(), 200);
+			context.getInput().moveCursor(-130, 75);
+			context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BURST, 100);
+
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+			context.getInput().scroll(1.0);
+			context.waitTicks(5);
+
+			String found = context.computeOnClient(client -> {
+				if (!CaptureMenu.isOpen()) {
+					return "the capture menu closed";
+				}
+				if (wasGrabbed && client.mouseHandler.isMouseGrabbed()) {
+					return "the mouse was grabbed again under the open menu";
+				}
+				if (CaptureMenu.aimedMode() != CaptureMenu.Mode.BURST) {
+					return "the aim moved off the burst wedge to " + CaptureMenu.aimedMode();
+				}
+				if (client.player.getInventory().getSelectedSlot() != slot) {
+					return "the wheel moved the hotbar from slot " + slot + " to "
+							+ client.player.getInventory().getSelectedSlot();
+				}
+				return null;
+			});
+			if (found != null) {
+				throw new AssertionError("clicking and scrolling over the open capture menu should do nothing, but "
+						+ found + " (mouse grabbed beforehand: " + wasGrabbed + ")");
+			}
+
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(10);
+		} finally {
+			context.getInput().releaseKey(InputConstants.KEY_F2);
+		}
+		context.waitTicks(40);
+
+		Set<String> after = listing(dir);
+		after.removeAll(before);
+		after.removeIf(name -> !name.endsWith(".png"));
+		if (!after.isEmpty()) {
+			throw new AssertionError("a click on the capture menu should not have captured anything, wrote " + after);
 		}
 	}
 
@@ -209,6 +275,56 @@ public class CaptureMenuTest implements FabricClientGameTest {
 		if (!size.equals(expected)) {
 			throw new AssertionError("aiming past the ring at fhd should have produced a "
 					+ expected + " capture, was " + size);
+		}
+	}
+
+	/**
+	 * The same held, aimed release with the HUD hidden (F1), which is where players compose the
+	 * screenshots a big screenshot is for. The aim is fed by whatever draws the capture menu, so a
+	 * menu drawn somewhere F1 switches off is also a menu that cannot be aimed: the hold still
+	 * opens it, the aim never leaves the centre, and every release takes a plain screenshot.
+	 */
+	private static void assertAnAimedReleaseWithTheHudHiddenTakesTheAimedMode(
+			ClientGameTestContext context, File dir) {
+		Dimensions window = windowSize(context);
+		Set<String> before;
+
+		context.runOnClient(client -> BigScreenshot.setSize(BigScreenshotSize.parse("2x")));
+		context.runOnClient(client -> client.gui.hud.toggle());
+		try {
+			context.waitTicks(2);
+			if (!context.computeOnClient(client -> client.gui.hud.isHidden())) {
+				throw new AssertionError("toggling the HUD should have hidden it");
+			}
+
+			context.getInput().holdKey(InputConstants.KEY_F2);
+			try {
+				context.waitFor(client -> CaptureMenu.isOpen(), 200);
+
+				// The big screenshot wedge's centre, as in the aimed release above.
+				context.getInput().moveCursor(130, 75);
+				context.waitFor(client -> CaptureMenu.aimedMode() == CaptureMenu.Mode.BIG_SCREENSHOT, 100);
+				// For a human: the capture menu has to be on screen with the HUD hidden, not only
+				// aimable. Taken before the listing, since it lands in the same folder.
+				context.waitTicks(2);
+				context.takeScreenshot("capture-menu-hud-hidden");
+				before = listing(dir);
+			} finally {
+				context.getInput().releaseKey(InputConstants.KEY_F2);
+			}
+
+			context.waitFor(client -> !CaptureMenu.isCapturePending() && !BigScreenshot.isBusy(), 200);
+			context.waitTicks(40);
+		} finally {
+			context.runOnClient(client -> client.gui.hud.toggle());
+		}
+
+		File written = theNewFile(dir, before, "a held, aimed release with the HUD hidden");
+		Dimensions size = pngSize(written);
+		Dimensions expected = new Dimensions(window.width() * 2, window.height() * 2);
+		if (!size.equals(expected)) {
+			throw new AssertionError("aiming at the big screenshot wedge with the HUD hidden should have "
+					+ "produced a " + expected + " screenshot, was " + size);
 		}
 	}
 

@@ -4,11 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.Gson;
+import com.thatapplefreak.voxelcam.client.screenshot.BigScreenshot;
+import com.thatapplefreak.voxelcam.client.screenshot.Burst;
 import com.thatapplefreak.voxelcam.client.screenshot.SortMode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +48,7 @@ class VoxelCamConfigTest {
 	@Test
 	void roundTripsThroughDisk() {
 		VoxelCamConfig original = new VoxelCamConfig();
-		original.burstLength = 12;
+		original.burstSeconds = 4;
 		original.bigScreenshotSize = "4k";
 		original.sortMode = SortMode.NAME_A_TO_Z.name();
 		original.favoritesOnly = true;
@@ -52,7 +61,7 @@ class VoxelCamConfigTest {
 		VoxelCamConfig.save(original, configFile());
 		VoxelCamConfig read = VoxelCamConfig.load(configFile());
 
-		assertEquals(original.burstLength, read.burstLength);
+		assertEquals(original.burstSeconds, read.burstSeconds);
 		assertEquals(original.bigScreenshotSize, read.bigScreenshotSize);
 		assertEquals(original.sortMode, read.sortMode);
 		assertEquals(original.favoritesOnly, read.favoritesOnly);
@@ -68,7 +77,7 @@ class VoxelCamConfigTest {
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
 		VoxelCamConfig defaults = new VoxelCamConfig();
-		assertEquals(defaults.burstLength, config.burstLength);
+		assertEquals(defaults.burstSeconds, config.burstSeconds);
 		assertEquals(defaults.bigScreenshotSize, config.bigScreenshotSize);
 		assertEquals(defaults.sortMode, config.sortMode);
 		assertFalse(config.favoritesOnly);
@@ -85,13 +94,24 @@ class VoxelCamConfigTest {
 	 */
 	@Test
 	void aConfigWrittenBeforeTheseSettingsExistedKeepsTheirDefaults() throws IOException {
-		Files.writeString(configFile(), "{ \"burstLength\": 6 }", StandardCharsets.UTF_8);
+		Files.writeString(configFile(), "{ \"burstSeconds\": 4 }", StandardCharsets.UTF_8);
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(6, config.burstLength);
+		assertEquals(4, config.burstSeconds);
 		assertTrue(config.autoCaptureAdvancement, "an older file must not read as every trigger off");
 		assertEquals(new VoxelCamConfig().autoCaptureCooldownSeconds, config.autoCaptureCooldownSeconds);
+	}
+
+	/** The old {@code burstLength} counted frames; read as seconds, a saved 8 or 20 would be a
+	 * nonsense length, so an upgraded file starts from the default instead. */
+	@Test
+	void anOldFrameCountIsNotReadAsSeconds() throws IOException {
+		Files.writeString(configFile(), "{ \"burstLength\": 20 }", StandardCharsets.UTF_8);
+
+		VoxelCamConfig config = VoxelCamConfig.load(configFile());
+
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
 	}
 
 	/** A file another program is mid-write to, or one hand-edited into something broken, must
@@ -102,7 +122,7 @@ class VoxelCamConfigTest {
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(new VoxelCamConfig().burstLength, config.burstLength);
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
 	}
 
 	@Test
@@ -111,7 +131,30 @@ class VoxelCamConfigTest {
 
 		VoxelCamConfig config = VoxelCamConfig.load(configFile());
 
-		assertEquals(new VoxelCamConfig().burstLength, config.burstLength);
+		assertEquals(new VoxelCamConfig().burstSeconds, config.burstSeconds);
+	}
+
+	/**
+	 * Not the same file as the literal {@code null} above: here the object parses, and Gson
+	 * writes the JSON null over the field's initialiser. The settings are applied during mod
+	 * initialisation, before anything could save a repaired file, so a throw there repeats at
+	 * every launch until the player edits voxelcam.json by hand.
+	 */
+	@Test
+	void aNullBigScreenshotSizeLeavesTheSizeInPlaceRatherThanCrashingTheLaunch() throws IOException {
+		Files.writeString(configFile(), "{ \"burstSeconds\": 4, \"bigScreenshotSize\": null, \"sortMode\": \"NAME_A_TO_Z\" }",
+				StandardCharsets.UTF_8);
+		String sizeBefore = BigScreenshot.getSize().token();
+		try {
+			VoxelCamConfig.applyToSession(VoxelCamConfig.load(configFile()));
+
+			assertEquals(sizeBefore, BigScreenshot.getSize().token());
+			assertEquals(4, Burst.getSeconds(), "the settings either side of the bad one still apply");
+			assertEquals(SortMode.NAME_A_TO_Z, SortMode.current());
+		} finally {
+			Burst.setSeconds(Burst.DEFAULT_SECONDS);
+			SortMode.setCurrent(SortMode.DATE_NEWEST);
+		}
 	}
 
 	@Test
@@ -121,6 +164,87 @@ class VoxelCamConfigTest {
 		VoxelCamConfig.save(new VoxelCamConfig(), nested);
 
 		assertTrue(Files.exists(nested));
+	}
+
+	private static VoxelCamConfig configWith(int burstSeconds, String bigScreenshotSize, SortMode sortMode) {
+		VoxelCamConfig config = new VoxelCamConfig();
+		config.burstSeconds = burstSeconds;
+		config.bigScreenshotSize = bigScreenshotSize;
+		config.sortMode = sortMode.name();
+		return config;
+	}
+
+	/** Strict where {@code load} is forgiving: {@code load} turns a file it cannot parse into
+	 * defaults, which is the damage these tests are about and would hide it from them. */
+	private VoxelCamConfig parsedStrictly() throws IOException {
+		return new Gson().fromJson(Files.readString(configFile(), StandardCharsets.UTF_8), VoxelCamConfig.class);
+	}
+
+	/**
+	 * Every change is its own task on a pool with several threads, so the write for an earlier
+	 * change can be the one that runs last. The file then keeps the setting from before the
+	 * player's last click, and the next launch restores that.
+	 */
+	@Test
+	void anOlderSnapshotWrittenLateDoesNotReplaceANewerOne() throws IOException {
+		long earlierClick = VoxelCamConfig.nextSaveSequence();
+		long laterClick = VoxelCamConfig.nextSaveSequence();
+
+		VoxelCamConfig.saveIfNewest(configWith(5, "4k", SortMode.NAME_A_TO_Z), configFile(), laterClick);
+		VoxelCamConfig.saveIfNewest(configWith(2, "2x", SortMode.DATE_NEWEST), configFile(), earlierClick);
+
+		assertEquals(5, parsedStrictly().burstSeconds);
+	}
+
+	/**
+	 * Two fast clicks on the sort button are two writes that can overlap. Truncate-and-write
+	 * let their bytes interleave into a file that no longer parsed; the next launch then ran
+	 * on defaults and the first change after it wrote those defaults over everything. The two
+	 * snapshots differ in length so that an interleaving leaves a visible tail.
+	 */
+	@Test
+	void overlappingSavesLeaveTheNewestSnapshotWholeOnDisk() throws Exception {
+		VoxelCamConfig shorter = configWith(2, "2x", SortMode.DATE_NEWEST);
+		VoxelCamConfig longer = configWith(5, "1920x1080", SortMode.DIMENSIONS_LARGEST);
+		ExecutorService pool = Executors.newFixedThreadPool(2);
+		try {
+			for (int round = 0; round < 200; round++) {
+				long earlierClick = VoxelCamConfig.nextSaveSequence();
+				long laterClick = VoxelCamConfig.nextSaveSequence();
+				CyclicBarrier together = new CyclicBarrier(2);
+				Future<?> first = pool.submit(() -> {
+					together.await();
+					VoxelCamConfig.saveIfNewest(shorter, configFile(), earlierClick);
+					return null;
+				});
+				Future<?> second = pool.submit(() -> {
+					together.await();
+					VoxelCamConfig.saveIfNewest(longer, configFile(), laterClick);
+					return null;
+				});
+				first.get(10, TimeUnit.SECONDS);
+				second.get(10, TimeUnit.SECONDS);
+
+				VoxelCamConfig onDisk = parsedStrictly();
+				assertEquals(longer.bigScreenshotSize, onDisk.bigScreenshotSize, "round " + round);
+				assertEquals(longer.sortMode, onDisk.sortMode, "round " + round);
+			}
+		} finally {
+			pool.shutdownNow();
+		}
+	}
+
+	/** The write goes through a temp file beside the target, which must not pile up in the
+	 * config folder the player sees. */
+	@Test
+	void aSaveLeavesNothingButTheConfigFileBehind() throws IOException {
+		VoxelCamConfig.save(new VoxelCamConfig(), configFile());
+		VoxelCamConfig.save(configWith(4, "4k", SortMode.NAME_A_TO_Z), configFile());
+
+		try (var listing = Files.list(dir)) {
+			assertEquals(List.of("voxelcam.json"), listing.map(path -> path.getFileName().toString()).toList());
+		}
+		assertEquals(4, parsedStrictly().burstSeconds);
 	}
 
 	/**
@@ -139,6 +263,7 @@ class VoxelCamConfigTest {
 		live.autoCaptureDeath = false;
 		live.autoCaptureNewDimension = false;
 		live.autoCaptureCooldownSeconds = 42;
+		live.captureStatusHud = false;
 
 		VoxelCamConfig snapshot = VoxelCamConfig.snapshot();
 
@@ -148,6 +273,7 @@ class VoxelCamConfigTest {
 		assertFalse(snapshot.autoCaptureDeath);
 		assertFalse(snapshot.autoCaptureNewDimension);
 		assertEquals(42, snapshot.autoCaptureCooldownSeconds);
+		assertFalse(snapshot.captureStatusHud);
 	}
 
 	@Test

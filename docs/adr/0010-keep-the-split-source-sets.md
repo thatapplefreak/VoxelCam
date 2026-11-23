@@ -3,7 +3,7 @@
 The build uses `splitEnvironmentSourceSets()`. Every line of Java lives in `src/client/java` and
 `src/main` holds only resources. That looks half-finished for a mod with `"environment":
 "client"`: collapsing everything into `src/main/java` would remove a launch warning and the manual
-test-classpath wiring in `build.gradle`. It stays because it is the layout Fabric's own 26.2
+test-classpath wiring in `build.gradle`. It stays because it is the layout Fabric's own 26.3
 example mod ships, so it is what anyone who has worked on another Fabric mod expects. Moving every
 file would change nothing a player can observe.
 

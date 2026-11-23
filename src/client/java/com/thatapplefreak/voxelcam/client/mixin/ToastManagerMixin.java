@@ -36,7 +36,7 @@ public class ToastManagerMixin {
 		// The plain title, not Advancement.name(holder): that one is decorated for hovering, and its
 		// formatting has no business in a Latin-1 PNG text chunk.
 		String title = holder.value().display()
-				.map(DisplayInfo::getTitle)
+				.map(DisplayInfo::title)
 				.map(Component::getString)
 				.orElse(null);
 		AutoCapture.fire(MomentTrigger.ADVANCEMENT, title);

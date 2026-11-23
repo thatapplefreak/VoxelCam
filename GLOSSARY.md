@@ -25,11 +25,11 @@ window (`4x`), or exact dimensions (`3840x2160`).
 _Avoid_: Resolution, scale
 
 **Burst**:
-A run of plain screenshots taken across consecutive frames and kept together as one group.
+A few seconds of play captured as plain screenshots, ten a second, and kept together as one group.
 _Avoid_: Sequence, series, live photo
 
 **Burst length**:
-How many frames a burst takes.
+How many seconds a burst covers, from two to five.
 _Avoid_: Burst count, burst size
 
 **Frame** (of a burst):
@@ -43,6 +43,12 @@ _Avoid_: Cover, thumbnail, primary
 **Set as key**:
 Making a different frame the key frame of its burst.
 _Avoid_: Promote, make cover
+
+**Animation**:
+One looping animated PNG made from a whole burst, written beside its key frame, with an animated
+WebP copy for sharing. Each frame stays up until the next one was captured, so it plays at the speed
+it happened.
+_Avoid_: GIF, video, clip
 
 **Capture menu**:
 The radial dial that opens while the capture key is held, offering one wedge per capture mode.
@@ -63,6 +69,15 @@ _Avoid_: Slice, segment
 The quick options (burst lengths, big screenshot sizes) that appear past a wedge's edge when the
 player aims far enough out.
 _Avoid_: Sub-menu
+
+**Capture status**:
+The small HUD line in the top-left corner that says what a capture is doing: saving, saved, failed
+or refused. It replaced chat as VoxelCam's capture feedback in 2.5.0.
+_Avoid_: Toast, chat message, overlay
+
+**Notice**:
+One message in the capture status, posted when something happened and gone after a few seconds.
+_Avoid_: Toast, popup, alert
 
 ### Automatic capture
 

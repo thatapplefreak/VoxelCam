@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
  * uses to press a binding.
  *
  * <p>VoxelCam needs it to tell whether a {@code Screenshot.grab} was caused by its own capture-menu
- * key being held: asking GLFW for that key's raw state answers regardless of where in vanilla's
+ * key being held: asking the platform for that key's raw state answers regardless of where in vanilla's
  * key handling the grab was raised, and resolving the key from the binding keeps the answer right
  * after a rebind. See {@code VoxelCamClient.isCaptureMenuKeyDown()}.
  */

@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,10 @@ public final class PngTextChunk {
 	private static final byte[] SIGNATURE = { (byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
 	private static final byte[] ITXT = "iTXt".getBytes(StandardCharsets.US_ASCII);
 	private static final String IEND = "IEND";
+	private static final String IHDR = "IHDR";
+	private static final int IHDR_DATA_LENGTH = 13;
+	/** Bytes from the start of the file through the end of a well-formed {@code IHDR}. */
+	static final int HEADER_LENGTH = SIGNATURE.length + 4 + 4 + IHDR_DATA_LENGTH + 4;
 
 	private PngTextChunk() {
 	}
@@ -57,8 +62,17 @@ public final class PngTextChunk {
 		}
 	}
 
-	/** Package-private seam: pure bytes in, bytes out, no file I/O to stub in a test. */
-	static byte[] embed(byte[] png, Map<String, String> entries) {
+	/**
+	 * Package-private seam: pure bytes in, bytes out, no file I/O to stub in a test.
+	 *
+	 * @throws IOException if {@code png} is not a PNG that starts with a whole {@code IHDR}.
+	 *         The manager lists anything named {@code .png} and offers to star it, a
+	 *         half-finished save among them, and the star toggle catches this and nothing
+	 *         else: an index error from splicing at an offset the bytes made up would leave
+	 *         a click handler on the render thread.
+	 */
+	static byte[] embed(byte[] png, Map<String, String> entries) throws IOException {
+		requireIhdrFirst(png);
 		// A key already present (e.g. re-embedding a toggled flag) must be replaced, not
 		// shadowed: new chunks are always inserted right after IHDR, ahead of anything
 		// already there, and read() keeps the LAST value it sees for a keyword as it walks
@@ -89,7 +103,8 @@ public final class PngTextChunk {
 			String type = new String(png, pos + 4, 4, StandardCharsets.US_ASCII);
 			int dataStart = pos + 8;
 			long dataEnd = (long) dataStart + length;
-			if (dataEnd + 4 > png.length) {
+			if (isDamaged(length, dataEnd, png)) {
+				// Copied through as it is: nothing from here on can be trusted to be chunks.
 				out.write(png, pos, png.length - pos);
 				return out.toByteArray();
 			}
@@ -123,7 +138,7 @@ public final class PngTextChunk {
 			String type = new String(png, pos + 4, 4, StandardCharsets.US_ASCII);
 			int dataStart = pos + 8;
 			long dataEnd = (long) dataStart + length;
-			if (dataEnd + 4 > png.length) {
+			if (isDamaged(length, dataEnd, png)) {
 				break; // truncated or corrupt; stop rather than read past the array
 			}
 			if ("iTXt".equals(type)) {
@@ -136,13 +151,47 @@ public final class PngTextChunk {
 		return tags;
 	}
 
+	/**
+	 * Whether a chunk walk has to stop at this chunk, because its length field is damage: the
+	 * chunk would run off the end of the file, or the length is negative. Both walks, {@link
+	 * #read(byte[])} and {@link #strip}, ask here so that neither can drift from the other.
+	 *
+	 * <p>The sign is not covered by the bound. A length with its top bit set passes it, and
+	 * then sends the walk backwards, where {@code strip} would copy a negative count, or, at
+	 * -12, puts the "next" chunk exactly where this one started, so that the walk never
+	 * advances. {@code read} runs on the render thread for every row the manager shows, and an
+	 * endless loop throws nothing for {@code read(File)} to catch.
+	 */
+	private static boolean isDamaged(int length, long dataEnd, byte[] png) {
+		return length < 0 || dataEnd + 4 > png.length;
+	}
+
+	private static void requireIhdrFirst(byte[] png) throws IOException {
+		if (!startsWithIhdr(png)) {
+			throw new IOException("Not a PNG with a complete IHDR, so there is nowhere to write a tag");
+		}
+	}
+
+	/**
+	 * Everything {@link #ihdrEnd} takes on trust, and everything {@link PngDimensions} needs
+	 * before bytes 16–23 mean width and height: the signature, and a first chunk that is a
+	 * 13-byte {@code IHDR} with its CRC inside the array. One check for both, because the
+	 * manager lists anything named {@code .png} and each reader once took the header on trust.
+	 */
+	static boolean startsWithIhdr(byte[] png) {
+		return png.length >= HEADER_LENGTH
+				&& Arrays.equals(png, 0, SIGNATURE.length, SIGNATURE, 0, SIGNATURE.length)
+				&& readInt(png, SIGNATURE.length) == IHDR_DATA_LENGTH
+				&& IHDR.equals(new String(png, SIGNATURE.length + 4, 4, StandardCharsets.US_ASCII));
+	}
+
 	/** The first chunk after the signature must be IHDR; this is where new chunks are inserted. */
 	private static int ihdrEnd(byte[] png) {
 		int dataLength = readInt(png, SIGNATURE.length);
 		return SIGNATURE.length + 4 + 4 + dataLength + 4;
 	}
 
-	private static byte[] iTXtChunk(String keyword, String text) {
+	static byte[] iTXtChunk(String keyword, String text) {
 		byte[] keywordBytes = keyword.getBytes(StandardCharsets.US_ASCII);
 		byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
 

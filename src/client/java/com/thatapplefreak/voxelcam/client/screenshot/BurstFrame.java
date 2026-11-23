@@ -12,7 +12,7 @@ import java.util.Map;
  *
  * <p>Deliberately carries no frame count: nothing reads one back — the manager's burst badge
  * counts frames from a free directory-name scan instead, and {@code Burst} tracks how many
- * frames it actually issued itself, for its own end-of-burst chat confirmation — and a count
+ * frames it actually issued itself, for its own end-of-burst confirmation — and a count
  * embedded here would lie about the group's size after an aborted burst.
  */
 public record BurstFrame(String groupId, int index, int offsetMillis) {

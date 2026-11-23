@@ -10,9 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import com.thatapplefreak.voxelcam.client.share.NativeShare.RevealOutcome;
 import net.minecraft.util.Util;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * The parts of the share targets that are reachable without a window.
  *
- * The native Save-As dialog and GLFW's clipboard both need a live client, so what
+ * The native Save-As dialog and the clipboard both need a live client, so what
  * is tested here is everything on either side of them: which path the dialog's
  * answer turns into, that the copy really happens, and which command each platform
  * gets for revealing a file.
@@ -102,6 +104,24 @@ class NativeShareTest {
 		assertEquals("pretend png", Files.readString(target));
 	}
 
+	/**
+	 * The dialog's overwrite prompt was about the name it returned. Where the dialog does not add
+	 * the extension itself, the player types {@code target}, the dialog finds no such file and asks
+	 * nothing, and the extension added afterwards lands the copy on a {@code target.png} nobody was
+	 * asked about.
+	 */
+	@Test
+	void copyDoesNotReplaceAFileTheDialogNeverAskedAbout() throws IOException {
+		File source = screenshot("shot.png");
+		Path existing = dir.resolve("target.png");
+		Files.writeString(existing, "old contents");
+
+		assertThrows(FileAlreadyExistsException.class,
+				() -> NativeShare.copyTo(source, dir.resolve("target").toString()));
+
+		assertEquals("old contents", Files.readString(existing));
+	}
+
 	@Test
 	void copyToAnUnwritableLocationReportsTheFailure() throws IOException {
 		File source = screenshot("shot.png");
@@ -160,16 +180,70 @@ class NativeShareTest {
 		assertNull(NativeShare.revealCommand(Util.OS.valueOf(platform), file));
 	}
 
-	/** Every platform must be handled, so the switch cannot fall through unexpectedly. */
+	// --- opening the containing folder ---------------------------------------
+
+	/**
+	 * 26.3 reduced Util.OS to a telemetry tag, taking openFile(File) with it, so the
+	 * folder-open command is VoxelCam's own now and needs the same per-platform cover
+	 * revealCommand has.
+	 */
+	@Test
+	void macOsOpensTheFolderWithOpen() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.OSX, dir));
+	}
+
+	@Test
+	void windowsOpensTheFolderWithExplorer() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "explorer.exe", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.WINDOWS, dir));
+	}
+
+	/**
+	 * Unlike revealing, opening a directory does have a documented Linux command, which
+	 * is the whole reason this is a separate seam rather than a branch of revealCommand.
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = { "LINUX", "SOLARIS" })
+	void unixLikePlatformsUseXdgOpen(String platform) throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertArrayEquals(new String[] { "xdg-open", dir.getAbsolutePath() },
+				NativeShare.openFolderCommand(Util.OS.valueOf(platform), dir));
+	}
+
+	@Test
+	void anUnknownPlatformHasNoFolderCommand() throws IOException {
+		File dir = screenshot("shot.png").getParentFile();
+
+		assertNull(NativeShare.openFolderCommand(Util.OS.UNKNOWN, dir));
+	}
+
+	/** A null directory must not become a command that opens the process's cwd. */
+	@Test
+	void aNullDirectoryHasNoFolderCommand() {
+		assertNull(NativeShare.openFolderCommand(Util.OS.OSX, null));
+	}
+
+	/** Neither switch may fall through to an empty command on any platform. */
 	@Test
 	void everyPlatformIsAccountedFor() throws IOException {
 		File file = screenshot("shot.png");
+		File dir = file.getParentFile();
 
 		for (Util.OS platform : Util.OS.values()) {
-			String[] command = NativeShare.revealCommand(platform, file);
-			if (command != null && command.length == 0) {
-				throw new AssertionError(platform + " produced an empty command");
-			}
+			assertNoEmptyCommand(platform, NativeShare.revealCommand(platform, file), "reveal");
+			assertNoEmptyCommand(platform, NativeShare.openFolderCommand(platform, dir), "folder-open");
+		}
+	}
+
+	private static void assertNoEmptyCommand(Util.OS platform, String[] command, String what) {
+		if (command != null && command.length == 0) {
+			throw new AssertionError(platform + " produced an empty " + what + " command");
 		}
 	}
 
@@ -187,7 +261,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "sh", "-c", "exit 1" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "sh", "-c", "exit 1" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -199,7 +273,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "sh", "-c", "exit 0" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "sh", "-c", "exit 0" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.REVEALED, outcome);
 		assertEquals(0, folderOpened.get());
@@ -211,7 +285,7 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				new String[] { "voxelcam-no-such-program" }, dir.toFile(), folderOpened::incrementAndGet);
+				new String[] { "voxelcam-no-such-program" }, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -222,7 +296,7 @@ class NativeShareTest {
 	void noRevealCommandOpensTheFolderDirectly() {
 		AtomicInteger folderOpened = new AtomicInteger();
 
-		RevealOutcome outcome = NativeShare.reveal(null, dir.toFile(), folderOpened::incrementAndGet);
+		RevealOutcome outcome = NativeShare.reveal(null, dir.toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.OPENED_FOLDER, outcome);
 		assertEquals(1, folderOpened.get());
@@ -234,10 +308,33 @@ class NativeShareTest {
 		AtomicInteger folderOpened = new AtomicInteger();
 
 		RevealOutcome outcome = NativeShare.reveal(
-				null, dir.resolve("deleted").toFile(), folderOpened::incrementAndGet);
+				null, dir.resolve("deleted").toFile(), opening(folderOpened));
 
 		assertEquals(RevealOutcome.FAILED, outcome);
 		assertEquals(0, folderOpened.get());
+	}
+
+	/**
+	 * Linux always lands on the folder fallback, and there the fallback is {@code xdg-open}: not
+	 * installed, or exiting non-zero with no file manager behind it, on plenty of setups. Nothing
+	 * opened, so the popup must not say the containing folder did.
+	 */
+	@Test
+	void aFolderThatDidNotOpenIsReportedAsAFailure() {
+		RevealOutcome withNoRevealCommand = NativeShare.reveal(null, dir.toFile(), () -> false);
+		RevealOutcome afterAFailedReveal = NativeShare.reveal(
+				new String[] { "voxelcam-no-such-program" }, dir.toFile(), () -> false);
+
+		assertEquals(RevealOutcome.FAILED, withNoRevealCommand);
+		assertEquals(RevealOutcome.FAILED, afterAFailedReveal);
+	}
+
+	/** A stand-in for the folder fallback that counts its calls and reports the folder opened. */
+	private static BooleanSupplier opening(AtomicInteger folderOpened) {
+		return () -> {
+			folderOpened.incrementAndGet();
+			return true;
+		};
 	}
 
 	@Test
@@ -253,5 +350,13 @@ class NativeShareTest {
 	@Test
 	void explorersExitStatusIsIgnored() {
 		assertTrue(NativeShare.revealed(new String[] { "explorer.exe", "/select,C:\\shot.png" }, 1));
+	}
+
+	@Test
+	void anAnimationsWebpCopyIsSavedAsWebp() {
+		assertEquals(Path.of("/tmp/jump.webp"), NativeShare.targetPath("/tmp/jump", "webp"));
+		assertEquals(Path.of("/tmp/jump.WEBP"), NativeShare.targetPath("/tmp/jump.WEBP", "webp"));
+		assertEquals("webp", NativeShare.extensionOf(new java.io.File("a_animation.webp")));
+		assertEquals("png", NativeShare.extensionOf(new java.io.File("a_animation.png")));
 	}
 }

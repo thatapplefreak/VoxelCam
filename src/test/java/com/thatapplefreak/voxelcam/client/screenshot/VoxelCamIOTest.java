@@ -1,5 +1,6 @@
 package com.thatapplefreak.voxelcam.client.screenshot;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,13 @@ class VoxelCamIOTest {
 
 		File file = dir.resolve(name).toFile();
 		Files.write(file.toPath(), out.toByteArray());
+		return file;
+	}
+
+	/** A PNG carrying the tag export writes, which is what makes a WebP beside it its sharing copy. */
+	private File exportedAnimation(String name) throws IOException {
+		File file = realPng(name);
+		PngTextChunk.embed(file, Map.of(AnimatedPng.FRAMES_KEY, "3"));
 		return file;
 	}
 
@@ -332,17 +341,201 @@ class VoxelCamIOTest {
 		assertNull(VoxelCamIO.selectionFor(List.of(), null));
 	}
 
+	/**
+	 * The selection here outlives the manager, which is what lets it follow a file across a
+	 * popup's rebuild, and was also what reopened the manager a week back on whatever the last
+	 * session left selected. The older file is still listed, so only forgetting it lets a
+	 * fresh opening land on the screenshot just taken.
+	 */
+	@Test
+	void aFreshOpeningTakesTheHeadOfTheListOverTheLastSessionsSelection() throws IOException {
+		File old = shot("trip.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(old);
+		File justTaken = shot("just-taken.png", 2_000L);
+
+		VoxelCamIO.forgetSelection();
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(justTaken, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), null));
+	}
+
+	@Test
+	void anAnimationsWebpCopyIsRenamedWithIt() throws IOException {
+		File animation = exportedAnimation("shot_animation.png");
+		File webp = dir.resolve("shot_animation.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1, 2, 3 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "jump");
+
+		assertEquals("jump.png", renamed.getName());
+		assertTrue(dir.resolve("jump.webp").toFile().isFile(), "the WebP copy should follow its animation");
+		assertFalse(webp.exists());
+	}
+
+	@Test
+	void aRenameWhoseWebpNameIsTakenIsRefusedWholesale() throws IOException {
+		File animation = exportedAnimation("shot_animation.png");
+		Files.write(dir.resolve("shot_animation.webp"), new byte[] { 1 });
+		Files.write(dir.resolve("jump.webp"), new byte[] { 2 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "jump"));
+		assertTrue(animation.exists(), "nothing should move when any target is taken");
+		assertArrayEquals(new byte[] { 2 }, Files.readAllBytes(dir.resolve("jump.webp")));
+	}
+
+	@Test
+	void deletingAnAnimationDeletesItsWebpCopy() throws IOException {
+		File animation = exportedAnimation("shot_animation.png");
+		File webp = dir.resolve("shot_animation.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(animation);
+
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
+		assertFalse(animation.exists());
+		assertFalse(webp.exists(), "an orphaned WebP would be invisible in the manager and never cleaned up");
+	}
+
+	@Test
+	void deletingAPlainScreenshotLeavesASameNamedWebpAlone() throws IOException {
+		File screenshot = realPng("trip.png");
+		File webp = dir.resolve("trip.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(screenshot);
+
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
+		assertFalse(screenshot.exists());
+		assertTrue(webp.isFile(), "a WebP the player made is theirs, and a delete cannot be undone");
+	}
+
+	@Test
+	void renamingAPlainScreenshotLeavesASameNamedWebpAlone() throws IOException {
+		File screenshot = realPng("trip.png");
+		File webp = dir.resolve("trip.webp").toFile();
+		Files.write(webp.toPath(), new byte[] { 1 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(screenshot);
+
+		assertEquals("jump.png", VoxelCamIO.rename(dir.toFile(), "jump").getName());
+		assertTrue(webp.isFile(), "only an exported animation's WebP travels with it");
+		assertFalse(dir.resolve("jump.webp").toFile().exists());
+	}
+
+	@Test
+	void aPlainScreenshotIsNotRefusedForATakenWebpName() throws IOException {
+		realPng("trip.png");
+		Files.write(dir.resolve("trip.webp"), new byte[] { 1 });
+		Files.write(dir.resolve("jump.webp"), new byte[] { 2 });
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(dir.resolve("trip.png").toFile());
+
+		assertEquals("jump.png", VoxelCamIO.rename(dir.toFile(), "jump").getName());
+		assertArrayEquals(new byte[] { 1 }, Files.readAllBytes(dir.resolve("trip.webp")));
+		assertArrayEquals(new byte[] { 2 }, Files.readAllBytes(dir.resolve("jump.webp")));
+	}
+
 	@Test
 	void deleteRemovesTheFileAndClearsTheSelection() throws IOException {
 		File doomed = shot("doomed.png", 1_000L);
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(doomed);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertFalse(doomed.exists());
 		assertNull(VoxelCamIO.getSelectedPhoto());
 		assertFalse(VoxelCamIO.getScreenShotFiles().contains(doomed));
+	}
+
+	/** Five rows, named so the name sort is the order they are written in. */
+	private List<File> fiveRowsByName() throws IOException {
+		for (String name : List.of("a.png", "b.png", "c.png", "d.png", "e.png")) {
+			shot(name, 1_000L);
+		}
+		SortMode.setCurrent(SortMode.NAME_A_TO_Z);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		return VoxelCamIO.getScreenShotFiles();
+	}
+
+	private File row(String name) {
+		return dir.resolve(name).toFile();
+	}
+
+	/**
+	 * The selection a delete leaves is the one the manager comes back to. Left at nothing, the
+	 * manager falls back to the head of the list: scrolled down to the twentieth row, the player
+	 * is put on the first, which is then what the next Delete is aimed at.
+	 */
+	@Test
+	void deletingARowSelectsTheOneAfterIt() throws IOException {
+		List<File> listed = fiveRowsByName();
+		VoxelCamIO.selectPhoto(row("c.png"));
+
+		assertTrue(VoxelCamIO.delete(listed));
+
+		assertEquals(row("d.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	@Test
+	void deletingTheLastRowSelectsTheOneBeforeIt() throws IOException {
+		List<File> listed = fiveRowsByName();
+		VoxelCamIO.selectPhoto(row("e.png"));
+
+		assertTrue(VoxelCamIO.delete(listed));
+
+		assertEquals(row("d.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	/**
+	 * Favorites only is the manager's own filter, so the rows it shows can be fewer than the
+	 * folder's. The next file in the folder may not have a row at all, and a selection the
+	 * manager is not listing sends it to the head of the list again.
+	 */
+	@Test
+	void theNeighbourIsOneOfTheRowsBeingShown() throws IOException {
+		fiveRowsByName();
+		List<File> starredOnly = List.of(row("a.png"), row("c.png"), row("e.png"));
+		VoxelCamIO.selectPhoto(row("c.png"));
+
+		assertTrue(VoxelCamIO.delete(starredOnly));
+
+		assertEquals(row("e.png"), VoxelCamIO.getSelectedPhoto());
+	}
+
+	/** The whole way round, as the manager does it when the confirm dialog hands back to it. */
+	@Test
+	void afterADeleteTheManagerResolvesToTheNeighbourNotTheHeadOfTheList() throws IOException {
+		List<File> listed = fiveRowsByName();
+		File deleted = row("d.png");
+		VoxelCamIO.selectPhoto(deleted);
+
+		assertTrue(VoxelCamIO.delete(listed));
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(row("e.png"), VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), deleted));
+	}
+
+	/** A refused delete leaves the row where it was, so the selection must not move off it. */
+	@Test
+	void aRefusedDeleteDoesNotMoveTheSelectionToANeighbour() throws IOException {
+		shot("a.png", 1_000L);
+		File stubborn = dir.resolve("b.png").toFile();
+		assertTrue(stubborn.mkdir());
+		Files.writeString(stubborn.toPath().resolve("holding-it-open.txt"), "x");
+		shot("c.png", 1_000L);
+		SortMode.setCurrent(SortMode.NAME_A_TO_Z);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(stubborn);
+
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
+
+		assertEquals(stubborn, VoxelCamIO.getSelectedPhoto());
 	}
 
 	/**
@@ -361,7 +554,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(stubborn);
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(stubborn.exists());
 		assertEquals(stubborn, VoxelCamIO.getSelectedPhoto());
@@ -373,7 +566,7 @@ class VoxelCamIOTest {
 		File keep = shot("keep.png", 1_000L);
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(keep.exists());
 	}
@@ -393,6 +586,25 @@ class VoxelCamIOTest {
 		assertTrue(VoxelCamIO.isSelectedFavorite());
 
 		VoxelCamIO.toggleSelectedFavorite();
+		assertFalse(VoxelCamIO.isSelectedFavorite());
+	}
+
+	/**
+	 * A half-finished save leaves a truncated {@code .png} that still gets a row and an active
+	 * star button. The toggle is pressed on the render thread, so the refusal has to end in the
+	 * log, with the file as it was, and not in an exception out of the click handler.
+	 */
+	@Test
+	void starringATruncatedPngLeavesItAloneRatherThanThrowing() throws IOException {
+		File whole = realPng("whole.png");
+		byte[] truncated = java.util.Arrays.copyOf(Files.readAllBytes(whole.toPath()), 20);
+		File file = dir.resolve("half-saved.png").toFile();
+		Files.write(file.toPath(), truncated);
+		VoxelCamIO.selectPhoto(file);
+
+		VoxelCamIO.toggleSelectedFavorite();
+
+		assertArrayEquals(truncated, Files.readAllBytes(file.toPath()));
 		assertFalse(VoxelCamIO.isSelectedFavorite());
 	}
 
@@ -470,7 +682,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(key);
 
-		assertTrue(VoxelCamIO.delete());
+		assertTrue(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertFalse(key.exists());
 		assertFalse(frame1.exists());
@@ -495,7 +707,7 @@ class VoxelCamIOTest {
 		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
 		VoxelCamIO.selectPhoto(key);
 
-		assertFalse(VoxelCamIO.delete());
+		assertFalse(VoxelCamIO.delete(VoxelCamIO.getScreenShotFiles()));
 
 		assertTrue(key.exists(), "the key must survive a partial delete");
 		assertTrue(stubbornFrame.exists());
@@ -519,6 +731,28 @@ class VoxelCamIOTest {
 	}
 
 	/**
+	 * What the image cache holds for a frame is under the path the frame had, so that is the
+	 * path a rename has to release: the new one holds nothing yet. Released the wrong way
+	 * round, a renamed burst's old thumbnails stay resident until the manager closes. A claim
+	 * stands in for a texture here, since {@code release} drops both and only a claim needs
+	 * no client.
+	 */
+	@Test
+	void renamingABurstReleasesTheImagesCachedUnderItsFramesOldPaths() throws IOException {
+		ScreenshotImageCache.releaseAll();
+		File key = shot("burst.png", 1_000L);
+		File frame = shot("burst_burst01.png", 1_000L);
+		ScreenshotImageCache.get(frame, true);
+		assertTrue(ScreenshotImageCache.isLoading(frame, true));
+		VoxelCamIO.selectPhoto(key);
+
+		File renamed = VoxelCamIO.rename(dir.toFile(), "sunset");
+
+		assertEquals("sunset.png", renamed.getName());
+		assertFalse(ScreenshotImageCache.isLoading(frame, true));
+	}
+
+	/**
 	 * Every target name — the key's and every frame's — is collision-checked before anything
 	 * moves, so a rename that would only fail on frame 2 of 8 refuses cleanly rather than
 	 * carrying the first frame across and then rolling it back.
@@ -538,6 +772,147 @@ class VoxelCamIOTest {
 		assertFalse(dir.resolve("sunset.png").toFile().exists());
 	}
 
+	/**
+	 * Membership is by filename alone, and the list folds one level. A key frame renamed to
+	 * {@code dragon_burst2} would itself fold under {@code dragon.png}, and its own frames,
+	 * carried to {@code dragon_burst2_burstNN}, would fold under a key that is now hidden: in
+	 * no row and no filmstrip, with deleting {@code dragon} taking the renamed key frame.
+	 */
+	@Test
+	void renamingABurstKeyToAnotherScreenshotsFrameNameIsRefused() throws IOException {
+		File dragon = shot("dragon.png", 2_000L);
+		File key = shot("burst.png", 1_000L);
+		File frame1 = shot("burst_burst01.png", 1_000L);
+		File frame2 = shot("burst_burst02.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon_burst2"));
+
+		assertTrue(key.exists(), "the key frame keeps its name");
+		assertTrue(frame1.exists());
+		assertTrue(frame2.exists());
+		assertEquals(key, VoxelCamIO.getSelectedPhoto());
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		assertEquals(List.of("dragon.png", "burst.png"), names());
+		assertEquals(0, VoxelCamIO.burstFrameCount(dragon));
+		assertEquals(2, VoxelCamIO.burstFrameCount(key));
+	}
+
+	/** The row the player just named would vanish into the other screenshot's filmstrip, and a
+	 * delete of that screenshot would then take it, so a plain screenshot is refused as well. */
+	@Test
+	void renamingAPlainScreenshotToAnotherScreenshotsFrameNameIsRefused() throws IOException {
+		shot("dragon.png", 2_000L);
+		File plain = shot("plain.png", 1_000L);
+		VoxelCamIO.selectPhoto(plain);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon_burst2"));
+
+		assertTrue(plain.exists());
+		assertFalse(dir.resolve("dragon_burst2.png").toFile().exists());
+	}
+
+	/** What the rename dialog asks before it lets Ok through. */
+	@Test
+	void aNameEndingInAFrameTagFoldsOnlyWhenTheKeyItPointsAtExists() throws IOException {
+		shot("dragon.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_burst2", other));
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "wyvern_burst2", other),
+				"no wyvern.png, so the name is an ordinary one that happens to end in the tag");
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_2", other));
+	}
+
+	/** The list folds by lowercased name, so the answer has to as well: on a case-sensitive
+	 * filesystem a bare {@code exists()} probe for {@code dragon.png} would miss this key. */
+	@Test
+	void theKeyANameFoldsUnderIsMatchedIgnoringCaseLikeTheListDoes() throws IOException {
+		shot("Dragon.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "dragon_BURST2", other));
+	}
+
+	/** {@code shot} renamed to {@code shot_burst1} leaves no {@code shot.png} behind to fold under. */
+	@Test
+	void aNameDoesNotFoldUnderTheFileBeingRenamed() throws IOException {
+		File shot = shot("shot.png", 1_000L);
+		VoxelCamIO.selectPhoto(shot);
+
+		assertFalse(VoxelCamIO.nameFoldsUnderAnotherScreenshot(dir.toFile(), "shot_burst1", shot));
+		assertEquals("shot_burst1.png", VoxelCamIO.rename(dir.toFile(), "shot_burst1").getName());
+	}
+
+	/**
+	 * The same end state reached the other way round. With no {@code dragon.png} in the folder
+	 * a burst can be named {@code dragon_burst2}, and it is an ordinary row. Naming another
+	 * screenshot {@code dragon} afterwards is what would fold that key frame under it, strand
+	 * the burst's own frames, and let a delete of {@code dragon} take the key frame.
+	 */
+	@Test
+	void renamingAScreenshotToTheNameAnExistingBurstKeyWouldFoldUnderIsRefused() throws IOException {
+		File key = shot("burst.png", 1_000L);
+		shot("burst_burst01.png", 1_000L);
+		shot("burst_burst02.png", 1_000L);
+		File other = shot("other.png", 2_000L);
+		VoxelCamIO.selectPhoto(key);
+		File renamedKey = VoxelCamIO.rename(dir.toFile(), "dragon_burst2");
+		assertEquals("dragon_burst2.png", renamedKey.getName(), "nothing to fold under yet, so this one is fine");
+		VoxelCamIO.selectPhoto(other);
+
+		assertNull(VoxelCamIO.rename(dir.toFile(), "dragon"));
+
+		assertTrue(other.exists(), "the screenshot keeps its name");
+		assertEquals(other, VoxelCamIO.getSelectedPhoto());
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		assertEquals(List.of("other.png", "dragon_burst2.png"), names());
+		assertEquals(2, VoxelCamIO.burstFrameCount(renamedKey), "the burst is still one reachable row");
+	}
+
+	/** What the rename dialog asks for this direction. */
+	@Test
+	void aNameTakesInAnotherScreenshotWhenAnExistingFileWouldFoldUnderIt() throws IOException {
+		shot("dragon_burst2.png", 1_000L);
+		File other = shot("other.png", 1_000L);
+
+		assertTrue(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "dragon", other));
+		assertTrue(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "DRAGON", other),
+				"the list folds by lowercased name");
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "wyvern", other));
+	}
+
+	/**
+	 * A burst's own frames already fold under it and are carried along by the rename, so a
+	 * name that differs from the key's only in case takes in nothing it did not have.
+	 */
+	@Test
+	void recapitalisingABurstKeyIsNotRefusedForItsOwnFrames() throws IOException {
+		File key = shot("sunset.png", 1_000L);
+		shot("sunset_burst01.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "Sunset", key));
+		assertEquals("Sunset.png", VoxelCamIO.rename(dir.toFile(), "Sunset").getName());
+		assertTrue(dir.resolve("Sunset_burst01.png").toFile().exists());
+	}
+
+	/**
+	 * A key frame that is itself named like a frame can take its base name: the file that
+	 * would fold under {@code dragon} is the one being renamed to it, and its own frames come
+	 * with it to {@code dragon_burstNN}.
+	 */
+	@Test
+	void aBurstKeyNamedLikeAFrameCanBeRenamedToItsBaseName() throws IOException {
+		File key = shot("dragon_burst2.png", 1_000L);
+		shot("dragon_burst2_burst01.png", 1_000L);
+		VoxelCamIO.selectPhoto(key);
+
+		assertFalse(VoxelCamIO.nameTakesInAnotherScreenshot(dir.toFile(), "dragon", key));
+		assertEquals("dragon.png", VoxelCamIO.rename(dir.toFile(), "dragon").getName());
+		assertTrue(dir.resolve("dragon_burst01.png").toFile().exists());
+	}
+
 	// --- Set as key ----------------------------------------------------------------------------
 
 	@Test
@@ -554,6 +929,42 @@ class VoxelCamIOTest {
 		// are untouched; only the bytes underneath moved.
 		assertEquals("frame-bytes", Files.readString(key.toPath()));
 		assertEquals("key-bytes", Files.readString(frame.toPath()));
+	}
+
+	/**
+	 * The star is a chunk inside the file, so a bare swap carries it to the frame's path, which
+	 * the list folds away. The row, the star button and favorites only all read the key's
+	 * path: to the player the burst is what is starred, whichever frame stands for it.
+	 */
+	@Test
+	void setAsKeyLeavesTheBurstsStarOnItsKeyFrame() throws IOException {
+		File key = realPng("burst.png");
+		File frame = realPng("burst_burst01.png");
+		PngTextChunk.embed(key, new BurstFrame("g", 0, 0).toTags());
+		PngTextChunk.embed(frame, new BurstFrame("g", 1, 100).toTags());
+		Favorite.setStarred(key, true);
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.setAsKey(frame));
+
+		assertTrue(Favorite.isStarred(key), "the burst's row keeps its star");
+		assertFalse(Favorite.isStarred(frame), "and none is left hidden on a folded frame");
+		assertEquals(1, BurstFrame.fromTags(PngTextChunk.read(key)).index(), "the frames still changed places");
+		assertEquals(0, BurstFrame.fromTags(PngTextChunk.read(frame)).index());
+	}
+
+	/** The other direction: a frame's bytes carrying a star must not bring one to the row. */
+	@Test
+	void setAsKeyDoesNotStarABurstThatWasNotStarred() throws IOException {
+		File key = realPng("burst.png");
+		File frame = realPng("burst_burst01.png");
+		Favorite.setStarred(frame, true);
+		VoxelCamIO.selectPhoto(key);
+
+		assertTrue(VoxelCamIO.setAsKey(frame));
+
+		assertFalse(Favorite.isStarred(key));
+		assertTrue(Favorite.isStarred(frame));
 	}
 
 	@Test

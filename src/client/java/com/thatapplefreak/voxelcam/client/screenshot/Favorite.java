@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public final class Favorite {
 
-	private static final String STARRED_KEY = "voxelcam:starred";
+	static final String STARRED_KEY = "voxelcam:starred";
 
 	private Favorite() {
 	}

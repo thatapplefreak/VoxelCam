@@ -92,7 +92,7 @@ public class GuiAutoCaptureSettings extends Screen {
 
 	/** {@code AutoCapture.cooldownSeconds()} clamps on read anyway, but the buttons disable at the
 	 * edges rather than leaving a click that silently does nothing — the same pairing {@code
-	 * GuiSettings} keeps around {@code Burst.setLength}. */
+	 * GuiSettings} keeps around {@code Burst.setSeconds}. */
 	private void adjustCooldown(int delta) {
 		VoxelCamConfig config = VoxelCamConfig.current();
 		config.autoCaptureCooldownSeconds = Math.clamp(config.autoCaptureCooldownSeconds + delta,

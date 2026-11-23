@@ -57,7 +57,7 @@ public final class ScreenshotNamer {
 	 * folder, which is the exact thing that method exists to prevent. Serialising captures ({@code
 	 * Burst.isBusy()} in every capture guard) is what closes the race instead.
 	 *
-	 * <p>Bounded by {@code Burst.MAX_LENGTH}: at most a handful of extra {@code File.exists()}
+	 * <p>Bounded by {@code Burst.MAX_FRAMES}: at most a handful of extra {@code File.exists()}
 	 * probes, paid once per burst on the render thread, not per frame and not per row.
 	 */
 	public static List<File> reserveBurstNames(File screenshotsDir, int count) {
@@ -91,7 +91,10 @@ public final class ScreenshotNamer {
 	 * <p>A hand-named {@code holiday_burst01.png} groups under {@code holiday.png} if that file
 	 * happens to exist — accepted rather than guarded against, since requiring the key part to
 	 * look like a capture name would break group rename (a renamed key is just whatever the
-	 * player typed). The file is only ever hidden by this, never unreachable.
+	 * player typed). The file is only ever hidden by this, never unreachable. That holds for
+	 * the file itself and not for frames of its own, which the one-level fold would strand, so
+	 * the manager's rename does guard this, from both sides: see {@code
+	 * VoxelCamIO.nameFoldsUnderAnotherScreenshot} and {@code nameTakesInAnotherScreenshot}.
 	 */
 	public static String burstKeyName(String pngFileName) {
 		Matcher matcher = BURST_FRAME_SUFFIX.matcher(pngFileName);

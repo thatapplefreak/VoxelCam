@@ -10,12 +10,18 @@ alone.
 Names decide membership because names are free to read. Tags decide order because they are what
 was true at capture time. The key is a byte swap because the alternative, renaming every frame,
 would have to rewrite tags or reshuffle the filmstrip. A swap changes which image stands for the
-group and nothing else.
+group and nothing else, with one exception: the favorite flag (see Consequences).
 
 ## Consequences
 
 - A frame's name stops telling you its capture position after a Set as key. The `burstindex` tag
   is authoritative, and the filmstrip marks the key with its own badge for that reason.
+- The favorite flag is the one tag a Set as key puts back. It lives in the same bytes as the
+  image (ADR-0002), so a bare swap carried a burst's star onto a frame the list folds away, where
+  nothing showed it or could clear it, and left the row unstarred. What the player starred is the
+  burst, and the row, the star button and favorites only all read the key's path. So since 2.5.0
+  each of the two files' flags is written back to the path it was on after the swap. The
+  `BurstFrame` tags are not: they are capture history and travel with their image.
 - No frame count is embedded: an aborted burst would make it a lie. The count comes from the
   directory scan.
 - Rename and delete act on the whole group, with rollback when part of it fails. Touching only the

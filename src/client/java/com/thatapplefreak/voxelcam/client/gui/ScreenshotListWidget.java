@@ -141,15 +141,19 @@ public class ScreenshotListWidget extends ObjectSelectionList<ScreenshotListWidg
 			int textWidth = Math.max(0, x + rowWidth - textX - CONTENT_PADDING);
 			var textRenderer = Minecraft.getInstance().font;
 
-			String name = textRenderer.plainSubstrByWidth(ScreenshotMetadata.displayName(file), textWidth);
+			// Fitted by whole facts rather than cut at the pixel: a cut that lands mid-fact turned
+			// "95 KB" into "95", and the narrowest row is the default window's.
+			ScreenshotMetadata.DisplayName displayName = ScreenshotMetadata.displayNameParts(file);
+			String name = CaptionFit.fit(CaptionFit.rowName(displayName.day(), displayName.name()),
+					CaptionFit.NAME_SEPARATOR, textWidth, textRenderer::width);
 			context.text(textRenderer, Component.literal(name), textX, y + 6, 0xFFFFFFFF);
 
 			ScreenshotMetadata.Dimensions size = ScreenshotMetadata.dimensions(file);
-			String subtitle = size == null
-					? ScreenshotMetadata.fileSize(file)
-					: size.width() + "×" + size.height() + "  ·  " + ScreenshotMetadata.fileSize(file);
+			String subtitle = CaptionFit.fit(CaptionFit.rowFacts(
+							size == null ? null : size.width() + "×" + size.height(), ScreenshotMetadata.fileSize(file)),
+					CaptionFit.ROW_SEPARATOR, textWidth, textRenderer::width);
 			context.text(textRenderer,
-					Component.literal(textRenderer.plainSubstrByWidth(subtitle, textWidth)).withStyle(ChatFormatting.GRAY),
+					Component.literal(subtitle).withStyle(ChatFormatting.GRAY),
 					textX, y + 18, 0xFFA0A0A0);
 		}
 	}

@@ -1,11 +1,13 @@
 package com.thatapplefreak.voxelcam.client.gui;
 
+import com.thatapplefreak.voxelcam.client.screenshot.AnimatedPng;
 import com.thatapplefreak.voxelcam.client.screenshot.BurstFrame;
 import com.thatapplefreak.voxelcam.client.screenshot.MomentTag;
 import com.thatapplefreak.voxelcam.client.screenshot.CaptureContext;
 import com.thatapplefreak.voxelcam.client.screenshot.Favorite;
 import com.thatapplefreak.voxelcam.client.screenshot.PngDimensions;
 import com.thatapplefreak.voxelcam.client.screenshot.PngTextChunk;
+import com.thatapplefreak.voxelcam.client.screenshot.VoxelCamIO;
 import java.io.File;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -32,25 +35,43 @@ import java.util.regex.Pattern;
  * is the one whose retry costs the most, and a half-finished save is exactly what leaves one
  * in the folder. {@code ScreenshotImageCache.FAILED} takes the same line with a decode.
  *
- * <p>Entries live until the manager closes and calls {@link #forgetAll()}; the one thing that
- * rewrites a listed screenshot in place while it is open is the star toggle, which calls
- * {@link #forget(File)} afterwards. Renaming or capturing produces a different {@code File}
- * key, so a rebuilt list reads those afresh without any eviction.
+ * <p>Entries live until the manager closes and calls {@link #forgetAll()}, unless something
+ * changes what a path holds while it is open, and each thing that does evicts for itself. The
+ * star toggle rewrites a file in place and calls {@link #forget(File)}; Set as key swaps two
+ * files' bytes and calls {@link #forgetFile(File)} for both. A rename or a delete leaves the
+ * bytes alone but takes the file away from its path, and that path can be given to another
+ * screenshot before the manager closes, so the manager renames and deletes through
+ * {@link #renameSelectedAndForget} and {@link #deleteSelectedAndForget}. A capture needs none
+ * of this: it is written under a name that is free, and a name the manager freed was evicted
+ * when it was.
  */
 public final class ScreenshotMetadata {
 
 	public record Dimensions(int width, int height) {
 	}
 
+	/**
+	 * A row's name, as {@link #displayName(File)} says it, with a capture's day kept apart from
+	 * its time so a row too narrow for both can drop the day and keep the seconds.
+	 *
+	 * @param day "Today", "Yesterday" or "17 Aug,"; null for a name the player gave.
+	 * @param name the time to the second after {@code day}, or the whole name if there is none.
+	 */
+	public record DisplayName(String day, String name, String full) {
+	}
+
 	private static final Map<File, Optional<Dimensions>> DIMENSIONS = new HashMap<>();
 	private static final Map<File, Optional<CaptureContext>> CONTEXTS = new HashMap<>();
 	private static final Map<File, Optional<BurstFrame>> BURST_FRAMES = new HashMap<>();
 	private static final Map<File, Optional<MomentTag>> MOMENTS = new HashMap<>();
+	private static final Map<File, Integer> ANIMATION_FRAMES = new HashMap<>();
 	private static final Map<File, Boolean> STARRED = new HashMap<>();
-	private static final Map<File, String> NAMES = new HashMap<>();
+	private static final Map<File, DisplayName> NAMES = new HashMap<>();
 	private static final Map<File, String> SIZES = new HashMap<>();
-	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
-	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm");
+	// To the second: an automatic capture, a burst's neighbours and a player tapping F2 all land
+	// several files in one minute, and a minute-only label gives every one of them the same name.
+	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
+	private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM,");
 	// String.replaceFirst and String.matches compile a fresh Pattern on every call. The
 	// NAMES cache means that is a compile per file rather than per frame, but the fill path
 	// still runs for every file whose row is scrolled into view, once per manager session —
@@ -73,10 +94,9 @@ public final class ScreenshotMetadata {
 	 * learn its size would be far more expensive, and this runs for every visible row.
 	 *
 	 * <p>A header that would not read is remembered as absent rather than left uncached. A
-	 * 0-byte or truncated {@code .png} throws out of the header read every time, so retrying
-	 * costs an open, an {@code EOFException} built with its stack trace, and a close — per
-	 * visible row per extracted frame, on the render thread, for the one file that is
-	 * guaranteed never to answer.
+	 * 0-byte or truncated {@code .png}, or a file that is not a PNG at all, fails the header read
+	 * every time, so retrying costs an open, a read and a close — per visible row per extracted
+	 * frame, on the render thread, for the one file that is guaranteed never to answer.
 	 */
 	public static Dimensions dimensions(File file) {
 		if (file == null) {
@@ -173,7 +193,26 @@ public final class ScreenshotMetadata {
 		return tag;
 	}
 
+	/**
+	 * How many frames an exported burst animation holds, or 0 for every other screenshot. An APNG
+	 * opens as its first frame everywhere in the manager, so this is the only thing that says it
+	 * moves. Cached and read exactly as {@link #moment(File)} is, for the same details line.
+	 */
+	public static int animationFrames(File file) {
+		if (file == null) {
+			return 0;
+		}
+		Integer cached = ANIMATION_FRAMES.get(file);
+		if (cached != null) {
+			return cached;
+		}
+		int frames = AnimatedPng.frameCount(PngTextChunk.read(file));
+		ANIMATION_FRAMES.put(file, frames);
+		return frames;
+	}
+
 	public static void forgetAll() {
+		ANIMATION_FRAMES.clear();
 		DIMENSIONS.clear();
 		CONTEXTS.clear();
 		BURST_FRAMES.clear();
@@ -208,6 +247,7 @@ public final class ScreenshotMetadata {
 	 * trusted afterwards.
 	 */
 	public static void forgetFile(File file) {
+		ANIMATION_FRAMES.remove(file);
 		DIMENSIONS.remove(file);
 		CONTEXTS.remove(file);
 		BURST_FRAMES.remove(file);
@@ -215,6 +255,58 @@ public final class ScreenshotMetadata {
 		STARRED.remove(file);
 		NAMES.remove(file);
 		SIZES.remove(file);
+	}
+
+	/**
+	 * {@code VoxelCamIO.rename}, as the manager has to call it: with every path the rename takes
+	 * a file away from, or brings one to, evicted. Every cache here is keyed by path, and a
+	 * path can change hands while the manager is open. Rename a starred {@code castle} away,
+	 * give another screenshot its name, and without this the new {@code castle} is drawn with
+	 * the old one's star, size and dimensions.
+	 *
+	 * <p>The path a rename lands on is evicted as well as the one it leaves: a file can lose
+	 * its name without the manager's doing, and what was cached under it would be waiting.
+	 *
+	 * <p>Here, not in {@code VoxelCamIO}, because that class only touches files and does not
+	 * reach into this package; and here, not in {@code RenamePopup}, so that a plain JUnit
+	 * test can reach it, the reason {@code VoxelCamIO.nameCollides} is not in the popup either.
+	 */
+	public static File renameSelectedAndForget(File screenshotsDir, String newName) {
+		// Before the rename: afterwards the frames are no longer listed under their old names.
+		forgetGroup(screenshotsDir, VoxelCamIO.getSelectedPhoto());
+		File renamed = VoxelCamIO.rename(screenshotsDir, newName);
+		if (renamed != null) {
+			forgetGroup(screenshotsDir, renamed);
+		}
+		return renamed;
+	}
+
+	/**
+	 * {@code VoxelCamIO.delete}, with the deleted paths evicted for the same reason
+	 * {@link #renameSelectedAndForget} evicts the ones a rename leaves. Whatever the delete
+	 * reports: a refused one may still have removed some of a burst's frames.
+	 *
+	 * @param listed the rows the manager is showing, which {@code VoxelCamIO.delete} picks the
+	 *        next selection from.
+	 */
+	public static boolean deleteSelectedAndForget(List<File> listed) {
+		File target = VoxelCamIO.getSelectedPhoto();
+		if (target != null) {
+			forgetGroup(target.getParentFile(), target);
+		}
+		return VoxelCamIO.delete(listed);
+	}
+
+	/** A screenshot and the burst frames folded under it, which rename and delete take with it.
+	 * An evicted entry that turns out not to have moved costs one re-read. */
+	private static void forgetGroup(File screenshotsDir, File key) {
+		if (key == null) {
+			return;
+		}
+		forgetFile(key);
+		for (File frame : VoxelCamIO.burstFrames(screenshotsDir, key)) {
+			forgetFile(frame);
+		}
 	}
 
 	/**
@@ -229,33 +321,45 @@ public final class ScreenshotMetadata {
 	 * left open across midnight, which lasts until the manager closes.
 	 */
 	public static String displayName(File file) {
-		String cached = NAMES.get(file);
+		return displayNameParts(file).full();
+	}
+
+	/** {@link #displayName(File)} in the parts a row fits separately, from the same cache. */
+	public static DisplayName displayNameParts(File file) {
+		DisplayName cached = NAMES.get(file);
 		if (cached != null) {
 			return cached;
 		}
 		String name = PNG_SUFFIX.matcher(file.getName()).replaceFirst("");
-		String display = CAPTURE_NAME.matcher(name).matches()
-				? relativeTime(file)
-				: name;
+		DisplayName display = CAPTURE_NAME.matcher(name).matches()
+				? relativeName(file)
+				: new DisplayName(null, name, name);
 		NAMES.put(file, display);
 		return display;
 	}
 
 	/**
-	 * "Today 14:32", "Yesterday 14:32", otherwise "17 Aug, 14:32". Deliberately left as an
+	 * "Today 14:32:05", "Yesterday 14:32:05", otherwise "17 Aug, 14:32:05". Deliberately left as an
 	 * uncached formatting primitive — {@link #displayName(File)} is the per-frame caller and
 	 * caches its own result, so a caller that wants a freshly stat'd label still has one.
 	 */
 	public static String relativeTime(File file) {
+		return relativeName(file).full();
+	}
+
+	private static DisplayName relativeName(File file) {
 		LocalDateTime when = modifiedAt(file);
 		LocalDate today = LocalDate.now();
+		String day;
 		if (when.toLocalDate().equals(today)) {
-			return "Today " + TIME.format(when);
+			day = "Today";
+		} else if (when.toLocalDate().equals(today.minusDays(1))) {
+			day = "Yesterday";
+		} else {
+			day = DATE.format(when);
 		}
-		if (when.toLocalDate().equals(today.minusDays(1))) {
-			return "Yesterday " + TIME.format(when);
-		}
-		return DATE_TIME.format(when);
+		String time = TIME.format(when);
+		return new DisplayName(day, time, day + " " + time);
 	}
 
 	private static LocalDateTime modifiedAt(File file) {

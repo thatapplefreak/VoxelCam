@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-VoxelCam is a **client-only Fabric mod** for Minecraft 26.2: an in-game screenshot browser with
+VoxelCam is a **client-only Fabric mod** for Minecraft 26.3: an in-game screenshot browser with
 rename/delete, keyless sharing, and oversized capture. Version 2.0.0 was a ground-up port of a
 LiteLoader mod; the pre-2.0 implementation (Twitter/Reddit/Facebook/Imgur uploaders, an image
 editor, a settings panel, a "big screenshot" capture mode) lived in `src/com/` and was **deleted but
@@ -21,13 +21,24 @@ was left behind.
 ```
 
 **Tests exist and are the first thing to run.** `./gradlew test` is a plain JUnit suite over the
-logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` was checked
+logic that runs without a live client — mostly Minecraft-free classes, though `Util.OS` (now `net.minecraft.util.Util.OS`) was checked
 and does load outside the game; `./gradlew runClientGameTest` launches a real client and runs
 the Fabric client game tests in `src/gametest/java`, which cover the title-screen and pause-screen
 buttons, the manager's render path, both capture paths (including an in-world oversized capture
 asserted at exactly 2x the window), the share popup, the rename dialog's focus, its failure
 path, and the selection following a rename, the settings screen and the config file it writes, and
 the automatic-capture path from an armed moment to a tagged PNG.
+
+**26.3 picks the graphics backend itself, and both are worth testing.** On an M3 Pro it chose
+OpenGL (`drivers: 4.1 Metal`) even though the device reports the Vulkan portability subset. To run
+the suite on the other one, pass Minecraft's own launch argument through the run config -
+`programArgs "--graphicsBackend", "vulkan"` in the `clientGameTest` block - which logs
+`Graphics backend forced to vulkan by launch argument` and, on macOS, comes up on MoltenVK. The
+in-game setting is `preferredGraphicsBackend` in `options.txt` (`default`/`opengl`/`vulkan`), but
+`deleteGameTestRunDir` wipes the run directory, so the launch argument is the route for a test run.
+Worth doing before a release: the readback in `BigScreenshot` is the one part of this mod whose
+correctness is a GPU timing property, and the backend is now a variable underneath it. Both
+backends passed on 26.3.
 
 **`./gradlew build` does not run the client game tests.** `check` pulls in `test` and vanilla's
 server-side `runGameTest`; `runClientGameTest` is outside `build` entirely, and CI
@@ -36,8 +47,9 @@ three separate steps. A green `build` locally says nothing about the client test
 name.
 
 The client game test API is **not bundled in fabric-api** and is pinned separately in
-`gradle.properties` as `client_gametest_version`; its `+515ac5339e` build suffix is the one 26.2's
-bundled fabric-api modules carry. `fabricApi { configureTests { ... } }` is what creates the
+`gradle.properties` as `client_gametest_version`; its `+131f8d475d` build suffix is the one 26.3's
+bundled fabric-api modules carry. The suffix changes every version: read it off the
+`fabric-api` POM for the pinned `fabric_version` rather than guessing. `fabricApi { configureTests { ... } }` is what creates the
 `gametest` source set and the `runClientGameTest` task.
 
 `splitEnvironmentSourceSets()` leaves the `test` source set extending `main`, which holds only
@@ -48,16 +60,17 @@ counts rather than the exit code.
 `CatboxUploaderTest` stubs catbox with a `com.sun.net.httpserver` server on loopback rather than
 touching the network, which is also the only way to reproduce its refusal-as-HTTP-200. Where a
 class wraps something untestable, the pattern has been to extract a package-private seam beside it
-(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`,
+(`CatboxUploader.upload(File, URI)`, `NativeShare.copyTo`/`targetPath`/`revealCommand`/`openFolderCommand`,
 `ScreenshotHandler.writeOrDiscard`, `BigScreenshot.deferRestore`/`beginReadback`/`completeReadback`,
 `ScreenshotImageCache.dispositionOf`/`isLoading`, `VoxelCamIO.nameCollides`/`selectionFor`,
-`AutoCapture.gateFor`/`shouldArm`/`markVisited`, `VoxelCamConfig.snapshot`) rather
+`AutoCapture.gateFor`/`shouldArm`/`markVisited`/`arrivingKind`, `ArrivalWatch`, `VoxelCamConfig.snapshot`) rather
 than mock the world. The last two pairs live on `VoxelCamIO` rather than in the popup that uses them
 for exactly this reason.
 
 `AutoCapture.gateFor` takes a `ScreenKind` rather than a `Screen` for the same reason, and
 `BossBarTracker` holds no Minecraft types at all — `BossBarSignal` flattens the packet's
-`Component` name to a `String` on the way in, which is what leaves the kill-detection rule
+`Component` name to a `String` on the way in, and hands over the level's game time and whether the
+bar's owner is dying as a `long` and a `boolean`, which is what leaves the kill-detection rule
 reachable from a no-client suite.
 
 `SharePopupTest` presses only "Copy file path". The other three targets each escape a test: the save
@@ -65,19 +78,43 @@ dialog blocks on a native window, revealing spawns the platform file manager, an
 would upload to the real catbox.
 
 **Still untested, and not by oversight:** the native Save-As dialog itself, the real `open -R` /
-`explorer.exe` reveal and the `Util.OS.openFile` fallback it lands on, and the upload-result branch
+`explorer.exe` reveal and the `NativeShare.openFolder` fallback it lands on, and the upload-result branch
 of `SharePopup` (which would need an injectable endpoint the popup does not have). Those are manual
 checks before a release.
 
-**So are all four automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
-directly, because earning an advancement, killing a boss, dying and walking a portal are
-server-driven events a client game test cannot stage — staging them would be testing Minecraft. So
-`ToastManagerMixin`'s `instanceof AdvancementToast` branch, `BossBarSignal`'s three overrides, and
-the `watchDeath`/`watchDimension` tick watches have never executed under test, even though the
-injectors themselves are proven to resolve (`defaultRequire: 1` fails the launch otherwise). Earn
+26.3 added two more to that list. **SDL's save dialog** is asynchronous, so neither its callback nor
+the free-in-callback discipline is reachable by a test — and a leak there is invisible rather than
+loud. **Cursor visibility after the capture menu** is the other: `SDL_HideCursor` is a global flag
+that vanilla never clears, so `CaptureMenu.restoreCursor` showing the pointer again is load-bearing
+and nothing asserts it. Hold F2, release, then open the inventory — the pointer has to be there.
+
+**So is one of the automatic triggers' own hooks.** `MomentCaptureTest` calls `AutoCapture.fire`
+directly for an advancement, because earning one is a server-driven event a client game test does
+not stage — staging it would be testing Minecraft. So `ToastManagerMixin`'s
+`instanceof AdvancementToast` branch has never been asserted on, even though the injector itself
+is proven to resolve (`defaultRequire: 1` fails the launch otherwise). The others are staged,
+because the integrated server takes commands (`singleplayer.getServer().runCommand`).
+`MomentCaptureTest` summons a Wither and kills it, which runs `BossBarSignal`'s add and remove and
+its search for a dying owner. It kills the player with `/kill` twice: once ordinarily, asserting a
+DEATH capture taken under `DeathScreen` before Respawn is pressed, and once under
+`immediate_respawn`, asserting nothing is written and the next moment is not blocked. It also
+stages three arrivals and compares each capture with the same view 200
+ticks later: a Nether portal walked in survival, where the advancement it grants may win; a
+teleport into the Nether, `watchDimension`'s alone with no overlay; and an end portal. It stages
+them twice, at the framework's render distance of 5 and at vanilla's 12. At 5 the view fills
+in a few ticks, which is how the first fix for this passed there and failed at 12. The
+Ender Dragon's sequence and a raid's exist only as packet sequences in `BossBarTrackerTest`. Earn
 an advancement, die, portal and kill a boss by hand before a release; watch the death path in
 particular, since `DEATH_PENDING_TIMEOUT_FRAMES` is the one constant in the design picked without
 measurement and its failure is silent.
+
+**The Modrinth disclosures are a release check too, and they block the release.** Modrinth unlisted
+the project once for a missing AI disclosure (#67), and its rules require disclosures to stay
+accurate and match what the project says elsewhere. The disclosure is a project setting, so
+`release.yml` can neither set nor check it. Before publishing a GitHub release, make the
+project's Settings → Disclosures match `AI_DISCLOSURE.md`. The same goes for work done here: an
+image or a translation made with AI changes `AI_DISCLOSURE.md` and the README's AI section in the
+same commit.
 
 **A `Checkbox` cannot be clicked by a client game test.** `clickScreenButton` resolves the key to a
 string and then walks the screen's renderables, but its matcher handles `Button` and `CycleButton`
@@ -86,7 +123,7 @@ skipped. That is why `GuiAutoCaptureSettings`' per-trigger toggles are `CycleBut
 reads a cycle button's *name* (the plain translation) rather than its rendered "Death: ON" label, so
 the label can carry live state and still be findable. The related rule is that a plain `Button`
 whose label carries a substitution is equally unfindable — see the big-screenshot size button in
-`SettingsScreenTest`, which is only asserted on, never pressed. `copyPath` *is* covered, end to end through the real GLFW clipboard, in
+`SettingsScreenTest`, which is only asserted on, never pressed. `copyPath` *is* covered, end to end through vanilla's real clipboard, in
 `SharePopupTest`, and `NativeShare.reveal`'s choice between revealing, opening the folder and giving
 up is covered in `NativeShareTest` by running harmless commands with known exit codes.
 
@@ -118,7 +155,7 @@ Yarn is gone — its last release ever was `1.21.11+build.6` — and there is no
 ```bash
 # the client jar for the version in gradle.properties
 URL=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print([v['url'] for v in d['versions'] if v['id']=='26.2'][0])")
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print([v['url'] for v in d['versions'] if v['id']=='26.3'][0])")
 curl -s "$(curl -s "$URL" | python3 -c "import json,sys;print(json.load(sys.stdin)['downloads']['client']['url'])")" -o mc.jar
 javap -p -classpath mc.jar net.minecraft.client.gui.components.Button
 ```
@@ -157,7 +194,7 @@ Three consequences worth recognising rather than re-diagnosing:
 
 **The split is kept deliberately.** For a client-only mod it buys nothing at runtime, and collapsing
 everything into `src/main/java` would remove both the launch warning and the test classpath wiring.
-It stays because it is the layout Fabric's own 26.2 example mod ships, so it is what anyone who has
+It stays because it is the layout Fabric's own 26.3 example mod ships, so it is what anyone who has
 seen another Fabric mod expects — and rearranging every file changes nothing a player can observe.
 Worth revisiting some time that is not immediately before a release.
 
@@ -177,12 +214,26 @@ acquiring the surface through presenting it, and both injections belong in the l
 is no longer `RenderTarget.blitToScreen` — that method is gone — but a blit of the main render
 target's texture onto the window's swapchain surface.
 
+**26.3 moved that surface, and everything around it, into `com.mojang.renderpearl`.** The injection
+point is structurally identical but its descriptor is not:
+`Lcom/mojang/renderpearl/api/device/GpuSurface;blitFromTexture(Lcom/mojang/renderpearl/api/commands/CommandEncoder;Lcom/mojang/renderpearl/api/textures/GpuTextureView;)V`.
+`CommandEncoder`, `GpuDevice`, `GpuBuffer` and `GpuTextureView` all moved with it, and there is now
+a Vulkan backend (`com.mojang.renderpearl.backend.vulkan.VulkanGpuSurface`) under the abstraction.
+No mod source imports any of those types — the `@At` target string is the only place the rename
+reaches, which is why a whole-package move cost one line. `RenderSystem`, `NativeImage`, `Window`
+and `RenderTarget` stayed in `com.mojang.blaze3d`.
+
+`GameRenderer.render()` is also no-arg from 26.3 on (it was `render(DeltaTracker, boolean)`), and a
+new `GameRenderer.update(DeltaTracker)` runs earlier in the frame. The order the capture paths
+depend on is otherwise unchanged: `extract` → `executePendingTasks` → `render` →
+`getColorTextureView` → `blitFromTexture`.
+
 The resize is `Window.setWidth/setHeight` (which write `framebufferWidth/Height`, so they are the
 framebuffer setters despite the names) followed by **both** `GameRenderer.resize` and
 `Minecraft.framebufferSizeChanged()`. On 26.x `framebufferSizeChanged` only recalculates the GUI
 scale; nothing in `Minecraft` resizes the main render target for you, so omitting
 `GameRenderer.resize` leaves the frame rendering at the old size. `framebufferSizeChanged` is the
-`WindowEventHandler` entry point GLFW's own callback uses; `resizeGui` is a narrower GUI-only path
+`WindowEventHandler` entry point the platform's own resize callback uses; `resizeGui` is a narrower GUI-only path
 and is **not** a substitute.
 
 Five things here are load-bearing and were each found the hard way:
@@ -206,10 +257,16 @@ Five things here are load-bearing and were each found the hard way:
   override `resize`, so its forgiving size search never runs on this path.
 - **A second request mid-capture must be refused,** and the saved window size snapshotted only on
   the `REQUESTED → CAPTURING` transition. Otherwise the saved size is overwritten with the oversized
-  one and every restore path leaves the window permanently huge.
+  one and every restore path leaves the window permanently huge. The restore itself runs only
+  while the window still has exactly the size the capture applied (`owesRestore`): vanilla writes
+  the window's size on a resize and on a fullscreen change, and restoring the snapshot over that
+  leaves the game rendering at the old size. A capturing frame whose window is no longer the
+  applied size is not read back at all. A request is refused while any
+  other save is in flight as well, as a burst and a plain screenshot are: `beforeBlit` joins the
+  save counter without a cap.
 - **Captures are gated on `currentScreen == null && world != null`** — the modern
   `ScreenshotIncapable`. Resizing runs `Screen.resize`, which the manager turns into a full
-  `rebuildWidgets`, and with no world `ChatMessages` is silent, so a multi-second freeze would come
+  `rebuildWidgets`, and with no world the HUD is not drawn, so a multi-second freeze would come
   with no explanation. The gate has to be checked **twice**: `request()` runs from
   `RenderSystem.pollEvents()`, `beginCapture()` a whole tick later at the head of `renderFrame`, and a
   disconnect or a screen opening in between would land the resize in exactly the state it forbids.
@@ -219,22 +276,24 @@ expected and not a bug. `BigScreenshot` holds the size in a session static, whic
 `VoxelCamConfig` now persists and restores at startup — it was genuinely session-only, never
 written to disk, up to and including 2.3.0. PNG
 encoding runs on `Util.ioPool()`, so `ScreenshotHandler.saving` clears in that task, not
-at the call site, and its chat feedback is bounced back through `client.execute`.
+at the call site, and its notices are bounced back through `client.execute`.
 
 **Capture menu** — `F2` reaches every capture mode (ADR-0005). `CaptureMenu` is a renderer-free
 state machine ticked from `END_CLIENT_TICK`: a release before `HOLD_THRESHOLD_TICKS` is a tap and
 takes a plain screenshot, a longer hold opens the dial, and releasing fires the aimed wedge.
-`CaptureMenuHud` draws it as a Fabric `HudElement`, rasterised on a coarse grid of filled
-rectangles because the extractor draws nothing else. The HUD is also what feeds the aim, recomputing
-it from the live cursor every frame. So an aim a test writes by hand does not survive the next
-frame, and an aimed test has to move the real cursor.
+`CaptureMenuHud` draws it from `HudMixin`'s `TAIL` injection, beside the capture status,
+rasterised on a coarse grid of filled rectangles because the extractor draws nothing else. It was a
+Fabric `HudElement` until 2.5.0, and those are not extracted with the HUD hidden (F1). The HUD is
+also what feeds the aim, recomputing it from the live cursor every frame. So a menu that is not
+drawn cannot be aimed either, an aim a test writes by hand does not survive the next frame, and an
+aimed test has to move the real cursor.
 
 Five things here each cost a playtest to find:
 
 - **The press is read from every route at once.** VoxelCam's binding and vanilla's screenshot key
   share `F2`, and vanilla's key map gives the press to exactly one of them. So `CaptureMenu` reads
-  the mapping's clicks, its down-state, and GLFW's raw state for the bound key (through
-  `KeyMappingAccessor`), and arming is idempotent. A release is any tick where something is armed
+  the mapping's clicks, its down-state, and the platform's raw state for the bound key
+  (`InputConstants.isKeyDown`, reached through `KeyMappingAccessor`), and arming is idempotent. A release is any tick where something is armed
   and the key is not held, which is what catches a tap shorter than a tick. Reasoning about which
   route is live was wrong twice. `CaptureMenuTest` presses the real key, which is what settled it.
 - **`ScreenshotRecorderMixin` ignores a grab only while the capture binding is held or the menu is
@@ -251,26 +310,99 @@ Five things here each cost a playtest to find:
   the pause screen has already opened, and a cancel that pauses the game is not a cancel. A
   cancelled hold latches until the key comes up, or the next tick reopens the menu. The pointer is
   *hidden* while aiming, not disabled, because disabling it hands the deltas back to mouse-look.
+  `MouseHandlerMixin` drops button presses and the wheel for the same span: with no `Screen` up,
+  vanilla takes a press on a released mouse as "click to regain focus", re-grabs it, re-centres
+  the cursor and then clicks the button's key mapping, and the wheel moves the hotbar regardless.
 
 The outer ring (`CaptureMenu.OPTION_RADIUS`) offers `Burst.DIAL_OPTIONS` and
-`BigScreenshotSize.DIAL_OPTIONS`: five values each, because eight would put labels 15° apart and
-colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. In a game test,
+`BigScreenshotSize.DIAL_OPTIONS`: four burst lengths (2–5 s, all of them) and five sizes, because
+eight would put labels 15° apart and colliding. `subOptionForAngle` clamps rather than wraps at a wedge's own edges. Below about 290 GUI pixels of height
+(854x480 is 240) the lowest labels reach vanilla's hotbar and the hearts/food row, so
+`CaptureMenuLabels.plate` pulls such a label in along its own ray until it clears them. A pulled
+label lands inside `OPTION_RADIUS`, so that option alone starts being selected where its label
+begins (`CaptureMenuLabels.optionRadii`, which the HUD hands `setAimOffset` each frame and draws
+that arc segment at). Moving only the label left steering onto "8k" or "2s" releasing with the old
+size; the radius only ever comes down, so every aim that picked an option still picks it. In a game test,
 `moveCursor` moves the raw cursor while aim is GUI-scaled, so a vector that clears the dead zone
 may not clear the ring.
 
-**Burst** — a run of plain-size captures across consecutive frames, grouped in the manager as one
-key frame with the rest folded under it (ADR-0006). `Burst.request()` reserves every frame's name
-up front and synchronously, and `beforeBlit()` issues one frame per call. `MAX_IN_FLIGHT` is the
-schedule rather than a timer, because each in-flight frame is a full-resolution `NativeImage` held
-until `Util.ioPool()` encodes it. `ScreenshotHandler`'s save latch is a counted guard
+**Burst** — a few seconds of play captured at `Burst.FRAMES_PER_SECOND` (10), grouped in the
+manager as one key frame with the rest folded under it (ADR-0006). Its length is in seconds
+(`getSeconds()`, 2–5, default 3; persisted as `burstSeconds`), so a 3 s burst is 30 slots, one every
+`FRAME_INTERVAL_MILLIS`. `Burst.request()` reserves every slot's name up front and synchronously.
+`beforeBlit()` issues a frame on the first blit in each slot's time (`dueSlot`), gated by
+`MAX_IN_FLIGHT`, because each in-flight frame is a full-resolution `NativeImage` held until
+`Util.ioPool()` encodes it. A slot that passes while the cap is full is **skipped, never caught
+up**: catching up would bunch frames, while skipping costs one frame and the recorded offsets keep
+playback true to time. Frames are numbered by issue order, so names stay contiguous across a skip. `ScreenshotHandler`'s save latch is a counted guard
 (`beginSave`/`endSave`/`joinSave`) for the same reason, shared by all three capture paths.
 
 Unlike `BigScreenshot`, a late burst consumer is harmless: it only writes a file to a name already
-reserved for it, so no generation tag is needed. The end-of-burst chat line waits in
+reserved for it, so no generation tag is needed. The end-of-burst notice waits in
 `frameCompleted` for every issued frame. Announcing off frame 0's own completion could land
-mid-burst, since completions race across the IO pool. `VoxelCamIO` collapses groups by filename so
+mid-burst, since completions race across the IO pool. A burst the gate or a failed readback stops
+(`abort`) while a later slot was still to come says it was cut short in that same notice
+(`completionNotice`), naming no cause the gate does not know (a death, a portal and a menu all fail
+it alike), and kept short enough to fit the default window with its file name; a skipped slot is not an early end and keeps the plain wording. `VoxelCamIO` collapses groups by filename so
 search stays zero-I/O. The filmstrip orders by the embedded `burstindex`, and Set as Key swaps
 bytes, not names. Rename and delete take the whole group, with rollback.
+The collapse is one level deep, so rename refuses any name that would fold the renamed file under
+another screenshot (`VoxelCamIO.nameFoldsUnderAnotherScreenshot`, also what `RenamePopup` asks): a
+key frame hidden that way would strand its own frames in no row and no filmstrip.
+It refuses the other order too (`nameTakesInAnotherScreenshot`): a name that a screenshot already
+in the folder would fold under ends in the same place.
+The byte swap has one exception, recorded in ADR-0006: `VoxelCamIO.setAsKey` writes each file's
+favorite flag back to the path it was on. The star is the burst's and is read from the key's path,
+so it is the one tag that does not travel with the image.
+
+**Export Animation** (`AnimatedPng`) writes a burst already on disk as one APNG beside its key,
+`<key>_animation.png` (ADR-0014). Frame 0 is stored whole; every later frame is a `FramePatch`, the
+even-aligned rectangle that changed, unchanged pixels transparent, written as RGBA `fdAT`s with blend
+OVER and dispose NONE. Order and frame delays come from the `BurstFrame` tags, never from file names,
+since Set as Key breaks name order. The export decodes one frame at a time on `Util.ioPool()`
+(`AnimatedPng.PixelDecoder`, `NativeImage` in game), feeds the same pixels to the APNG and WebP
+writers, writes through temp files, and refuses frames of different sizes instead of writing a
+corrupt file. The result is tagged `voxelcam:animationframes`, which is
+the only thing that tells the manager it moves: everything else in the mod sees an ordinary PNG of
+the first frame. Set as Key and Export share one stacked column at the filmstrip's right end, so the
+second button costs the strip no cells.
+
+The preview plays a tagged animation through `AnimationPreview`, because `NativeImage` (like any
+decoder that does not know APNG) only ever decodes frame 0. `AnimatedPng.splitFrames` rebuilds each
+frame's patch as a standalone PNG (pure bytes); the loader thread decodes each, composites it onto a
+canvas with `FramePatch.composite`, snapshots the canvas scaled to at most 1024px, and uploads one
+texture per frame. Only the selected animation is held; the still from `ScreenshotImageCache` is drawn
+until its frames land, and that still is frame 0, so the switch is seamless. An APNG that disposes
+frames (which `AnimatedPng` never writes) stays a still.
+
+Every export also writes `<key>_animation.webp` beside the APNG, from the same frames, through
+`AnimatedWebp`: a pure-Java lossless (VP8L) encoder. Discord plays an animated WebP but shows an
+APNG as its first frame. The WebP is a sidecar, not a screenshot: the manager never lists it, and
+`AnimatedPng.webpBeside` is how rename and delete carry it along (as a group member, with
+rollback) and how `SharePopup` hands it out in the APNG's place. After the first frame, each frame
+is the same `FramePatch` the APNG uses, so a burst of a still scene costs little more than one
+frame. Each image gets subtract-green, a
+per-16x16-block predictor, hash-chain LZ77 (distances other than left and above are sent as
+distance + 120, skipping the spec's 2D table) and a 1024-entry colour cache, but no meta prefix
+codes or colour transforms. It lands within 5–16% of libwebp's lossless size, was checked
+bit-exact against libwebp, and `AnimatedWebpTest` keeps that honest with its own decoder for
+exactly this subset; extend that decoder with any feature you add to the encoder.
+
+When the sharing WebP is over Discord's free limit (`SmallerShareCopy.DISCORD_LIMIT_BYTES`), Save a
+copy and Get a share link open `ShareSizePopup` first: a smaller copy (recommended) or full
+resolution, Escape and Cancel sending nothing. The smaller copy is re-rendered from the APNG's
+composited frames, area-averaged down to a scale estimated from the full copy's size (side ∝ √bytes,
+15% headroom) and retried smaller if it misses; it lives in a temp folder as
+`<name>_discord.webp`, is reused for a second send, and is deleted when the share popup closes.
+A popup that another screen replaces (a death, a disconnect) gets `removed()` and never
+`onClose()`, so the cleanup hangs off `removed()` too, with opening its own size prompt as the one
+departure that is not leaving. If that prompt is itself replaced, a copy already made stays until
+the game exits. A late link or a pending send asks `LateShare.popupStillOpen` first.
+Reveal and Copy path never ask: they point at the file on disk.
+
+Burst frames themselves are written by `PngEncoder`, not `NativeImage.writeToFile`: RGB when
+opaque, the best of the five PNG filters per row, zlib 6. That is about 37% smaller than stb's
+output. Single captures still use the vanilla encoder.
 
 **Embedded metadata** — capture context, provenance, favourites, burst membership and moment tags
 are all `iTXt` chunks under `voxelcam:*` keywords, spliced into the PNG after `NativeImage` writes
@@ -284,8 +416,8 @@ records the server-list name, never the address (ADR-0003). `ModProvenance` cura
 `ShaderPack` reads Iris entirely by reflection (ADR-0009).
 
 **Automatic capture** — four vanilla-visible signals arm a single plain-size screenshot nobody
-pressed a key for: an advancement toast, a boss bar emptying and disappearing, the player's own
-death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
+pressed a key for: an advancement toast, a boss bar disappearing because its boss died, the player's
+own death, and a first arrival in a dimension. `AutoCapture` is the dispatcher, `MomentTrigger` the enum
 the dispatcher and the settings screen both iterate (so a trigger is never named individually), and
 `MomentTag` the PNG tags — `voxelcam:trigger`, `voxelcam:momentsubject` — that let the manager say
 afterwards why a file nobody asked for exists. All four ship **on**, each individually toggleable;
@@ -306,33 +438,75 @@ from becoming one mechanism per trigger. Two arrive from mixins, two are watches
   so any content mod granting one through the vanilla system arrives with no adapter.
 - `BossHealthOverlayMixin` at `HEAD` of `update`, handing the packet to `BossBarSignal`.
   `ClientboundBossEventPacket.Handler` is a public interface whose methods all have defaults, so
-  `packet.dispatch(...)` reaches add/progress/remove with no accessor and no reflection.
+  `packet.dispatch(...)` reaches add/progress/name/remove with no accessor and no reflection.
+  The name is followed because it is what a bar's owner is recognised by, and what the
+  screenshot is tagged with.
   **`HEAD`, not the more obvious `TAIL`:** the moment is the *removal*, and whether it was a kill
   depends on the bar's progress just before it vanished — vanilla drops the entry, and that
   progress with it, while handling the packet, so running afterwards leaves nothing to judge by.
   `BossBarTracker` keeping its own copy is the point, not duplication.
+  **A removal is a kill on either of two grounds,** because vanilla's bosses disagree about what
+  a dead boss's bar looks like. The Ender Dragon's bar is driven to zero and removed 200 ticks
+  later, so a bar that *changed* to empty within `DEFEATED_WINDOW_TICKS` (400) is a kill. The
+  window is what keeps a won raid out: its bar empties at the win and is removed 600 ticks later.
+  Not entirely: a player who leaves or enters the raid's range inside the window still reads as a
+  kill, which the Javadoc on `DEFEATED_WINDOW_TICKS` spells out as a known gap.
+  It runs from the last change and not from the first low reading, or a dragon left on a sliver
+  before the final blow would time out. The Wither stops writing its bar at the killing blow
+  (`customServerAiStep` does not run for a dying mob), so its bar goes still showing the health
+  the blow landed on; what says kill is a mob with the bar's name dying in the client level, which
+  is still there because `ServerEntity.removePairing` takes the bar away before the entity. The
+  clock is the level's game time, since both vanilla delays are counted in server ticks.
 - Death and new-dimension need no mixin: both are plain client state.
 
-Four things here are load-bearing:
+Five things here are load-bearing:
 
 - **The gate drops rather than defers.** An automatic capture that fires at the wrong moment is
   worse than one that never fires — a shot of the inventory screen the player opened ten seconds
   later is not the moment, and a feature producing those is one nobody leaves switched on. So a
-  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`)
-  and dropped when it is the player's own doing (any other screen), or when the level or player is
-  gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
+  pending capture is held only when the obstruction will clear on its own (a `LevelLoadingScreen`,
+  or an arrival not yet in view) and dropped when it is the player's own doing
+  (any other screen), or when the level or player is gone. This is a *policy* gate, not the technical one `BigScreenshot` and `Burst` need: a
   window-size capture resizes nothing, so none of these states is unsafe to shoot in.
+  A held capture menu is the player's own doing too, and it is not a `Screen`, so it has its own
+  term in both places: `shouldArm` refuses from key-down, and `gateFor` drops a moment the menu
+  was armed over. Captured instead, the frame has the dial in it, and the moment's save can refuse
+  the selection the player releases.
 - **The pending countdown does not run under a `LevelLoadingScreen`.** That screen is already
   bounded by its own completion, so counting frames against it only races chunk-load speed — and
   losing that race fails *silently*, with a cold Nether portal producing no screenshot and nothing
   said about why. A load that never finishes ends in a disconnect, which `forgetSession()` handles.
+- **A moment armed for an arrival waits for the arrival to come into view.** Vanilla closes the
+  loading screen once the player's own section is ready, so the first frame after it is fog, the
+  End's empty sky, or the portal overlay at nearly full strength. An arrival is a change of
+  dimension (joining a world is not one), and the moment armed for it is the new-dimension one,
+  or the advancement for entering the dimension, which arrives with it and usually wins the
+  cooldown. Anything armed before the view settles counts; anything armed later does not wait.
+  `ArrivalWatch` decides, from the renderer's visible-section count holding unchanged for
+  `STEADY_TICKS` (10) and the portal overlay back at zero. Until then the open frame reads as
+  `ScreenKind.ARRIVING`, which waits. The count climbs in bursts as chunks arrive and stops when
+  the view is in. The readings that look like better signals are not: `expectedChunks()` never
+  empties at render distance 5, and empties with a third of the view drawn at 16, and
+  `hasRenderedAllSections()` is true with nothing on screen. Nothing read on the first tick after
+  the screen closes counts, because the renderer can still describe the level just left. A
+  player who walks more than `WANDER_BLOCKS` (8) away first has made the moment their own doing,
+  and it is dropped. So is one whose view has not held still after `TIMEOUT_TICKS` (600), a
+  backstop well past the slowest arrival measured.
 - **`DEATH` waits for `DeathScreen` rather than racing it.** `AutoCapture.tick` runs at
   `END_CLIENT_TICK`, but the screen is opened from `handlePlayerCombatKill`, a server-driven packet
   a variable number of ticks later. Shooting on the first open frame would give a clean shot or the
   red-overlay shot depending on latency — the same trigger, two different screenshots. So `DEATH`
   alone inverts two rows of the gate: no screen means WAIT, `DeathScreen` means CAPTURE.
   `DeathScreen` draws the world behind itself rather than replacing it, so the moment is still in
-  the shot.
+  the shot. **So a death under the `immediate_respawn` gamerule is never captured, by design.**
+  `handlePlayerCombatKill` respawns instead of opening the screen when
+  `LocalPlayer.shouldShowDeathScreen()` is false, and `gateFor` drops such a death on its first
+  frame (`deathScreenComing`) rather than holding the one pending slot for a screen that is never
+  coming. That first frame does show the dying player at the death spot (empty hearts, the hurt
+  tilt, no red tint, no "You Died"): `runTick` renders straight after the tick that arms the
+  death. It is deliberately not taken. It is not the death-screen shot every other death gets,
+  and the kill packet has already requested the respawn, so whether the death arms at all and
+  every later frame depend on latency. Capturing it would make the trigger intermittent.
 - **The cooldown is global, charged at arm time, and handed back on a drop.** One automatic capture
   per window whatever caused it: first trigger in a window wins, the rest are dropped silently,
   because a cascade of advancements a second apart is one moment to the player and not five files.
@@ -341,11 +515,42 @@ Four things here are load-bearing:
   trusted from the file — a hand-edited zero would turn a cascade into a screenshot per toast.
 
 `ScreenshotHandler.captureMoment` refuses **silently** rather than reusing `captureNow`, whose
-refusal path sends `voxelcam.savingpleasewait` to chat: nobody asked for this screenshot, so nobody
+refusal path posts a busy notice: nobody asked for this screenshot, so nobody
 wants to be told at length why it did not happen. `MomentTag` threads through
 `saveCapturedImage`/`write`/`embedMetadata` as a fourth nullable parameter, kept separate from
 `BurstFrame` rather than bagged with it because `burst` carries *behaviour* (completion accounting,
-chat suppression) while `moment` carries only tags and a chat key.
+notice suppression) while `moment` carries only tags and a notice key.
+
+**Capture status HUD** — every capture's feedback (busy, saved, failed, refused) is a notice
+posted to `CaptureStatus` and drawn top-left by `CaptureStatusHud` (ADR-0013). Completions are
+*posted*, never polled, because the save counter drops to zero on the IO pool between two frames.
+The one save that posts nothing is one that dies with an `Error`; the catch in
+`ScreenshotHandler.write` says why.
+The ambient "Saving screenshot…" line, with a spinner, is the one derived state. It shows from a
+save's first frame and is held for at least `BUSY_MIN_SHOW_MILLIS`, so a quick plain shot does not
+flicker it. The save's own result notice ends that hold early. While a save really is running it
+shows for at most `BUSY_MAX_MILLIS`, because `AWAITING_READBACK` has no frame budget and a lost
+consumer would otherwise light it for the session. It is read from `Burst.isBusy()` as well as
+the counter, because the counter touches zero between burst frames. The spinner is eight dots
+whose brightness moves round, because the extractor fills rectangles and nothing else.
+
+Two things are load-bearing:
+
+- **`CaptureStatus.beforeFrame()` runs last in `voxelcam$beforeFrame`, and the HUD is blank on any
+  frame it says will be read back.** Extraction precedes the blit every capture reads from, so
+  anything drawn on a captured frame is in the PNG. Each path contributes its own condition:
+  `BigScreenshot.isCapturing()`, `CaptureMenu.capturesThisFrame()`, `Burst.isBusy()` and
+  `AutoCapture.capturesThisFrame()`. That last one is the frame the moment's gate takes, not every
+  frame it is pending, which during an arrival can be seconds. A new capture path has to add its own, or its frames carry
+  whatever notice is up. `CaptureStatusHudTest` checks pixels for this: it asserts the accent
+  bar is in the presented frame, then asserts it is absent from a menu tap, every burst frame
+  and a big screenshot.
+- **It is drawn by `HudMixin` at `TAIL` of `Hud.extractRenderState`, not a Fabric `HudElement`,**
+  so that it survives F1. The method's other return is the `LevelLoadingScreen` early-out, which
+  `TAIL` does not touch. The capture menu is drawn from the same injection for the same reason,
+  ahead of the capture status, and `CaptureMenuTest` aims and releases it with the HUD hidden.
+
+`captureStatusHud` in `voxelcam.json` switches it off, which leaves no capture feedback at all.
 
 **Manager UI** — `GuiScreenShotManager` is the hub: `ScreenshotListWidget` (rows) on the left,
 preview on the right, actions along the bottom. `VoxelCamIO` owns the file list, current selection,
@@ -353,6 +558,11 @@ rename, and delete. `ScreenshotMetadata` caches per-file dimensions/size/display
 embedded capture context, and the starred flag. Everything the extract pass shows goes through it —
 nothing else in the GUI calls `Favorite` or `PngDimensions` itself, and `VoxelCamIO.isSelectedFavorite`
 stays uncached only because the game test wants the flag from the file rather than from the cache.
+That cache is keyed by path, and a path can change hands while the manager is open, so the popups
+rename and delete through `ScreenshotMetadata.renameSelectedAndForget`/`deleteSelectedAndForget`,
+which evict every path the operation leaves or lands on, burst frames included. Calling
+`VoxelCamIO.rename`/`delete` straight from a screen brings back a row drawn with another file's
+star, size and dimensions.
 
 Five invariants that are easy to break:
 
@@ -375,17 +585,38 @@ Five invariants that are easy to break:
   session.
 - **Popups (`RenamePopup`, `DeletePopup`, `SharePopup`) return via `client.setScreenAndShow(parent)`.** The
   manager overrides `repositionElements()` to `rebuildWidgets()` so it rebuilds — that is what picks
-  up files renamed or deleted while a popup was open, not just resize handling.
+  up files renamed or deleted while a popup was open, not just resize handling. The rebuild also
+  runs the no-arg `setInitialFocus()`, and after an arrow key or Tab vanilla's default lands on
+  the search field and switches the shortcuts off. The manager overrides it to focus the
+  highlighted row through `setInitialFocus(list)`, not `setFocused(list)`: a list focused with no
+  focused row is outside the focus path, the next rebuild's `clearFocus()` misses it, and the
+  arrows then move a selection the highlight no longer shows. A search being typed keeps the field
+  and its cursor across a rebuild. `ManagerFocusTest` plays every return with real input.
 - **That rebuild is also why the manager's own `selected` field is not authoritative.** It predates
   whatever the popup just did, and after a rename it names a file that no longer exists, so `init()`
   and `refreshFiles()` both resolve through `VoxelCamIO.selectionFor`. Falling back to the head of the
   list instead moves the player onto whichever screenshot the sort puts first — the one the next
-  Delete would be aimed at.
+  Delete would be aimed at. A delete is the same case: `VoxelCamIO.delete(listed)` leaves its
+  selection on the row beside the deleted one, taken from the rows the manager passes in, because
+  favorites only is the manager's filter and the next file in the folder may have no row. The
+  flip side is that `VoxelCamIO`'s selection outlives the screen, so the manager's constructor
+  calls `VoxelCamIO.forgetSelection()`: every way in builds a new manager and every return hands
+  back the same one, and without it a new opening landed on whatever the last session left
+  selected instead of the screenshot just taken.
+
+**A screen shortcut on a key vanilla binds globally never reaches `Screen.keyPressed` by itself.**
+`KeyboardHandler.keyPress` offers each press to `Minecraft.handleGlobalKeyPress` first (fullscreen,
+the screenshot key) and returns if it is taken, so the manager's F2 rename shortcut used to take a
+screenshot of the manager instead. `MinecraftClientMixin` answers false at the head of that method
+for the one press `GuiScreenShotManager.claimsFromGlobalKeys` claims, which is F2 under the same
+condition as the shortcut itself. `RenameShortcutTest` presses the real key for this reason: a test
+that calls `keyPressed` passes with or without the injection.
 
 **Sharing** — `SharePopup` offers four targets, none needing credentials: `NativeShare.saveCopy`
-(LWJGL `TinyFileDialogs` native Save-As, run on `Util.ioPool()` because it blocks and
-drives AppleScript on macOS), `NativeShare.revealInFileManager` (`open -R` / `explorer /select,`,
-falling back to opening the parent directory), `NativeShare.copyPath` (GLFW clipboard, **text only**),
+(SDL's native Save-As — **asynchronous**, so the dialog is shown on the calling thread and only the
+copy runs on `Util.ioPool()`; see the SDL trap below), `NativeShare.revealInFileManager`
+(`open -R` / `explorer /select,`, falling back to `NativeShare.openFolder`),
+`NativeShare.copyPath` (vanilla's clipboard, **text only**),
 and `CatboxUploader` (catbox.moe, no key; it signals refusals with HTTP 200 plus an error body, so the
 response is validated by checking for a `https://` prefix). `MultipartBody` exists because
 `java.net.http` ships no multipart publisher.
@@ -400,6 +631,11 @@ against, which is what keeps one set of byte-for-byte framing tests covering the
 `ofFile` checks existence eagerly, so a missing file still fails the future before any request is
 sent.
 
+The request timeout scales with the file (`CatboxUploader.timeoutFor`): `HttpRequest.timeout` runs
+until the response arrives and catbox answers only after the whole body, so a flat timeout is a cap
+on file size. A file over catbox's 200 MB limit fails the future with `TooLargeException` before
+anything is sent, which is the one upload failure `SharePopup` gives a reason for.
+
 **Title-screen button** — `VoxelCamClient` registers `ScreenEvents.AFTER_INIT` and appends a
 `PhotoButton` via `Screens.getWidgets(screen).add(...)`. It goes in vanilla's row of square icon
 buttons (friends, language, accessibility), found **by shape at runtime** — square and
@@ -412,11 +648,11 @@ under the menu above it. `TitleScreenButtonTest` guards exactly that. The slot p
 the row's own spacing, and there is a fallback to the old position past the bottom full-width row
 for menu-replacing mods.
 
-**Config** — `VoxelCamConfig` persists nine settings to `voxelcam.json` (Gson, under
-`FabricLoader.getConfigDir()`): burst length, big-screenshot size, the manager's sort mode, its
+**Config** — `VoxelCamConfig` persists ten settings to `voxelcam.json` (Gson, under
+`FabricLoader.getConfigDir()`): burst length in seconds, big-screenshot size, the manager's sort mode, its
 favourites-only filter, and the five automatic-capture settings (four per-trigger booleans plus
-`autoCaptureCooldownSeconds`). Only three mirror an existing session-static holder
-(`Burst.getLength()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other six live *only* on
+`autoCaptureCooldownSeconds`), and `captureStatusHud`. Only three mirror an existing session-static holder
+(`Burst.getSeconds()`, `BigScreenshot.getSize()`, `SortMode.current()`). The other seven live *only* on
 `VoxelCamConfig.current()` — `favoritesOnly` is read in the manager's `init()` and written in
 `toggleFavoritesOnly()`, and `MomentTrigger`'s per-constant getter/setter lambdas point straight at
 their own flat field — rather than keeping a second copy that could drift. The fields stay flat, and
@@ -435,9 +671,15 @@ Defaults are written as **field initialisers**, not applied after the parse: Gso
 finds no key for at whatever the constructor set, so a `voxelcam.json` written before a setting
 existed keeps that setting's default instead of reading as `false`/`0`.
 
-`Burst.setLength`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
+Each `saveCurrent()` is its own task on `Util.ioPool()`, which has several threads, so the writes
+carry a sequence number taken on the calling thread. `saveIfNewest` takes one lock, drops a
+snapshot older than the one on disk, and `save` writes `voxelcam.json.tmp` and moves it over the
+file. Unordered truncate-and-write could interleave two saves into JSON that no longer parsed, which
+`load` answers with defaults that the next change writes over every setting.
+
+`Burst.setSeconds`, `BigScreenshot.setSize`, and `SortMode.setCurrent` deliberately do **not** call
 `VoxelCamConfig.saveCurrent()` themselves — that would touch `FabricLoader.getInstance()` from
-`BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setLength`
+`BurstTest`'s and `BigScreenshotTest`'s no-client unit suites, which currently exercise `setSeconds`
 directly. `saveCurrent()` is instead called explicitly from every place a setting actually changes
 at the player's hand: the capture menu's outer ring, `BigScreenshotCommand`, and the manager's sort
 button and favourites toggle — all of which already need a live client to run at all. `load()` (once,
@@ -448,15 +690,43 @@ writing straight back.
 A settings screen (`GuiSettings`, reachable from a gear button in the manager, or from Mod Menu if
 installed — `VoxelCamModMenu`, `compileOnly` in `build.gradle` so it costs nothing for a player who
 does not have Mod Menu) reaches burst length across its full range and every `BigScreenshotSize`
-preset, complementing the ring's five-value ladders for each. An "Automatic capture…" row opens
+preset, complementing the ring's ladders for each. An "Automatic capture…" row opens
 `GuiAutoCaptureSettings` — its own screen rather than four more rows, because `GuiSettings`
-positions its rows by hand off `height / 2` with no scrolling and would sit at the edge of the
-smallest GUI scale a player can pick.
+positions its rows by hand with no scrolling. A "Capture status" `CycleButton` is its fourth row.
+Since 2.5.0 the rows are block-centred on `height / 2`, as `GuiAutoCaptureSettings`' are, rather
+than anchored and grown downward. That leaves room for about three more at vanilla's smallest
+scaled height, and `SettingsScreenTest` resizes to 320x240 and fails if any widget leaves the
+screen, because `clickScreenButton` presses without a hit test and would not notice.
 
 ## Version-specific API traps
 
 These cost real debugging time and are not guessable from the class names:
 
+- **26.3 runs on SDL, not GLFW, and `org.lwjgl:lwjgl-glfw` is no longer a Minecraft library.**
+  Nothing can import `org.lwjgl.glfw`, so key codes come from `InputConstants`, which now exposes
+  the full set itself (`KEY_DELETE`, `KEY_BACKSPACE`, `KEY_F2`, `KEY_LEFT`, `KEY_RIGHT`,
+  `KEY_RETURN`, `KEY_NUMPADENTER`, `KEY_ESCAPE`) plus `PRESS`/`RELEASE`/`REPEAT`. Two further
+  signature changes come with it: `InputConstants.Type.KEYSYM` is now `Type.KEYBOARD` (`SCANCODE`
+  is gone), and `InputConstants.isKeyDown` lost its `Window` parameter. `Window.handle()` is now an
+  SDL window pointer, so what is left of raw platform access goes through `org.lwjgl.sdl.*` —
+  `SDLMouse.SDL_HideCursor()`/`SDL_ShowCursor()` is what `CaptureMenu` hides the pointer with.
+- **`lwjgl-tinyfd` went with GLFW, so the native Save-As dialog is SDL's and asynchronous.**
+  `SDLDialog.SDL_ShowSaveFileDialog` answers through a callback invoked later, on a thread SDL
+  does not document, where `tinyfd_saveFileDialog` blocked its own. Three consequences, all load-bearing:
+  nothing handed to SDL may live on the `MemoryStack`, because the stack frame is long gone by the
+  time the callback runs and SDL does not copy the filters — the filter struct, its strings and the
+  default location are malloc'd and freed in the callback, which is also the only place the
+  callback can free itself; a non-null but **empty** file list is a cancel while a null list is a
+  real failure, and conflating them turns "the user changed their mind" into a failure on the
+  popup's status line; and
+  SDL's simple entry point takes **no title**, so the OS default caption shows unless someone takes
+  `SDL_ShowFileDialogWithProperties`. None of this is reachable by a test.
+- **`Util` is `net.minecraft.util.Util` and `Util.OS` is now only a telemetry tag.** The enum and
+  `Util.getPlatform()` survive with the same constants, but the behaviour methods are gone —
+  including `openFile(File)`. `NativeShare.openFolder`/`openFolderCommand` is the replacement, built
+  on the same per-OS command seam as `revealCommand` so it stays testable without a file manager
+  opening on the tester's desktop.
+- **`DisplayInfo` is a record-style accessor from 26.3: `title()`, not `getTitle()`.**
 - **The GUI is retained-mode from 26.x on: widgets no longer draw, they extract render state.**
   `Screen.render` is `extractRenderState(GuiGraphicsExtractor, ...)`, `Button.renderContents` is
   `extractContents`, list entries implement `extractContent`, and the drawing calls are `text`,
@@ -482,8 +752,8 @@ These cost real debugging time and are not guessable from the class names:
 Files are **tab-indented**. Comments explain *why* — a constraint, a vanilla behaviour, a rejected
 alternative — not what the line does; match that rather than annotating mechanics.
 
-**`ChatMessages` silently does nothing when `client.player == null`**, which is the normal case since
-the manager is reachable from the title screen. New user-facing feedback belongs in the GUI, not chat.
+**Nothing goes to chat.** Capture feedback is a `CaptureStatus.post(kind, key, args...)` notice
+(ADR-0013); feedback inside a screen belongs on that screen.
 A refused rename keeps `RenamePopup` open with the typed name; a refused delete goes to the manager's
 details line via `reportDeleteResult`. Both add strings to **both** `en_us.json` and `en_pt.json`.
 
@@ -494,6 +764,26 @@ follow the player's system locale are the exception, not the rule.
 
 `GuiScreenShotManager` splits its content area on the golden ratio (`preview : list == φ : 1`) with a
 `MIN_LIST_WIDTH` floor that wins below ~430px of GUI width.
+That floor leaves a row's text about 80px at the default 854x480 window, so the rows and the details
+line are never cut at the pixel: `CaptionFit` drops whole facts, lowest-ranked first, leaving `…`
+where they were, and only free text (a name, an advancement title) is ever cut inside. The ranks
+live in its three builders — a capture's time to the second outranks its day, dimensions outrank
+size, and the details line runs animation, moment, location, dimensions, size, file name.
+Below ~362px the filmstrip's Set as key / Export animation column narrows too
+(`FilmstripLayout.actionWidth`), so that one cell always fits between the scroll buttons, and its
+two buttons take their `.short` labels where the full ones no longer fit. A button label that does not fit is not clipped:
+vanilla scrolls it inside the button. So only a label that would scroll by a large part of itself
+has a `.short` wording (Rename, Set as key, Export animation, and the search hint, which is
+neither scrolled nor clipped but runs on until the favorites star covers it), picked in `init()`
+by `LabelFit.keyFor` where the full one does not fit and the short one is shorter;
+Delete and Share overflow by a few pixels at 320 and are left to scroll. The cells
+are drawn after the widgets, so a cell the row has no room for is painted over a button; the cell
+count is never forced up to one. That arithmetic lives in `FilmstripLayout`, beside the manager and
+free of Minecraft types, for the reason `nameCollides` lives on `VoxelCamIO`: `FilmstripLayoutTest`
+sweeps the widths without loading a `Screen`.
+The cells themselves are kept between frames (`filmstripCells`): working them out lists the whole
+folder, and extraction asks every frame. `forgetFilmstripCells()` goes wherever the folder is
+listed again and after Set as key, which changes the strip's order.
 
 ## Known dead ends
 
