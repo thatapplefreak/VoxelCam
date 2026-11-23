@@ -341,6 +341,25 @@ class VoxelCamIOTest {
 		assertNull(VoxelCamIO.selectionFor(List.of(), null));
 	}
 
+	/**
+	 * The selection here outlives the manager, which is what lets it follow a file across a
+	 * popup's rebuild, and was also what reopened the manager a week back on whatever the last
+	 * session left selected. The older file is still listed, so only forgetting it lets a
+	 * fresh opening land on the screenshot just taken.
+	 */
+	@Test
+	void aFreshOpeningTakesTheHeadOfTheListOverTheLastSessionsSelection() throws IOException {
+		File old = shot("trip.png", 1_000L);
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+		VoxelCamIO.selectPhoto(old);
+		File justTaken = shot("just-taken.png", 2_000L);
+
+		VoxelCamIO.forgetSelection();
+		VoxelCamIO.updateScreenShotFilesList(dir.toFile(), "");
+
+		assertEquals(justTaken, VoxelCamIO.selectionFor(VoxelCamIO.getScreenShotFiles(), null));
+	}
+
 	@Test
 	void anAnimationsWebpCopyIsRenamedWithIt() throws IOException {
 		File animation = exportedAnimation("shot_animation.png");

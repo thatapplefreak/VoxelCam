@@ -253,6 +253,17 @@ public final class VoxelCamIO {
 	}
 
 	/**
+	 * Drops the selection for a manager being opened rather than returned to, so that
+	 * {@link #selectionFor} lands it on the head of the list: under the default sort, the
+	 * screenshot the player has just taken. The selection here outlives every screen, which
+	 * is what lets it follow a file across a popup's rebuild, but a new opening inherited it
+	 * too — a week-old file deep in the list, which Rename, Delete and Share then acted on.
+	 */
+	public static void forgetSelection() {
+		selected = null;
+	}
+
+	/**
 	 * Renames the selected screenshot, returning the new file — or null if it did not
 	 * happen, which the caller has to tell the player about: nothing here throws, the file
 	 * keeps its old name, and the manager re-lists it as if nothing had been asked.

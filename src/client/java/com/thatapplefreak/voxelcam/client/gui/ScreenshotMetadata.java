@@ -82,10 +82,9 @@ public final class ScreenshotMetadata {
 	 * learn its size would be far more expensive, and this runs for every visible row.
 	 *
 	 * <p>A header that would not read is remembered as absent rather than left uncached. A
-	 * 0-byte or truncated {@code .png} throws out of the header read every time, so retrying
-	 * costs an open, an {@code EOFException} built with its stack trace, and a close — per
-	 * visible row per extracted frame, on the render thread, for the one file that is
-	 * guaranteed never to answer.
+	 * 0-byte or truncated {@code .png}, or a file that is not a PNG at all, fails the header read
+	 * every time, so retrying costs an open, a read and a close — per visible row per extracted
+	 * frame, on the render thread, for the one file that is guaranteed never to answer.
 	 */
 	public static Dimensions dimensions(File file) {
 		if (file == null) {
